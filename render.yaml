@@ -1,0 +1,13 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# ダッシュボードでリポジトリと連携後、このファイルで Web サービスを定義できます。
+# 秘密はダッシュボードの Environment で設定してください。
+
+services:
+  - type: web
+    name: near
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production

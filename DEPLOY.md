@@ -15,23 +15,30 @@
 | `ADMIN_API_KEY` | 長いランダム文字列（管理 API 用） |
 | `PORT` | 未設定なら `3000`。Render 等が自動で付与する場合はそのまま |
 | `CRON_SECRET` | 任意（`/internal/reminders/dispatch` を保護する場合） |
-| `ADMIN_LINE_USER_ID` | 任意。未対応依頼の**実装提案**が生成されたとき、管理者の LINE にプッシュ通知（24h・同一要約指紋あたり1通まで） |
+| `ADMIN_LINE_USER_ID` | 任意。**成長フロー**で管理者へ第一段階承認・ヒアリング・最終承認・実装指示・進捗を LINE プッシュ（あなたの userId を設定） |
+| `GROWTH_AUTO_CODING_ENABLED` | 任意 `true`/`1`。自動コーディング runner（**未接続時はスタブ**で手動運用推奨） |
+| `GROWTH_AUTO_DEPLOY_ENABLED` | 任意 `true`/`1`。自動デプロイ runner（**未接続時はスタブ**。本番は既定オフ推奨） |
 | `PUBLIC_BASE_URL` | 任意。上記通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし） |
 | `LINE_BOT_USER_ID` | 任意。グループ／トークルームでは **@ボットのメンション** か **本文に「NEAR」「ニア」** がないと返信しない（1:1 は従来どおり）。メンション判定に使う。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |
 | `NEAR_WHATS_NEW` | 任意。改行可。「最近できるようになったこと」を NEAR が短く話すときの本文（デプロイごとに手更新） |
 
-初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001_init.sql` に続けて `002_growth.sql`）。
+初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001`〜`003_growth_flow.sql`）。
 
 ## NEAR 成長システム（運用の流れ）
 
-1. ユーザーが LINE で未対応依頼をすると `unsupported_requests` に記録され、非同期で `implementation_suggestions`（`cursor_prompt` 等）が生成されることがあります。
-2. `ADMIN_LINE_USER_ID` を設定していれば、提案作成時に管理者へ LINE 通知（クールダウンあり）。
-3. 管理 API（`Authorization: Bearer <ADMIN_API_KEY>`）で確認・承認します。
-   - `GET /admin/suggestions?status=pending` … 未承認一覧
-   - `GET /admin/suggestions/:id` … 1件（`cursor_prompt` をコピーして Cursor に貼る）
-   - `PATCH /admin/suggestions/:id` … `{"approval_status":"approved"|"rejected"|"implemented","review_notes":"…"}`（遷移: `pending`→`approved`|`rejected`、`approved`→`implemented`）
-   - `GET /admin/stats/fingerprint-demand` … 同種依頼の多い `message_fingerprint` ランキング
-4. コード変更は Cursor で行い、テスト後に Git へ反映・デプロイしてください（自動本番反映はしません）。
+1. ユーザーが未対応依頼をすると `unsupported_requests` に保存され、非同期で `implementation_suggestions` が作られます（`cursor_prompt` のたたき台含む）。
+2. `ADMIN_LINE_USER_ID` があると、管理者の LINE に**第一段階承認**（この成長候補で進めてよいか）が届きます。`growth_admin_sessions` でアクティブな提案が紐づきます。
+3. 管理者は LINE で「はい／いいえ」→**ヒアリング**（1問ずつ）→**第二承認**→**Cursor 向け指示の再生成＋プッシュ**、の順で進めます。メッセージ例: 進行中は `テスト完了`→`デプロイ準備OK`→実装後 `成長完了`（または管理 API の `complete`）。
+4. 管理 API（`Authorization: Bearer <ADMIN_API_KEY>`）の例:
+   - `GET /admin/suggestions?status=pending` … 第一段階 `approval_status` フィルタ
+   - `GET /admin/suggestions/:id` … 1件
+   - `GET /admin/suggestions/:id/hearing` … ヒアリング Q&A
+   - `PATCH /admin/suggestions/:id` … `approval_status`（`pending`→`approved`|`rejected`）、`implementation_state`、`deploy_safety_confirmed`（`deploying` へ進むとき必須）、`failure_reason` / `review_notes`
+   - `POST /admin/suggestions/:id/growth/second-approve` … 第二承認相当（LINE と同じ処理）
+   - `POST /admin/suggestions/:id/growth/complete` … 成長完了（`capability_registry` 追記・通知）
+5. **自動コーディング／自動デプロイ**は `coding_runner` / `deploy_runner` のアダプタ差し替えで拡張します。フラグオンでも未接続ならスタブが返るだけです。
+
+設計メモはリポジトリ内 `GROWTH.md` を参照してください。
 
 ## LINE Webhook
 

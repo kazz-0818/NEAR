@@ -2,8 +2,7 @@ import OpenAI from "openai";
 import { getEnv } from "../config/env.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
-import { messageFingerprint } from "../lib/messageFingerprint.js";
-import { notifyAdminNewSuggestion } from "../jobs/adminGrowthNotify.js";
+import { onSuggestionCreated } from "../services/growth_orchestrator.js";
 import {
   FEATURE_SUGGESTION_JSON_SCHEMA,
   featureSuggestionSchema,
@@ -42,6 +41,7 @@ export async function generateAndSaveSuggestion(input: {
 
   try {
     const sys = await systemPrompt();
+    const capabilityLines = await listCapabilityLines(input.db);
     const userPayload = JSON.stringify(
       {
         user_message: input.originalMessage,
@@ -49,7 +49,7 @@ export async function generateAndSaveSuggestion(input: {
         reason: input.intent.reason,
         suggested_category: input.intent.suggested_category,
         registered_intents: listRegisteredIntents(),
-        capability_lines: listCapabilityLines(),
+        capability_lines: capabilityLines,
       },
       null,
       2
@@ -72,11 +72,12 @@ export async function generateAndSaveSuggestion(input: {
 
     const ins = await input.db.query<{ id: string }>(
       `INSERT INTO implementation_suggestions (
-         unsupported_request_id, summary, required_apis, new_modules, data_stores,
+         unsupported_request_id, summary, required_apis, suggested_modules, data_stores,
          steps, difficulty, priority_score, raw_llm,
-         approval_status, cursor_prompt, improvement_kind, risk_level, estimated_effort
+         approval_status, cursor_prompt, improvement_kind, risk_level, estimated_effort,
+         implementation_state
        ) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8, $9::jsonb,
-         'pending', $10, $11, $12, $13)
+         'pending', $10, $11, $12, $13, 'not_started')
        RETURNING id`,
       [
         input.unsupportedId,
@@ -97,14 +98,12 @@ export async function generateAndSaveSuggestion(input: {
     const suggestionId = Number(ins.rows[0]?.id);
     if (!Number.isFinite(suggestionId)) return;
 
-    const fp = messageFingerprint(input.originalMessage);
-    await notifyAdminNewSuggestion({
-      db: input.db,
-      messageFingerprint: fp,
-      suggestionId,
-      summary: parsed.summary,
-      difficulty: parsed.difficulty,
-    });
+    await input.db.query(
+      `UPDATE unsupported_requests SET status = 'suggestion_created', updated_at = now() WHERE id = $1`,
+      [input.unsupportedId]
+    );
+
+    await onSuggestionCreated(input.db, suggestionId);
   } catch (e) {
     log.warn({ err: e, unsupportedId: input.unsupportedId }, "feature_suggester failed");
   }

@@ -13,6 +13,7 @@ import {
 } from "../lib/buildInfo.js";
 import { getLogger } from "../lib/logger.js";
 import { buildWhatsNewDraft, isWhatsNewCapabilityQuestion } from "../lib/whatsNew.js";
+import { tryHandleAdminGrowthLine } from "./growth_admin_line.js";
 
 async function saveIntentRun(
   db: Db,
@@ -37,6 +38,15 @@ export async function handleLineTextMessage(input: {
   const log = getLogger();
   const { db, replyToken, channelUserId, text, inboundMessageId } = input;
   const channel = "line";
+  const env = getEnv();
+
+  if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
+    const growth = await tryHandleAdminGrowthLine({ db, adminUserId: channelUserId, text });
+    if (growth.handled) {
+      await replyOrPush(replyToken, channelUserId, growth.reply);
+      return;
+    }
+  }
 
   if (isDeployTimeQuestion(text)) {
     const draft = buildDeployTimeDraft();
@@ -51,7 +61,7 @@ export async function handleLineTextMessage(input: {
   }
 
   if (isWhatsNewCapabilityQuestion(text)) {
-    const draft = buildWhatsNewDraft();
+    const draft = await buildWhatsNewDraft(db);
     let finalText = draft;
     try {
       finalText = await composeNearReply({ draft, situation: "success" });
@@ -110,7 +120,7 @@ export async function handleLineTextMessage(input: {
       });
 
       const draft =
-        "すいません、今はまだこのお願いには対応できません。ただ、今後できるように改善していきます。ひとまず内容は記録いたしました。";
+        "すいません、今はまだそのお願いには対応できません。ただ、できるように改善していきます。内容は記録いたしました。";
       let finalText = draft;
       try {
         finalText = await composeNearReply({ draft, situation: "unsupported" });

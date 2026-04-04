@@ -1,3 +1,4 @@
+import type { Db } from "../db/client.js";
 import { getEnv } from "../config/env.js";
 import { listCapabilityLines } from "../modules/capabilities.js";
 
@@ -66,9 +67,9 @@ export function isWhatsNewCapabilityQuestion(text: string): boolean {
   return false;
 }
 
-export function buildWhatsNewDraft(): string {
+export async function buildWhatsNewDraft(db: Db): Promise<string> {
   const env = getEnv();
-  const lines = listCapabilityLines();
+  const lines = await listCapabilityLines(db);
   const bullets = lines.map((l) => `・${l}`).join("\n");
 
   const parts: string[] = [

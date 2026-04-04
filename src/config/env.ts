@@ -51,6 +51,16 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** true / 1 で有効。未設定はオフ。自動コーディング runner（アダプタ未接続時はスタブ） */
+  GROWTH_AUTO_CODING_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /** true / 1 で有効。未設定はオフ。自動デプロイ runner（アダプタ未接続時はスタブ） */
+  GROWTH_AUTO_DEPLOY_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
 });
 
 export type Env = z.infer<typeof envSchema>;

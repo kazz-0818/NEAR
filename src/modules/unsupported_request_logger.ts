@@ -22,12 +22,14 @@ export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise
   const fingerprint = messageFingerprint(input.originalMessage);
   const improvementKind = inferImprovementKind(input.originalMessage, input.intent);
 
+  const normalizedMessage = input.originalMessage.normalize("NFKC").trim();
+
   const res = await input.db.query<{ id: string }>(
     `INSERT INTO unsupported_requests (
        channel, channel_user_id, original_message, detected_intent, why_unsupported,
        suggested_implementation_category, priority, status, notes, confidence, inbound_message_id,
-       message_fingerprint, improvement_kind
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'logged', $8, $9, $10, $11, $12)
+       message_fingerprint, improvement_kind, normalized_message, intent_guess
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'logged', $8, $9, $10, $11, $12, $13, $14)
      RETURNING id`,
     [
       input.channel,
@@ -42,6 +44,8 @@ export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise
       input.inboundMessageId,
       fingerprint,
       improvementKind,
+      normalizedMessage,
+      input.intent.intent,
     ]
   );
   const id = res.rows[0]?.id;

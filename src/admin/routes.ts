@@ -5,21 +5,23 @@ import { getEnv } from "../config/env.js";
 import { getPool } from "../db/client.js";
 import { listCapabilityLines } from "../modules/capabilities.js";
 import { listRegisteredIntents } from "../modules/registry.js";
+import { patchApprovalStatus, patchImplementationState } from "../services/approval_service.js";
+import { GROWTH_APPROVAL_STATUSES, IMPLEMENTATION_STATES } from "../services/growth_constants.js";
+import {
+  handleAdminAffirmativeFinalApproval,
+  handleAdminGrowthComplete,
+  startHearingFlow,
+} from "../services/growth_orchestrator.js";
 
-const APPROVAL_STATUSES = ["pending", "approved", "rejected", "implemented"] as const;
-type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
-
-function isAllowedApprovalTransition(from: string, to: ApprovalStatus): boolean {
-  if (from === to) return true;
-  if (from === "pending" && (to === "approved" || to === "rejected")) return true;
-  if (from === "approved" && to === "implemented") return true;
-  return false;
-}
-
-const patchSuggestionBody = z.object({
-  approval_status: z.enum(APPROVAL_STATUSES),
-  review_notes: z.string().nullable().optional(),
-});
+const patchSuggestionBody = z
+  .object({
+    approval_status: z.enum(GROWTH_APPROVAL_STATUSES).optional(),
+    implementation_state: z.enum(IMPLEMENTATION_STATES).optional(),
+    deploy_safety_confirmed: z.boolean().optional(),
+    failure_reason: z.string().nullable().optional(),
+    review_notes: z.string().nullable().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, { message: "empty patch" });
 
 export function createAdminApp(): Hono {
   const app = new Hono();
@@ -30,10 +32,12 @@ export function createAdminApp(): Hono {
     return bearer(c, next);
   });
 
-  app.get("/capabilities", (c) => {
+  app.get("/capabilities", async (c) => {
+    const pool = getPool();
+    const lines = await listCapabilityLines(pool);
     return c.json({
       registered_intents: listRegisteredIntents(),
-      user_visible_lines: listCapabilityLines(),
+      user_visible_lines: lines,
     });
   });
 
@@ -75,7 +79,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const params: unknown[] = [];
     let where = "";
-    if (status && APPROVAL_STATUSES.includes(status as ApprovalStatus)) {
+    if (status && GROWTH_APPROVAL_STATUSES.includes(status as (typeof GROWTH_APPROVAL_STATUSES)[number])) {
       params.push(status);
       where = `WHERE approval_status = $${params.length}`;
     }
@@ -99,6 +103,41 @@ export function createAdminApp(): Hono {
     return c.json(r.rows[0]);
   });
 
+  /** 第二承認（API 経由）。LINE と同じく cursor_prompt 再生成・通知まで実行 */
+  app.post("/suggestions/:id/growth/second-approve", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isFinite(id) || id < 1) return c.json({ error: "invalid id" }, 400);
+    if (!env.ADMIN_LINE_USER_ID) {
+      return c.json({ error: "ADMIN_LINE_USER_ID required for LINE notifications" }, 400);
+    }
+    const pool = getPool();
+    const msg = await handleAdminAffirmativeFinalApproval(pool, env.ADMIN_LINE_USER_ID, id);
+    return c.json({ ok: true, message: msg });
+  });
+
+  app.post("/suggestions/:id/growth/complete", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isFinite(id) || id < 1) return c.json({ error: "invalid id" }, 400);
+    if (!env.ADMIN_LINE_USER_ID) {
+      return c.json({ error: "ADMIN_LINE_USER_ID required for LINE notifications" }, 400);
+    }
+    const pool = getPool();
+    const msg = await handleAdminGrowthComplete(pool, env.ADMIN_LINE_USER_ID, id);
+    return c.json({ ok: true, message: msg });
+  });
+
+  app.get("/suggestions/:id/hearing", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isFinite(id) || id < 1) return c.json({ error: "invalid id" }, 400);
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, sort_order, question_key, question_text, answer_text, asked_at, answered_at
+       FROM growth_hearing_items WHERE implementation_suggestion_id = $1 ORDER BY sort_order`,
+      [id]
+    );
+    return c.json({ items: r.rows });
+  });
+
   app.patch("/suggestions/:id", async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isFinite(id) || id < 1) {
@@ -115,25 +154,36 @@ export function createAdminApp(): Hono {
       return c.json({ error: parsed.error.flatten() }, 400);
     }
     const pool = getPool();
-    const cur = await pool.query<{ approval_status: string }>(
-      `SELECT approval_status FROM implementation_suggestions WHERE id = $1`,
-      [id]
-    );
-    if (cur.rows.length === 0) return c.json({ error: "not found" }, 404);
-    const from = cur.rows[0].approval_status;
-    const to = parsed.data.approval_status;
-    if (!isAllowedApprovalTransition(from, to)) {
-      return c.json({ error: `invalid transition: ${from} -> ${to}` }, 400);
+
+    if (parsed.data.approval_status != null) {
+      const r = await patchApprovalStatus(pool, id, parsed.data.approval_status, parsed.data.review_notes ?? null);
+      if (!r.ok) return c.json({ error: r.error }, 400);
+      if (parsed.data.approval_status === "approved" && env.ADMIN_LINE_USER_ID) {
+        await startHearingFlow(pool, env.ADMIN_LINE_USER_ID, id);
+      }
     }
-    await pool.query(
-      `UPDATE implementation_suggestions
-       SET approval_status = $1,
-           review_notes = COALESCE($2, review_notes),
-           reviewed_at = now()
-       WHERE id = $3`,
-      [to, parsed.data.review_notes ?? null, id]
-    );
-    return c.json({ ok: true, id, approval_status: to });
+
+    if (parsed.data.implementation_state != null) {
+      const r = await patchImplementationState(pool, id, parsed.data.implementation_state, {
+        failureReason: parsed.data.failure_reason ?? undefined,
+        deploySafetyConfirmed: parsed.data.deploy_safety_confirmed === true,
+      });
+      if (!r.ok) return c.json({ error: r.error }, 400);
+    } else if (parsed.data.failure_reason != null || parsed.data.review_notes != null) {
+      await pool.query(
+        `UPDATE implementation_suggestions
+         SET review_notes = COALESCE($1, review_notes),
+             failure_reason = COALESCE($2, failure_reason),
+             updated_at = now()
+         WHERE id = $3`,
+        [parsed.data.review_notes ?? null, parsed.data.failure_reason ?? null, id]
+      );
+    }
+
+    const cur = await pool.query(`SELECT approval_status, implementation_state FROM implementation_suggestions WHERE id = $1`, [
+      id,
+    ]);
+    return c.json({ ok: true, id, ...cur.rows[0] });
   });
 
   app.get("/stats/fingerprint-demand", async (c) => {

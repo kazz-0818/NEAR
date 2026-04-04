@@ -16,7 +16,23 @@ export type ComposeInput = {
   draft: string;
   /** 状況: success | unsupported | error | followup */
   situation: "success" | "unsupported" | "error" | "followup";
+  /** ユーザーのその発言。言い回しのバリエーション・軽い相槌に使う（任意） */
+  userMessage?: string;
 };
+
+function temperatureForSituation(s: ComposeInput["situation"]): number {
+  switch (s) {
+    case "success":
+    case "followup":
+      return 0.78;
+    case "unsupported":
+      return 0.64;
+    case "error":
+      return 0.55;
+    default:
+      return 0.7;
+  }
+}
 
 export async function composeNearReply(input: ComposeInput): Promise<string> {
   const env = getEnv();
@@ -25,22 +41,30 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
 
   try {
     const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+    const userBits: string[] = [
+      `状況: ${input.situation}`,
+      "次のドラフトは骨子です。NEARの口調で1通にまとめてください。",
+      "- 事実・約束・次のアクション・列挙する内容はドラフトどおり。",
+      "- 表現・導入・つかみ・軽いユーモアや一言ツッコミは毎回変えてよい。決まり文句だけの返答は避ける。",
+      "- ユーザーの発言があれば、長くならない範囲で軽く拾ってよい。",
+      "- 読みやすいよう改行を入れる。",
+    ];
+    if (input.userMessage?.trim()) {
+      userBits.push("", `ユーザー発言: ${input.userMessage.trim()}`);
+    }
+    userBits.push("", "【ドラフト】", input.draft);
+
     const completion = await client.chat.completions.create({
       model: env.OPENAI_INTENT_MODEL,
       messages: [
         { role: "system", content: persona },
         {
           role: "user",
-          content: [
-            `状況: ${input.situation}`,
-            "次のドラフトを、NEARの口調に整えて1通の返信にしてください。意味は変えないでください。読みやすいよう改行を入れてください（話題の切れ目・結論と補足の間など）。",
-            "",
-            input.draft,
-          ].join("\n"),
+          content: userBits.join("\n"),
         },
       ],
-      max_tokens: 400,
-      temperature: 0.5,
+      max_tokens: 520,
+      temperature: temperatureForSituation(input.situation),
     });
     const text = completion.choices[0]?.message?.content?.trim();
     if (text) return text;

@@ -52,7 +52,7 @@ export async function handleLineTextMessage(input: {
     const draft = buildDeployTimeDraft();
     let finalText = draft;
     try {
-      finalText = await composeNearReply({ draft, situation: "success" });
+      finalText = await composeNearReply({ draft, situation: "success", userMessage: text });
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed (deploy time path)");
     }
@@ -64,7 +64,7 @@ export async function handleLineTextMessage(input: {
     const draft = await buildWhatsNewDraft(db);
     let finalText = draft;
     try {
-      finalText = await composeNearReply({ draft, situation: "success" });
+      finalText = await composeNearReply({ draft, situation: "success", userMessage: text });
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed (whats new path)");
     }
@@ -123,7 +123,7 @@ export async function handleLineTextMessage(input: {
         "すいません、今はまだそのお願いには対応できません。ただ、できるように改善していきます。内容は記録いたしました。";
       let finalText = draft;
       try {
-        finalText = await composeNearReply({ draft, situation: "unsupported" });
+        finalText = await composeNearReply({ draft, situation: "unsupported", userMessage: text });
       } catch (ce) {
         log.warn({ err: ce }, "composeNearReply failed (unsupported path)");
       }
@@ -169,7 +169,7 @@ export async function handleLineTextMessage(input: {
 
     let finalText = modResult.draft;
     try {
-      finalText = await composeNearReply({ draft: modResult.draft, situation });
+      finalText = await composeNearReply({ draft: modResult.draft, situation, userMessage: text });
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed, sending draft as-is");
     }
@@ -180,7 +180,7 @@ export async function handleLineTextMessage(input: {
       "申し訳ございません、少し調子が悪いようです。お手数ですが、もう一度お試しください。";
     let finalText = draft;
     try {
-      finalText = await composeNearReply({ draft, situation: "error" });
+      finalText = await composeNearReply({ draft, situation: "error", userMessage: text });
     } catch {
       /* draft のまま */
     }

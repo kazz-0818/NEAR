@@ -11,7 +11,11 @@ import { handleLineTextMessage } from "./services/orchestrator.js";
 import { replyOrPush } from "./channels/line/client.js";
 import { createAdminApp } from "./admin/routes.js";
 import { startReminderCron, dispatchDueReminders } from "./jobs/reminder_dispatcher.js";
-import { isLineGroupOrRoomSource, textMessageMentionsBot } from "./channels/line/groupMention.js";
+import {
+  isLineGroupOrRoomSource,
+  textContainsNearNameReferral,
+  textMessageMentionsBot,
+} from "./channels/line/groupMention.js";
 import { getDeployedAtIso } from "./lib/buildInfo.js";
 
 const app = new Hono();
@@ -94,14 +98,18 @@ async function lineMessagingWebhook(c: Context) {
     }
 
     const inGroup = isLineGroupOrRoomSource(source);
-    const groupMentionRequired = Boolean(envLine.LINE_BOT_USER_ID && inGroup);
-    if (groupMentionRequired) {
+    if (inGroup) {
       if (messageType !== "text") {
-        log.info({ messageId, messageType }, "group/room: skip non-text (mention required)");
+        log.info({ messageId, messageType }, "group/room: skip non-text (need mention or NEAR/ニア)");
         continue;
       }
-      if (!textMessageMentionsBot(message, envLine.LINE_BOT_USER_ID!)) {
-        log.info({ messageId }, "group/room: skip (no bot mention)");
+      const groupText = String(message.text ?? "").trim();
+      if (!groupText) continue;
+      const botId = envLine.LINE_BOT_USER_ID;
+      const mentioned = botId ? textMessageMentionsBot(message, botId) : false;
+      const nameRef = textContainsNearNameReferral(groupText);
+      if (!mentioned && !nameRef) {
+        log.info({ messageId }, "group/room: skip (no bot mention and no NEAR/ニア in text)");
         continue;
       }
     }

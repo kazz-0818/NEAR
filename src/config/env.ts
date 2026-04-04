@@ -38,8 +38,9 @@ const envSchema = z.object({
       return Number.isNaN(ms) ? undefined : new Date(ms).toISOString();
     }),
   /**
-   * グループ／ルームでメンション必須にするときのボット自身の userId。
-   * GET https://api.line.me/v2/bot/info の userId。未設定時はグループでも従来どおり全メッセージに返信。
+   * グループ／ルームで @メンションを検出するときのボット自身の userId。
+   * GET https://api.line.me/v2/bot/info の userId。
+   * 未設定でもグループでは本文に「NEAR」「ニア」があれば応答する（メンション検出には必須）。
    */
   LINE_BOT_USER_ID: z
     .string()

@@ -17,7 +17,7 @@
 | `CRON_SECRET` | 任意（`/internal/reminders/dispatch` を保護する場合） |
 | `ADMIN_LINE_USER_ID` | 任意。未対応依頼の**実装提案**が生成されたとき、管理者の LINE にプッシュ通知（24h・同一要約指紋あたり1通まで） |
 | `PUBLIC_BASE_URL` | 任意。上記通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし） |
-| `LINE_BOT_USER_ID` | 任意。**設定するとグループ／トークルームでは、ボットがメンションされたテキストだけに返信**（1:1トークは従来どおり）。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |
+| `LINE_BOT_USER_ID` | 任意。グループ／トークルームでは **@ボットのメンション** か **本文に「NEAR」「ニア」** がないと返信しない（1:1 は従来どおり）。メンション判定に使う。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |
 | `NEAR_WHATS_NEW` | 任意。改行可。「最近できるようになったこと」を NEAR が短く話すときの本文（デプロイごとに手更新） |
 
 初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001_init.sql` に続けて `002_growth.sql`）。

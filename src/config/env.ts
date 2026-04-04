@@ -3,16 +3,19 @@ import { z } from "zod";
 
 loadDotenv();
 
+/** Render / .env 貼り付けで末尾改行が混ざると LINE 署名が一致しない */
+const trimSecret = z.string().min(1).transform((s) => s.trim());
+
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().url(),
-  LINE_CHANNEL_SECRET: z.string().min(1),
-  LINE_CHANNEL_ACCESS_TOKEN: z.string().min(1),
-  OPENAI_API_KEY: z.string().min(1),
+  LINE_CHANNEL_SECRET: trimSecret,
+  LINE_CHANNEL_ACCESS_TOKEN: trimSecret,
+  OPENAI_API_KEY: trimSecret,
   OPENAI_INTENT_MODEL: z.string().default("gpt-4o-mini"),
   OPENAI_SUGGESTION_MODEL: z.string().default("gpt-4o-mini"),
-  ADMIN_API_KEY: z.string().min(1),
+  ADMIN_API_KEY: trimSecret,
   CRON_SECRET: z.string().optional(),
 });
 

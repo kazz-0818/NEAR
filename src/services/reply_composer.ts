@@ -33,7 +33,7 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
           role: "user",
           content: [
             `状況: ${input.situation}`,
-            "次のドラフトを、NEARの口調に整えて1通の返信にしてください。意味は変えないでください。",
+            "次のドラフトを、NEARの口調に整えて1通の返信にしてください。意味は変えないでください。読みやすいよう改行を入れてください（話題の切れ目・結論と補足の間など）。",
             "",
             input.draft,
           ].join("\n"),

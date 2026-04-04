@@ -15,8 +15,21 @@
 | `ADMIN_API_KEY` | 長いランダム文字列（管理 API 用） |
 | `PORT` | 未設定なら `3000`。Render 等が自動で付与する場合はそのまま |
 | `CRON_SECRET` | 任意（`/internal/reminders/dispatch` を保護する場合） |
+| `ADMIN_LINE_USER_ID` | 任意。未対応依頼の**実装提案**が生成されたとき、管理者の LINE にプッシュ通知（24h・同一要約指紋あたり1通まで） |
+| `PUBLIC_BASE_URL` | 任意。上記通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし） |
 
-初回起動時に `ensureSchema()` が DB マイグレーション相当を流します。
+初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001_init.sql` に続けて `002_growth.sql`）。
+
+## NEAR 成長システム（運用の流れ）
+
+1. ユーザーが LINE で未対応依頼をすると `unsupported_requests` に記録され、非同期で `implementation_suggestions`（`cursor_prompt` 等）が生成されることがあります。
+2. `ADMIN_LINE_USER_ID` を設定していれば、提案作成時に管理者へ LINE 通知（クールダウンあり）。
+3. 管理 API（`Authorization: Bearer <ADMIN_API_KEY>`）で確認・承認します。
+   - `GET /admin/suggestions?status=pending` … 未承認一覧
+   - `GET /admin/suggestions/:id` … 1件（`cursor_prompt` をコピーして Cursor に貼る）
+   - `PATCH /admin/suggestions/:id` … `{"approval_status":"approved"|"rejected"|"implemented","review_notes":"…"}`（遷移: `pending`→`approved`|`rejected`、`approved`→`implemented`）
+   - `GET /admin/stats/fingerprint-demand` … 同種依頼の多い `message_fingerprint` ランキング
+4. コード変更は Cursor で行い、テスト後に Git へ反映・デプロイしてください（自動本番反映はしません）。
 
 ## LINE Webhook
 

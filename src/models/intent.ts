@@ -69,6 +69,14 @@ export const INTENT_JSON_SCHEMA = {
   },
 } as const;
 
+const improvementKindEnum = [
+  "prompt_tune",
+  "routing_fix",
+  "new_module",
+  "external_auth",
+  "out_of_scope",
+] as const;
+
 export const featureSuggestionSchema = z.object({
   summary: z.string(),
   required_apis: z.array(z.string()),
@@ -77,6 +85,11 @@ export const featureSuggestionSchema = z.object({
   steps: z.array(z.string()),
   difficulty: z.enum(["low", "medium", "high"]),
   priority_score: z.number(),
+  improvement_kind: z.enum(improvementKindEnum),
+  risk_level: z.enum(["low", "medium", "high"]),
+  estimated_effort: z.enum(["low", "medium", "high"]),
+  /** Cursor に貼る実装指示（1ブロック・日本語） */
+  cursor_prompt: z.string().min(1),
 });
 
 export type FeatureSuggestion = z.infer<typeof featureSuggestionSchema>;
@@ -95,6 +108,13 @@ export const FEATURE_SUGGESTION_JSON_SCHEMA = {
       steps: { type: "array", items: { type: "string" } },
       difficulty: { type: "string", enum: ["low", "medium", "high"] },
       priority_score: { type: "number" },
+      improvement_kind: {
+        type: "string",
+        enum: [...improvementKindEnum],
+      },
+      risk_level: { type: "string", enum: ["low", "medium", "high"] },
+      estimated_effort: { type: "string", enum: ["low", "medium", "high"] },
+      cursor_prompt: { type: "string" },
     },
     required: [
       "summary",
@@ -104,6 +124,10 @@ export const FEATURE_SUGGESTION_JSON_SCHEMA = {
       "steps",
       "difficulty",
       "priority_score",
+      "improvement_kind",
+      "risk_level",
+      "estimated_effort",
+      "cursor_prompt",
     ],
   },
 } as const;

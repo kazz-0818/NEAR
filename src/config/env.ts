@@ -17,6 +17,16 @@ const envSchema = z.object({
   OPENAI_SUGGESTION_MODEL: z.string().default("gpt-4o-mini"),
   ADMIN_API_KEY: trimSecret,
   CRON_SECRET: z.string().optional(),
+  /** 実装提案作成時にプッシュ通知する管理者の LINE ユーザーID（任意） */
+  ADMIN_LINE_USER_ID: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 管理APIのベースURL表示用（末尾スラッシュなし推奨、任意） */
+  PUBLIC_BASE_URL: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim().replace(/\/$/, "") : undefined)),
 });
 
 export type Env = z.infer<typeof envSchema>;

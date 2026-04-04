@@ -7,7 +7,12 @@ import type { ParsedIntent } from "../models/intent.js";
 import { classifyIntent } from "./intent_classifier.js";
 import { composeNearReply } from "./reply_composer.js";
 import { replyOrPush } from "../channels/line/client.js";
+import {
+  buildDeployTimeDraft,
+  isDeployTimeQuestion,
+} from "../lib/buildInfo.js";
 import { getLogger } from "../lib/logger.js";
+import { buildWhatsNewDraft, isWhatsNewCapabilityQuestion } from "../lib/whatsNew.js";
 
 async function saveIntentRun(
   db: Db,
@@ -32,6 +37,30 @@ export async function handleLineTextMessage(input: {
   const log = getLogger();
   const { db, replyToken, channelUserId, text, inboundMessageId } = input;
   const channel = "line";
+
+  if (isDeployTimeQuestion(text)) {
+    const draft = buildDeployTimeDraft();
+    let finalText = draft;
+    try {
+      finalText = await composeNearReply({ draft, situation: "success" });
+    } catch (ce) {
+      log.warn({ err: ce }, "composeNearReply failed (deploy time path)");
+    }
+    await replyOrPush(replyToken, channelUserId, finalText);
+    return;
+  }
+
+  if (isWhatsNewCapabilityQuestion(text)) {
+    const draft = buildWhatsNewDraft();
+    let finalText = draft;
+    try {
+      finalText = await composeNearReply({ draft, situation: "success" });
+    } catch (ce) {
+      log.warn({ err: ce }, "composeNearReply failed (whats new path)");
+    }
+    await replyOrPush(replyToken, channelUserId, finalText);
+    return;
+  }
 
   let parsed: ParsedIntent;
   try {

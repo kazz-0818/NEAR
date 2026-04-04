@@ -11,11 +11,19 @@ import { handleLineTextMessage } from "./services/orchestrator.js";
 import { replyOrPush } from "./channels/line/client.js";
 import { createAdminApp } from "./admin/routes.js";
 import { startReminderCron, dispatchDueReminders } from "./jobs/reminder_dispatcher.js";
+import { isLineGroupOrRoomSource, textMessageMentionsBot } from "./channels/line/groupMention.js";
+import { getDeployedAtIso } from "./lib/buildInfo.js";
 
 const app = new Hono();
 const log = getLogger();
 
-app.get("/health", (c) => c.json({ ok: true, service: "NEAR" }));
+app.get("/health", (c) =>
+  c.json({
+    ok: true,
+    service: "NEAR",
+    built_at: getDeployedAtIso(),
+  })
+);
 
 app.post("/internal/reminders/dispatch", async (c) => {
   const env = getEnv();
@@ -55,6 +63,8 @@ async function lineMessagingWebhook(c: Context) {
     log.info({ count: events.length }, "LINE webhook: events received");
   }
 
+  const envLine = getEnv();
+
   for (const ev of events) {
     const e = ev as Record<string, unknown>;
     if (e.type !== "message") continue;
@@ -81,6 +91,19 @@ async function lineMessagingWebhook(c: Context) {
     if (isDuplicate) {
       log.warn({ messageId }, "duplicate LINE message id (webhook retry?); skip to avoid double reply");
       continue;
+    }
+
+    const inGroup = isLineGroupOrRoomSource(source);
+    const groupMentionRequired = Boolean(envLine.LINE_BOT_USER_ID && inGroup);
+    if (groupMentionRequired) {
+      if (messageType !== "text") {
+        log.info({ messageId, messageType }, "group/room: skip non-text (mention required)");
+        continue;
+      }
+      if (!textMessageMentionsBot(message, envLine.LINE_BOT_USER_ID!)) {
+        log.info({ messageId }, "group/room: skip (no bot mention)");
+        continue;
+      }
     }
 
     if (messageType !== "text") {

@@ -27,6 +27,29 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim().replace(/\/$/, "") : undefined)),
+  /** 任意: デプロイ／アップロード時刻を手動で固定（ISO8601）。未設定時は build-info.json */
+  NEAR_BUILT_AT: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim();
+      if (!t) return undefined;
+      const ms = Date.parse(t);
+      return Number.isNaN(ms) ? undefined : new Date(ms).toISOString();
+    }),
+  /**
+   * グループ／ルームでメンション必須にするときのボット自身の userId。
+   * GET https://api.line.me/v2/bot/info の userId。未設定時はグループでも従来どおり全メッセージに返信。
+   */
+  LINE_BOT_USER_ID: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 「何ができるようになったか」用の短文（改行可）。デプロイごとに手で更新する想定 */
+  NEAR_WHATS_NEW: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -6,6 +6,7 @@ RUN npm ci
 
 FROM deps AS build
 COPY tsconfig.json ./
+COPY scripts ./scripts
 COPY src ./src
 COPY prompts ./prompts
 RUN npm run build

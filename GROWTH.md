@@ -3,7 +3,7 @@
 ## 成果物インデックス
 
 1. **DB**: `src/db/migrations/003_growth_flow.sql`（`unsupported_requests` 拡張、`implementation_suggestions` 拡張、`growth_admin_sessions`、`growth_hearing_items`、`capability_registry`）
-2. **サービス**: `growth_orchestrator.ts`, `growth_suggestion_gate.ts`（suggestion 前ゲート）, `approval_service.ts`, `hearing_service.ts`, `cursor_prompt_builder.ts`, `coding_runner.ts`, `deploy_runner.ts`, `admin_notification_service.ts`, `capability_sync_service.ts`, `growth_admin_line.ts`, `growth_constants.ts`
+2. **サービス**: `growth_orchestrator.ts`, `growth_suggestion_gate.ts`（suggestion 前ゲート）, `approval_service.ts`, `hearing_service.ts`, `cursor_prompt_builder.ts`, `coding_runner.ts`, `deploy_runner.ts`, `admin_notification_service.ts`, `capability_sync_service.ts`, `growth_admin_line.ts`, `growth_constants.ts`, `lib/growth_tiers.ts`（難易度ラベル）
 3. **エントリ**: `orchestrator.ts`（管理者 LINE 優先）、`feature_suggester.ts`（提案後 `onSuggestionCreated`）、`admin/routes.ts`
 4. **capabilities**: `capability_registry` を参照する `listCapabilityLines(db)`（空なら静的フォールバック）
 
@@ -13,7 +13,7 @@
 stateDiagram-v2
   direction LR
   [*] --> logged: 未対応保存
-  logged --> growth_skipped: ゲート不通過
+    logged --> growth_skipped: ゲート不通過／LLM非現実判定
   logged --> suggestion_created: ゲート通過後 LLM 提案 INSERT
   suggestion_created --> admin_approval_requested: 管理者通知
   admin_approval_requested --> hearing_in_progress: 第一段階 はい
@@ -35,6 +35,12 @@ stateDiagram-v2
 ## Suggestion ゲート（既定）
 
 `evaluateGrowthSuggestionEligibility` が `scheduleFeatureSuggestion` より前に動く。`out_of_scope`、短文、`needs_followup`、低 confidence の `unknown`、同一 fingerprint 件数不足などで `growth_skipped` になる。環境変数は `DEPLOY.md` 参照。
+
+## 成長難易度（E〜SSS）
+
+- `implementation_suggestions.difficulty` に **E, D, C, B, A, S, SS, SSS** を保存（**E が最も易しく、SSS が最難**）。旧データに `low` / `medium` / `high` が残っていても動作上は問題ないが、通知の【成長難易度】行は新 tier のみ表示する。
+- LLM の structured output は `src/models/intent.ts` の `featureSuggestionSchema`。プロンプトは `prompts/feature_suggestion.system.md`。
+- **`trivially_infeasible: true`**（非現実的・明らかに範囲外）のときは `implementation_suggestions` を **作らず**、`markUnsupportedGrowthSkipped` で `growth_skipped`（notes に `trivially_infeasible` と理由）。
 
 ## 安全
 

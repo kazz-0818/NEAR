@@ -2,6 +2,7 @@ import { pushText } from "../channels/line/client.js";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
+import { formatGrowthDifficultyLines } from "../lib/growth_tiers.js";
 const LINE_TEXT_MAX = 4800;
 
 function clip(s: string, max = 3500): string {
@@ -57,12 +58,16 @@ export async function notifyUserGrowthConsent(input: {
   suggestionId: number;
   userOriginalSnippet: string;
   userSummary: string;
+  /** implementation_suggestions.difficulty（E〜SSS） */
+  growthDifficultyTier?: string | null;
 }): Promise<void> {
   const log = getLogger();
+  const tierLines = formatGrowthDifficultyLines(input.growthDifficultyTier ?? null);
   const body = [
     "NEAR です。あなたからいただいた次のご依頼は、いまの私ではまだお手伝いできませんでした。",
     `「${clip(input.userOriginalSnippet, 420)}」`,
     "",
+    ...tierLines,
     "内容の要約:",
     clip(input.userSummary, 480),
     "",
@@ -92,10 +97,21 @@ export async function notifyGrowthFirstApproval(input: {
   const log = getLogger();
   const adminBase = env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL}/admin` : null;
   const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
+  let tierLines: string[] = [];
+  try {
+    const dr = await input.db.query<{ difficulty: string | null }>(
+      `SELECT difficulty FROM implementation_suggestions WHERE id = $1`,
+      [input.suggestionId]
+    );
+    tierLines = formatGrowthDifficultyLines(dr.rows[0]?.difficulty ?? null);
+  } catch {
+    tierLines = [];
+  }
   const body = [
     "こんにちは、NEAR です。ひとつ成長のご相談があります。",
     "",
     ...requesterLines,
+    ...tierLines,
     `ご利用者の方から、次のようなお願いがありました（いまの私ではまだお手伝いできませんでした）。`,
     `「${clip(input.userOriginalSnippet, 400)}」`,
     "",
@@ -157,9 +173,10 @@ export async function notifyFinalApproval(input: {
       required_information: unknown;
       channel_user_id: string;
       channel: string;
+      difficulty: string | null;
     }>(
       `SELECT u.original_message, s.summary, s.required_information,
-              u.channel_user_id, u.channel
+              u.channel_user_id, u.channel, s.difficulty
        FROM implementation_suggestions s
        JOIN unsupported_requests u ON u.id = s.unsupported_request_id
        WHERE s.id = $1`,
@@ -173,14 +190,18 @@ export async function notifyFinalApproval(input: {
       if (ri && typeof ri === "object" && !Array.isArray(ri)) {
         hearingBlock = clip(JSON.stringify(ri, null, 2), 3500);
       }
+      const tierLines = formatGrowthDifficultyLines(row.difficulty ?? null);
       if (row.channel_user_id) {
         const chLabel = row.channel === "line" ? "LINE" : row.channel;
         requesterLines = [
+          ...tierLines,
           "【成長依頼元】",
           `${chLabel} の userId（依頼メッセージを送ったユーザー）: ${row.channel_user_id}`,
           "※ グループ／トークルームからの依頼でも、上記はその発言の送信者です。",
           "",
         ];
+      } else {
+        requesterLines = [...tierLines];
       }
     }
   } catch (e) {

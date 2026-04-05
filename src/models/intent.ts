@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GROWTH_DIFFICULTY_TIERS } from "../lib/growth_tiers.js";
 
 export const INTENT_NAMES = [
   "greeting",
@@ -77,18 +78,25 @@ const improvementKindEnum = [
   "out_of_scope",
 ] as const;
 
+const growthTierEnum = z.enum(GROWTH_DIFFICULTY_TIERS);
+
 export const featureSuggestionSchema = z.object({
   summary: z.string(),
   required_apis: z.array(z.string()),
   new_modules: z.array(z.string()),
   data_stores: z.array(z.string()),
   steps: z.array(z.string()),
-  difficulty: z.enum(["low", "medium", "high"]),
+  /** E が最も易しく、SSS が最難。DB の difficulty 列に保存する。 */
+  growth_difficulty_tier: growthTierEnum,
+  /** true のときは成長パイプラインに載せず growth_skipped とする（非現実的・範囲外の依頼）。 */
+  trivially_infeasible: z.boolean(),
+  /** trivially_infeasible が true のときは理由を1〜2文。false のときは空文字。 */
+  trivially_infeasible_reason: z.string(),
   priority_score: z.number(),
   improvement_kind: z.enum(improvementKindEnum),
   risk_level: z.enum(["low", "medium", "high"]),
   estimated_effort: z.enum(["low", "medium", "high"]),
-  /** Cursor に貼る実装指示（1ブロック・日本語） */
+  /** Cursor に貼る実装指示（1ブロック・日本語）。trivially_infeasible 時は短い説明でよい。 */
   cursor_prompt: z.string().min(1),
 });
 
@@ -106,7 +114,9 @@ export const FEATURE_SUGGESTION_JSON_SCHEMA = {
       new_modules: { type: "array", items: { type: "string" } },
       data_stores: { type: "array", items: { type: "string" } },
       steps: { type: "array", items: { type: "string" } },
-      difficulty: { type: "string", enum: ["low", "medium", "high"] },
+      growth_difficulty_tier: { type: "string", enum: [...GROWTH_DIFFICULTY_TIERS] },
+      trivially_infeasible: { type: "boolean" },
+      trivially_infeasible_reason: { type: "string" },
       priority_score: { type: "number" },
       improvement_kind: {
         type: "string",
@@ -122,7 +132,9 @@ export const FEATURE_SUGGESTION_JSON_SCHEMA = {
       "new_modules",
       "data_stores",
       "steps",
-      "difficulty",
+      "growth_difficulty_tier",
+      "trivially_infeasible",
+      "trivially_infeasible_reason",
       "priority_score",
       "improvement_kind",
       "risk_level",

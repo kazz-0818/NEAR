@@ -161,6 +161,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
       suggestionId,
       userOriginalSnippet: String(row.original_message ?? ""),
       userSummary: String(row.summary ?? ""),
+      growthDifficultyTier: row.difficulty != null ? String(row.difficulty) : null,
     });
   } else {
     log.warn({ suggestionId }, "onSuggestionCreated: no channel_user_id; user consent notify skipped");

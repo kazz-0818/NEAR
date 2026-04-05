@@ -3,6 +3,7 @@ import { getEnv } from "../config/env.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
 import { onSuggestionCreated } from "../services/growth_orchestrator.js";
+import { markUnsupportedGrowthSkipped } from "../services/growth_suggestion_gate.js";
 import {
   FEATURE_SUGGESTION_JSON_SCHEMA,
   featureSuggestionSchema,
@@ -70,6 +71,20 @@ export async function generateAndSaveSuggestion(input: {
     if (!raw) return;
     const parsed = featureSuggestionSchema.parse(JSON.parse(raw));
 
+    if (parsed.trivially_infeasible) {
+      const note = String(parsed.trivially_infeasible_reason ?? "").trim().slice(0, 400);
+      await markUnsupportedGrowthSkipped(
+        input.db,
+        input.unsupportedId,
+        `trivially_infeasible tier=${parsed.growth_difficulty_tier}${note ? `: ${note}` : ""}`
+      );
+      log.info(
+        { unsupportedId: input.unsupportedId, tier: parsed.growth_difficulty_tier },
+        "feature_suggester: skipped trivially infeasible growth"
+      );
+      return;
+    }
+
     const ins = await input.db.query<{ id: string }>(
       `INSERT INTO implementation_suggestions (
          unsupported_request_id, summary, required_apis, suggested_modules, data_stores,
@@ -86,7 +101,7 @@ export async function generateAndSaveSuggestion(input: {
         JSON.stringify(parsed.new_modules),
         JSON.stringify(parsed.data_stores),
         JSON.stringify(parsed.steps),
-        parsed.difficulty,
+        parsed.growth_difficulty_tier,
         Math.min(10, Math.max(1, Math.round(parsed.priority_score))),
         JSON.stringify({ model: env.OPENAI_SUGGESTION_MODEL, raw }),
         parsed.cursor_prompt,

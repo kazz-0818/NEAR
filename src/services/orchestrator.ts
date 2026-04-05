@@ -23,6 +23,11 @@ import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversat
 import { promoteGoogleSheetsFollowUp } from "./sheetsIntentFollowUp.js";
 import { tryHandleGoogleOAuthUserLine } from "./google_oauth_user_line.js";
 import { saveOutboundAssistantText } from "./outbound_store.js";
+import { interpretSecretaryRequest } from "./request_interpreter.js";
+import { resolveLatestAssistantTextForEdit } from "./conversation_target_resolver.js";
+import { editPreviousOutput } from "./previous_output_editor.js";
+import { buildSecretaryClarificationReply } from "./secretary_clarification_handler.js";
+import { syntheticIntentForSecretaryLayer } from "../models/requestInterpretation.js";
 
 async function saveIntentRun(
   db: Db,
@@ -115,6 +120,90 @@ export async function handleLineTextMessage(input: {
     return;
   }
 
+  let recentUserMessages: string[] = [];
+  let recentAssistantMessages: string[] = [];
+  try {
+    recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId);
+    recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId);
+  } catch (ctxErr) {
+    log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
+  }
+
+  if (!env.NEAR_SECRETARY_LAYER_DISABLED) {
+    try {
+      const interpretation = await interpretSecretaryRequest({
+        userText: text,
+        recentUserMessages,
+        recentAssistantMessages,
+      });
+
+      if (interpretation.mode === "edit_previous_output" && interpretation.confidence >= 0.48) {
+        const target = resolveLatestAssistantTextForEdit(recentAssistantMessages);
+        if (target) {
+          try {
+            const edited = await editPreviousOutput({
+              targetText: target,
+              instruction: text,
+              recentUserMessages,
+            });
+            let finalText = edited;
+            try {
+              finalText = await composeNearReply({
+                draft: edited,
+                situation: "success",
+                userMessage: text,
+                recentUserMessages,
+                recentAssistantMessages,
+              });
+            } catch (ce) {
+              log.warn({ err: ce }, "composeNearReply failed (secretary edit path)");
+            }
+            await saveIntentRun(db, inboundMessageId, syntheticIntentForSecretaryLayer("edit_previous_output", interpretation.confidence), {
+              secretary_interpretation: interpretation,
+              shortcut: "edit_previous_output",
+            });
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+            return;
+          } catch (e) {
+            log.warn({ err: e }, "secretary edit_previous_output failed; continuing to intent routing");
+          }
+        }
+      }
+
+      if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.52) {
+        try {
+          const clarifyDraft = await buildSecretaryClarificationReply({
+            userMessage: text,
+            recentUserMessages,
+            recentAssistantMessages,
+          });
+          let finalText = clarifyDraft;
+          try {
+            finalText = await composeNearReply({
+              draft: clarifyDraft,
+              situation: "followup",
+              userMessage: text,
+              recentUserMessages,
+              recentAssistantMessages,
+            });
+          } catch (ce) {
+            log.warn({ err: ce }, "composeNearReply failed (secretary clarify path)");
+          }
+          await saveIntentRun(db, inboundMessageId, syntheticIntentForSecretaryLayer("clarify_missing_info", interpretation.confidence), {
+            secretary_interpretation: interpretation,
+            shortcut: "clarify_missing_info",
+          });
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+          return;
+        } catch (e) {
+          log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
+        }
+      }
+    } catch (e) {
+      log.warn({ err: e }, "secretary layer error; continuing to intent routing");
+    }
+  }
+
   let parsed: ParsedIntent;
   try {
     parsed = await classifyIntent(text);
@@ -130,15 +219,6 @@ export async function handleLineTextMessage(input: {
       reason: "分類エラー",
       suggested_category: "システム安定化",
     };
-  }
-
-  let recentUserMessages: string[] = [];
-  let recentAssistantMessages: string[] = [];
-  try {
-    recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId);
-    recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId);
-  } catch (ctxErr) {
-    log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }
 
   try {

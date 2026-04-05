@@ -1,6 +1,6 @@
 # NEAR（LINE × AI秘書）MVP
 
-公式LINEを窓口に、OpenAI で意図判定し、モジュール実行または未対応ログ＋丁寧な返答を行います。
+公式LINEを窓口に、OpenAI で意図判定し、モジュール実行または未対応ログ＋丁寧な返答を行います。設計思想・秘書レイヤー（request_mode）・ロードマップは [`docs/NEAR_SECRETARY_ARCHITECTURE.md`](docs/NEAR_SECRETARY_ARCHITECTURE.md) を参照してください。
 
 ## 必要な環境変数
 

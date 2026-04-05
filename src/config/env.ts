@@ -204,6 +204,14 @@ const envSchema = z.object({
         return undefined;
       }
     }),
+  /**
+   * true / 1 で有効。秘書レイヤー（request_interpreter による直前出力編集短絡等）をオフにし、従来の intent ルートのみにする。
+   * 障害時の切り分け・ロールバック用。
+   */
+  NEAR_SECRETARY_LAYER_DISABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
   /** refresh_token 暗号化用（16文字以上推奨。漏洩厳禁） */
   GOOGLE_OAUTH_TOKEN_SECRET: z
     .string()

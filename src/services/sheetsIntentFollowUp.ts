@@ -20,6 +20,19 @@ export function findSpreadsheetIdInUserThread(text: string, recentUserMessages: 
   return null;
 }
 
+/** 会話内のユーザー発言にスプレッドシート URL が一度でも出ているか（続き質問の文脈があるか） */
+function spreadsheetUrlInUserThread(text: string, recentUserMessages: string[]): boolean {
+  if (extractSpreadsheetId(text)) return true;
+  return recentUserMessages.some((m) => extractSpreadsheetId(m) != null);
+}
+
+/**
+ * 既定シート／環境既定だけで Sheets に寄せるとき、**明らかに表・シートの話**と分かる語があるか。
+ * （「2月の売上予想は？」のような一般質問を Sheets に誤送しない＝臨機応変に FAQ へ残す）
+ */
+const SHEETS_TOPIC_EXPLICIT =
+  /シート|スプシ|スプレッド|spreadsheet|一覧を|一覧が|一覧に|表を|表の|表に|表データ|ブック|セル|先に(送|貼|共有)|このブック|この一覧|この表|既定の|読み取った|取り込ん|docs\.google\.com\/spreadsheets/i;
+
 /**
  * 「一覧出して」続けて「これ分析して」のように、URL 無しの続きを Sheets 参照に乗せる。
  * simple_question のみ上書き（他 intent は触らない）。
@@ -60,6 +73,13 @@ export async function promoteGoogleSheetsFollowUp(
     if (looksLikeSpreadsheetId(envId)) id = envId;
   }
   if (!id) return parsed;
+
+  const urlInThread = spreadsheetUrlInUserThread(text, recentUserMessages);
+  if (!urlInThread) {
+    const continuingTable = ANALYZE_OR_CONTINUE_SHEETS.test(text.trim());
+    const explicitSheetTopic = SHEETS_TOPIC_EXPLICIT.test(text);
+    if (!continuingTable && !explicitSheetTopic) return parsed;
+  }
 
   return {
     ...parsed,

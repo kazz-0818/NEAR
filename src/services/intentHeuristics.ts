@@ -159,36 +159,32 @@ export function rescueCasualShortMessage(userText: string): ParsedIntent | null 
 const SUMMARIZE_LIKE = /要約して|要約を|まとめて|箇条書きにして/i;
 const REMINDER_ACTION = /リマインド(して|を|に登録|お願い)|通知してくれ|思い出させて/i;
 
+/** 外部ツール連携・NEAR に専用実装を期待する依頼は unknown のまま（成長パイプライン用） */
+const INTEGRATION_OR_AUTOMATION = /スプレッドシート(に|へ)(書|記|追|保存|貼|出力)|シートに反映|セルに入れ|([Gg]oogle|Outlook)\s*カレンダー(に|へ)(予定|イベント|登録)|Notion(に)?(ページ|データベース)(を)?(作|保存|追記)|Slack(に)?(投稿|通知|送って)|Webhook|API\s*キー.*(で|を使って).*(連携|取得|書き込)|OAuth.*(連携|認証して).*(実行|取得)/i;
+
+const RESCUE_MAX_CODEPOINTS = 8000;
+
 /**
- * 天気・URL・一般知識っぽい質問を unknown に落とさず simple_question へ（長めの文も対象）。
+ * unknown / can_handle:false のあと、**除外に当たらないものはすべて** simple_question へ（GPT が対話で扱える範囲を広く逃がす）。
  */
 export function rescueBroadSimpleQuestion(userText: string): ParsedIntent | null {
   if (TASK_LIKE.test(userText)) return null;
   if (SUMMARIZE_LIKE.test(userText)) return null;
   if (REMINDER_ACTION.test(userText)) return null;
+  if (INTEGRATION_OR_AUTOMATION.test(userText)) return null;
 
   const t = userText.normalize("NFKC").trim();
-  if (t.length === 0 || t.length > 420) return null;
-
-  const looksGeneralQA =
-    /[?？]/.test(t) ||
-    /ですか|でしょうか|だろうか|ください|教えて|を知りたい|って(何|なに)|とは[?？]?$/u.test(t) ||
-    /いつ|いつから|どこ|だれ|誰が|なぜ|どうやって|どうすれば|いくつ|何歳|意味は|理由は/u.test(t);
-
-  const looksWeather = /天気|気温|降水|雪か|雨か|晴れ|weather|forecast|予報(は|を|が)?/i.test(t);
-  const looksUrl =
-    /url|URL|リンク|ホームページ|ウェブサイト|公式(サイト|ページ)|ドメイン|このサイト|そのサイト/i.test(t);
-
-  if (!looksGeneralQA && !looksWeather && !looksUrl) return null;
+  if (t.length === 0) return null;
+  if ([...t].length > RESCUE_MAX_CODEPOINTS) return null;
 
   return {
     intent: "simple_question",
-    confidence: 0.9,
+    confidence: 0.88,
     can_handle: true,
     required_params: {},
     needs_followup: false,
     followup_question: null,
-    reason: "heuristic_broad_simple_question",
+    reason: "heuristic_open_simple_question",
     suggested_category: null,
   };
 }

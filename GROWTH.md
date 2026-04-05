@@ -3,7 +3,7 @@
 ## 成果物インデックス
 
 1. **DB**: `src/db/migrations/003_growth_flow.sql`（`unsupported_requests` 拡張、`implementation_suggestions` 拡張、`growth_admin_sessions`、`growth_hearing_items`、`capability_registry`）
-2. **サービス**: `growth_orchestrator.ts`, `approval_service.ts`, `hearing_service.ts`, `cursor_prompt_builder.ts`, `coding_runner.ts`, `deploy_runner.ts`, `admin_notification_service.ts`, `capability_sync_service.ts`, `growth_admin_line.ts`, `growth_constants.ts`
+2. **サービス**: `growth_orchestrator.ts`, `growth_suggestion_gate.ts`（suggestion 前ゲート）, `approval_service.ts`, `hearing_service.ts`, `cursor_prompt_builder.ts`, `coding_runner.ts`, `deploy_runner.ts`, `admin_notification_service.ts`, `capability_sync_service.ts`, `growth_admin_line.ts`, `growth_constants.ts`
 3. **エントリ**: `orchestrator.ts`（管理者 LINE 優先）、`feature_suggester.ts`（提案後 `onSuggestionCreated`）、`admin/routes.ts`
 4. **capabilities**: `capability_registry` を参照する `listCapabilityLines(db)`（空なら静的フォールバック）
 
@@ -13,7 +13,8 @@
 stateDiagram-v2
   direction LR
   [*] --> logged: 未対応保存
-  logged --> suggestion_created: LLM 提案 INSERT
+  logged --> growth_skipped: ゲート不通過
+  logged --> suggestion_created: ゲート通過後 LLM 提案 INSERT
   suggestion_created --> admin_approval_requested: 管理者通知
   admin_approval_requested --> hearing_in_progress: 第一段階 はい
   admin_approval_requested --> rejected: 第一段階 いいえ
@@ -30,6 +31,10 @@ stateDiagram-v2
 
 - `cursor_prompt_builder.buildFinalCursorPrompt` が第二承認後にフル文を生成し DB に保存。
 - 手動モード（既定）: `coding_runner` は説明メッセージのみ。自動モードは `GROWTH_AUTO_CODING_ENABLED`＋将来のアダプタ接続。
+
+## Suggestion ゲート（既定）
+
+`evaluateGrowthSuggestionEligibility` が `scheduleFeatureSuggestion` より前に動く。`out_of_scope`、短文、`needs_followup`、低 confidence の `unknown`、同一 fingerprint 件数不足などで `growth_skipped` になる。環境変数は `DEPLOY.md` 参照。
 
 ## 安全
 

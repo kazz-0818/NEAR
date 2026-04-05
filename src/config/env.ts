@@ -61,6 +61,55 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
+  /**
+   * false / 0 で無効。未設定は有効。無効時は従来どおり未対応のたびに suggestion をスケジュール。
+   */
+  GROWTH_SUGGESTION_GATE_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => !(s === "false" || s === "0")),
+  /** out_of_scope のとき suggestion を作らない（既定 true）。false で許可。 */
+  GROWTH_SKIP_OUT_OF_SCOPE: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined ? true : !(s === "false" || s === "0"))),
+  /** needs_followup のとき suggestion を保留（既定 true）。false でフォロー中でも提案。 */
+  GROWTH_SKIP_WHEN_FOLLOWUP: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined ? true : !(s === "false" || s === "0"))),
+  /** これ未満の文字数（Unicode コードポイント）では suggestion しない。0 で無効。既定 12。 */
+  GROWTH_MIN_MESSAGE_CHARS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 12;
+      const n = Number(s);
+      return Number.isFinite(n) && n >= 0 ? n : 12;
+    }),
+  /**
+   * 同一 message_fingerprint の unsupported がこの件数に達したら suggestion 可（INSERT 後の COUNT）。
+   * 1 で初回から従来同等。既定 2。
+   */
+  GROWTH_MIN_FINGERPRINT_COUNT: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 2;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 ? n : 2;
+    }),
+  /**
+   * unknown_custom_request かつ confidence がこの値未満（かつ confidence>0）のときスキップ。0 で無効。既定 0.35。
+   */
+  GROWTH_MIN_CONFIDENCE_UNKNOWN: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 0.35;
+      const n = Number(s);
+      return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.35;
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

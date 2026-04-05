@@ -14,6 +14,10 @@ import {
 import { getLogger } from "../lib/logger.js";
 import { buildWhatsNewDraft, isWhatsNewCapabilityQuestion } from "../lib/whatsNew.js";
 import { tryHandleAdminGrowthLine } from "./growth_admin_line.js";
+import {
+  evaluateGrowthSuggestionEligibility,
+  markUnsupportedGrowthSkipped,
+} from "./growth_suggestion_gate.js";
 
 async function saveIntentRun(
   db: Db,
@@ -112,12 +116,18 @@ export async function handleLineTextMessage(input: {
               : "ハンドラ未登録",
       });
 
-      scheduleFeatureSuggestion({
-        db,
-        unsupportedId,
-        originalMessage: text,
-        intent: parsed,
-      });
+      const gate = await evaluateGrowthSuggestionEligibility({ db, text, parsed });
+      if (gate.allow) {
+        scheduleFeatureSuggestion({
+          db,
+          unsupportedId,
+          originalMessage: text,
+          intent: parsed,
+        });
+      } else {
+        await markUnsupportedGrowthSkipped(db, unsupportedId, gate.reason);
+        log.info({ unsupportedId, reason: gate.reason }, "growth suggestion skipped by gate");
+      }
 
       const draft =
         "すいません、今はまだそのお願いには対応できません。ただ、できるように改善していきます。内容は記録いたしました。";
@@ -159,12 +169,18 @@ export async function handleLineTextMessage(input: {
         inboundMessageId,
         whyOverride: "モジュールが未対応と判断",
       });
-      scheduleFeatureSuggestion({
-        db,
-        unsupportedId,
-        originalMessage: text,
-        intent: parsed,
-      });
+      const gate = await evaluateGrowthSuggestionEligibility({ db, text, parsed });
+      if (gate.allow) {
+        scheduleFeatureSuggestion({
+          db,
+          unsupportedId,
+          originalMessage: text,
+          intent: parsed,
+        });
+      } else {
+        await markUnsupportedGrowthSkipped(db, unsupportedId, gate.reason);
+        log.info({ unsupportedId, reason: gate.reason }, "growth suggestion skipped by gate");
+      }
     }
 
     let finalText = modResult.draft;

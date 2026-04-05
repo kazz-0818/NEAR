@@ -20,6 +20,7 @@ import {
   markUnsupportedGrowthSkipped,
 } from "./growth_suggestion_gate.js";
 import { loadRecentUserMessages } from "./conversation_context.js";
+import { promoteGoogleSheetsFollowUp } from "./sheetsIntentFollowUp.js";
 
 async function saveIntentRun(
   db: Db,
@@ -101,8 +102,6 @@ export async function handleLineTextMessage(input: {
     };
   }
 
-  await saveIntentRun(db, inboundMessageId, parsed, { ok: true });
-
   let recentUserMessages: string[] = [];
   try {
     recentUserMessages = await loadRecentUserMessages(
@@ -114,6 +113,14 @@ export async function handleLineTextMessage(input: {
   } catch (ctxErr) {
     log.warn({ err: ctxErr }, "loadRecentUserMessages failed; continuing without context");
   }
+
+  try {
+    parsed = await promoteGoogleSheetsFollowUp(text, parsed, recentUserMessages, db, channelUserId);
+  } catch (promoErr) {
+    log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");
+  }
+
+  await saveIntentRun(db, inboundMessageId, parsed, { ok: true });
 
   const handler = getHandler(parsed.intent);
   const routable =

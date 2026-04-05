@@ -74,6 +74,12 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
         "【未対応時の追加ルール】ドラフトに既に謝意と「記録した」旨がある。**同じ意味の断りを繰り返さない**。**「成長」ネタで盛らない**（ドラフトに書いてある事実だけ）。全体は**短く**（目安3〜5文）。"
       );
     }
+    if (input.situation === "success" && /（参照:\s*シート「/.test(input.draft)) {
+      userBits.push(
+        "",
+        "【スプレッドシート参照成功】ドラフトは**すでにシートを読み取った結果**です。「リンクを開けない」「中身を覗けない」など**アクセス不能の断りは禁止**（矛盾する）。導入はデータ要約・次の一歩に寄せる。"
+      );
+    }
 
     const completion = await client.chat.completions.create({
       model: env.OPENAI_INTENT_MODEL,

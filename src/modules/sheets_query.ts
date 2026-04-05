@@ -63,7 +63,7 @@ function resolveSheetTitle(pick: string, titles: string[]): string {
   return titles[0] ?? t;
 }
 
-async function loadUserDefault(db: Db, lineUserId: string): Promise<string | null> {
+export async function loadUserSpreadsheetDefault(db: Db, lineUserId: string): Promise<string | null> {
   try {
     const r = await db.query<{ spreadsheet_id: string }>(
       `SELECT spreadsheet_id FROM user_sheet_defaults WHERE line_user_id = $1`,
@@ -165,7 +165,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   let spreadsheetId =
     paramSpreadsheetId(ctx.intent) ??
     idFromMessage ??
-    (await loadUserDefault(ctx.db, ctx.channelUserId)) ??
+    (await loadUserSpreadsheetDefault(ctx.db, ctx.channelUserId)) ??
     env.GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID?.trim() ??
     null;
 

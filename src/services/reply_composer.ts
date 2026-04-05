@@ -39,6 +39,15 @@ function temperatureForSituation(s: ComposeInput["situation"]): number {
 export async function composeNearReply(input: ComposeInput): Promise<string> {
   const env = getEnv();
   const log = getLogger();
+
+  // シート読取成功ドラフトは API 済みの事実が本文に含まれる。ペルソナ整形で「リンクを開けない」等が
+  // 付くと論理矛盾になるため、そのまま返す（answerWithLlm 側で NEAR 口調の土台はある）。
+  const sheetsSuccess =
+    input.situation === "success" && /（参照:\s*シート「/.test(input.draft);
+  if (sheetsSuccess) {
+    return input.draft;
+  }
+
   const persona = await getPersona();
 
   try {
@@ -74,14 +83,6 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
         "【未対応時の追加ルール】ドラフトに既に謝意と「記録した」旨がある。**同じ意味の断りを繰り返さない**。**「成長」ネタで盛らない**（ドラフトに書いてある事実だけ）。全体は**短く**（目安3〜5文）。"
       );
     }
-    const sheetsSuccess = input.situation === "success" && /（参照:\s*シート「/.test(input.draft);
-    if (sheetsSuccess) {
-      userBits.push(
-        "",
-        "【スプレッドシート参照成功】ドラフトは**ユーザー指示に沿って**シートを読み取り整形した結果です。「リンクを開けない」等**アクセス不能の断りは禁止**。**体裁・見出し・段落/箇条書きの比率はドラフトどおり維持**し、勝手に一覧だけに組み換えない。**数値・結論・根拠は省略しない**。ユーザーが短文・報告調・締めなしの指定ならそのまま。指定がなければ導入・締めを短く NEAR 口調に整えてよい。"
-      );
-    }
-
     const completion = await client.chat.completions.create({
       model: env.OPENAI_INTENT_MODEL,
       messages: [
@@ -91,7 +92,7 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
           content: userBits.join("\n"),
         },
       ],
-      max_tokens: sheetsSuccess ? 1100 : 520,
+      max_tokens: 520,
       temperature: temperatureForSituation(input.situation),
     });
     const text = completion.choices[0]?.message?.content?.trim();

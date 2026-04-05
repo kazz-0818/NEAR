@@ -1,6 +1,10 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
-# ダッシュボードでリポジトリと連携後、このファイルで Web サービスを定義できます。
-# 秘密はダッシュボードの Environment で設定してください。
+#
+# デプロイ後:
+# - ブラウザでルート https://<サービス名>.onrender.com/ を開くと、公開 URL・/health・Render ダッシュボードへのリンクが表示されます。
+# - Render が自動で付与: RENDER_EXTERNAL_URL, RENDER_SERVICE_ID, RENDER=true など（手動設定不要）
+# - PUBLIC_BASE_URL は任意。未設定でも RENDER_EXTERNAL_URL を通知・/health で利用します。
+# 秘密（DATABASE_URL, LINE_*, OPENAI_*, ADMIN_API_KEY 等）はダッシュボードの Environment で設定してください。
 
 services:
   - type: web

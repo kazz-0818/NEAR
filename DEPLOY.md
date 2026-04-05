@@ -29,7 +29,7 @@
 | `GROWTH_MIN_MESSAGE_CHARS` | 既定 `12`。未満はログのみ（`growth_skipped`）。`0` で無効 |
 | `GROWTH_MIN_FINGERPRINT_COUNT` | 既定 `1`（初回から成長候補化）。スパム抑制で `2` 以上にすると同一要約が溜まるまで保留 |
 | `GROWTH_MIN_CONFIDENCE_UNKNOWN` | 既定 `0.35`。`unknown_custom_request` かつ低 confidence はスキップ。`0` で無効 |
-| `PUBLIC_BASE_URL` | 任意。上記通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし） |
+| `PUBLIC_BASE_URL` | 任意。通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし）。**Render では未設定でも `RENDER_EXTERNAL_URL` に自動フォールバック** |
 | `LINE_BOT_USER_ID` | 任意。グループ／トークルームでは **@ボットのメンション** か **本文に「NEAR」「ニア」** がないと返信しない（1:1 は従来どおり）。メンション判定に使う。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |
 | `NEAR_WHATS_NEW` | 任意。改行可。「最近できるようになったこと」を NEAR が短く話すときの本文（デプロイごとに手更新） |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | 任意。**Google Sheets 読み取り**。サービスアカウント鍵の JSON 文字列（1行推奨）。改行が難しいときは `GOOGLE_SERVICE_ACCOUNT_JSON_B64` |
@@ -114,6 +114,8 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 5. **Deploy**。URL が発行されたら LINE の Webhook を更新
 
 `render.yaml` を使う場合は **Blueprint** からリポジトリを指定。
+
+**ブラウザで確認:** デプロイ後、発行された URL の**ルート**（例: `https://near-xxxx.onrender.com/`）を開くと、公開 URL・`/health`・**Render ダッシュボード（このサービス）**へのリンクが表示されます。稼働確認は `GET /health`（JSON に `render`・`public_base_url` が含まれる場合あり）。
 
 ---
 

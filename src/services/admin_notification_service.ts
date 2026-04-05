@@ -1,5 +1,6 @@
 import { pushText } from "../channels/line/client.js";
 import { getEnv } from "../config/env.js";
+import { getEffectivePublicBaseUrl } from "../lib/renderRuntime.js";
 import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
 import { formatGrowthDifficultyLines } from "../lib/growth_tiers.js";
@@ -95,9 +96,9 @@ export async function notifyGrowthFirstApproval(input: {
   userSummary: string;
   userOriginalSnippet: string;
 }): Promise<void> {
-  const env = getEnv();
   const log = getLogger();
-  const adminBase = env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL}/admin` : null;
+  const publicBase = getEffectivePublicBaseUrl();
+  const adminBase = publicBase ? `${publicBase}/admin` : null;
   const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   let tierLines: string[] = [];
   try {
@@ -244,9 +245,9 @@ export async function notifyCodingReady(input: {
   runnerHint: string;
 }): Promise<void> {
   const log = getLogger();
-  const env = getEnv();
   const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
-  const adminBase = env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL}/admin` : null;
+  const publicBase = getEffectivePublicBaseUrl();
+  const adminBase = publicBase ? `${publicBase}/admin` : null;
   const fullTextUrl = adminBase
     ? `${adminBase}/suggestions/${input.suggestionId}/cursor-prompt`
     : null;
@@ -262,7 +263,7 @@ export async function notifyCodingReady(input: {
       ? `【全文取得】${fullTextUrl}\n（Authorization: Bearer <ADMIN_API_KEY> で GET。下のコピー用は長いと省略されます）`
       : "※ 全文は GET /admin/suggestions/" +
         input.suggestionId +
-        "/cursor-prompt（Authorization: Bearer <ADMIN_API_KEY>）。PUBLIC_BASE_URL を設定すると URL をここに載せられます。",
+        "/cursor-prompt（Authorization: Bearer <ADMIN_API_KEY>）。PUBLIC_BASE_URL または Render の RENDER_EXTERNAL_URL があれば通知に URL を載せられます。",
     promptWasTruncated ? "※ 以下の「コピー用」は文字数のため途中までです。全文は上記 URL または cursor-prompt エンドポイントで取得してください。" : "",
     "",
     "---- コピー用（cursor_prompt・省略の可能性あり）----",

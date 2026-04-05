@@ -20,17 +20,75 @@ import {
 } from "./channels/line/groupMention.js";
 import { fireAndForgetObserveLineGroup } from "./services/line_group_observation.js";
 import { getDeployedAtIso } from "./lib/buildInfo.js";
+import {
+  escapeHtmlAttr,
+  getEffectivePublicBaseUrl,
+  getRenderRuntimeInfo,
+} from "./lib/renderRuntime.js";
 
 const app = new Hono();
 const log = getLogger();
 
-app.get("/health", (c) =>
-  c.json({
+app.get("/health", (c) => {
+  const render = getRenderRuntimeInfo();
+  const publicBase = getEffectivePublicBaseUrl();
+  return c.json({
     ok: true,
     service: "NEAR",
     built_at: getDeployedAtIso(),
-  })
-);
+    public_base_url: publicBase ?? null,
+    render: render.on_render
+      ? {
+          external_url: render.external_url,
+          dashboard_url: render.dashboard_url,
+          service_id: render.service_id,
+        }
+      : null,
+  });
+});
+
+/** ブラウザで開きやすい簡易ページ（Render の URL・ダッシュボード導線） */
+app.get("/", (c) => {
+  const render = getRenderRuntimeInfo();
+  const publicBase = getEffectivePublicBaseUrl();
+  const parts: string[] = [
+    "<!DOCTYPE html>",
+    '<html lang="ja"><head><meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    "<title>NEAR</title>",
+    "<style>",
+    "body{font-family:system-ui,-apple-system,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1.25rem;line-height:1.55;color:#1a1a1a}",
+    "h1{font-size:1.35rem}",
+    "ul{padding-left:1.2rem}",
+    "a{color:#0466c8}",
+    "code{font-size:.9em;background:#f0f0f0;padding:.1em .35em;border-radius:4px}",
+    "</style></head><body>",
+    "<h1>NEAR</h1>",
+    "<p>LINE 秘書ボットの HTTP エンドポイントです。</p>",
+    "<ul>",
+    '<li><a href="/health">/health</a>（JSON・稼働確認）</li>',
+  ];
+  if (publicBase) {
+    const safe = escapeHtmlAttr(publicBase);
+    parts.push(
+      `<li>公開 URL: <a href="${safe}">${safe}</a>（Webhook は <code>/webhook/line</code>）</li>`
+    );
+  } else {
+    parts.push("<li>公開 URL: 環境変数 <code>PUBLIC_BASE_URL</code> または Render の <code>RENDER_EXTERNAL_URL</code> で表示されます</li>");
+  }
+  if (render.dashboard_url) {
+    const d = escapeHtmlAttr(render.dashboard_url);
+    parts.push(
+      `<li><a href="${d}" rel="noopener noreferrer">Render ダッシュボード（このサービス）</a></li>`
+    );
+  } else if (render.on_render) {
+    parts.push(
+      '<li><a href="https://dashboard.render.com/" rel="noopener noreferrer">Render ダッシュボード</a>（一覧からサービスを開いてください）</li>'
+    );
+  }
+  parts.push("</ul>", "<p style=\"font-size:.9rem;color:#555\">管理 API は <code>/admin</code> 配下（要 <code>Authorization: Bearer …</code>）。</p>", "</body></html>");
+  return c.html(parts.join(""));
+});
 
 app.post("/internal/reminders/dispatch", async (c) => {
   const env = getEnv();

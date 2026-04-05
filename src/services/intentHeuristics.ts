@@ -155,3 +155,40 @@ export function rescueCasualShortMessage(userText: string): ParsedIntent | null 
 
   return null;
 }
+
+const SUMMARIZE_LIKE = /要約して|要約を|まとめて|箇条書きにして/i;
+const REMINDER_ACTION = /リマインド(して|を|に登録|お願い)|通知してくれ|思い出させて/i;
+
+/**
+ * 天気・URL・一般知識っぽい質問を unknown に落とさず simple_question へ（長めの文も対象）。
+ */
+export function rescueBroadSimpleQuestion(userText: string): ParsedIntent | null {
+  if (TASK_LIKE.test(userText)) return null;
+  if (SUMMARIZE_LIKE.test(userText)) return null;
+  if (REMINDER_ACTION.test(userText)) return null;
+
+  const t = userText.normalize("NFKC").trim();
+  if (t.length === 0 || t.length > 420) return null;
+
+  const looksGeneralQA =
+    /[?？]/.test(t) ||
+    /ですか|でしょうか|だろうか|ください|教えて|を知りたい|って(何|なに)|とは[?？]?$/u.test(t) ||
+    /いつ|いつから|どこ|だれ|誰が|なぜ|どうやって|どうすれば|いくつ|何歳|意味は|理由は/u.test(t);
+
+  const looksWeather = /天気|気温|降水|雪か|雨か|晴れ|weather|forecast|予報(は|を|が)?/i.test(t);
+  const looksUrl =
+    /url|URL|リンク|ホームページ|ウェブサイト|公式(サイト|ページ)|ドメイン|このサイト|そのサイト/i.test(t);
+
+  if (!looksGeneralQA && !looksWeather && !looksUrl) return null;
+
+  return {
+    intent: "simple_question",
+    confidence: 0.9,
+    can_handle: true,
+    required_params: {},
+    needs_followup: false,
+    followup_question: null,
+    reason: "heuristic_broad_simple_question",
+    suggested_category: null,
+  };
+}

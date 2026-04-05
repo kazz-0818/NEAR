@@ -8,7 +8,11 @@ import {
   parsedIntentSchema,
 } from "../models/intent.js";
 import { buildIntentUserEnvelope } from "../lib/datetimeContext.js";
-import { matchIntentHeuristic, rescueCasualShortMessage } from "./intentHeuristics.js";
+import {
+  matchIntentHeuristic,
+  rescueBroadSimpleQuestion,
+  rescueCasualShortMessage,
+} from "./intentHeuristics.js";
 
 let systemPromptCache: string | null = null;
 
@@ -46,18 +50,26 @@ export async function classifyIntent(userText: string): Promise<ParsedIntent> {
     const json = JSON.parse(raw) as unknown;
     let parsed = parsedIntentSchema.parse(json);
     // モデルが挨拶・ヘルプだけ can_handle:false にすることがあるので上書き
-    if (parsed.intent === "greeting" || parsed.intent === "help_capabilities") {
+    if (
+      parsed.intent === "greeting" ||
+      parsed.intent === "help_capabilities" ||
+      parsed.intent === "simple_question"
+    ) {
       parsed = { ...parsed, can_handle: true };
     }
     if (parsed.intent === "unknown_custom_request" || !parsed.can_handle) {
       const rescue = rescueCasualShortMessage(userText);
       if (rescue) return rescue;
+      const broad = rescueBroadSimpleQuestion(userText);
+      if (broad) return broad;
     }
     return parsed;
   } catch (e) {
     log.warn({ err: e }, "Intent classification failed, using fallback");
     const rescue = rescueCasualShortMessage(userText);
     if (rescue) return rescue;
+    const broad = rescueBroadSimpleQuestion(userText);
+    if (broad) return broad;
     return {
       intent: "unknown_custom_request",
       confidence: 0,

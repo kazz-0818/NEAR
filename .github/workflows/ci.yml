@@ -1,4 +1,4 @@
-# main への push / PR でビルド検証。Render で autoDeployTrigger: checksPass のとき、このチェック成功後にデプロイされます。
+# main への push / PR でビルド検証。Render は commit トリガーで push 直後にデプロイ（このジョブ完了を待たない）。
 name: CI
 
 on:
@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# デフォルト GITHUB_TOKEN の権限を明示（組織ポリシーでブロックされにくくする）
+permissions:
+  contents: read
 
 jobs:
   build:

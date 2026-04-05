@@ -12,9 +12,9 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    # main へ push 後、GitHub の CI（.github/workflows/ci.yml）が成功したら自動デプロイ
+    # main へ push したら即自動デプロイ（CI 成否を待たない）。品質ゲートは CI ログで確認。
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_ENV
         value: production

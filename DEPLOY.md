@@ -142,7 +142,11 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 
 **ブラウザで確認:** デプロイ後、発行された URL の**ルート**（例: `https://near-xxxx.onrender.com/`）を開くと、公開 URL・`/health`・**Render ダッシュボード（このサービス）**へのリンクが表示されます。稼働確認は `GET /health`（JSON に `render`・`public_base_url` が含まれる場合あり）。
 
-**自動ビルド・自動デプロイ:** リポジトリに [`.github/workflows/ci.yml`](.github/workflows/ci.yml) があり、`main` へ push すると GitHub Actions で `npm run build` が走ります。`render.yaml` の `autoDeployTrigger: checksPass` は、**その CI が成功したあと** Render がデプロイする設定です（Render と GitHub を連携済みであることが前提。CI 無しで毎回即デプロイしたい場合は `autoDeployTrigger: commit` に変更）。
+**自動ビルド・自動デプロイ:** `main` へ push すると [`.github/workflows/ci.yml`](.github/workflows/ci.yml) で `npm run build` が走ります。`render.yaml` は **`autoDeployTrigger: commit`**（push 直後に Render がデプロイ。CI 完了を待たない）です。デプロイ前に CI 成功を必須にしたい場合は `checksPass` に変更し、Render ダッシュボードで GitHub 連携を確認してください。
+
+**GitHub でワークフローが「承認が必要」と止まる場合:** リポジトリ **Settings → Actions → General** で、フォークからの PR や初回コントリビュータの承認ポリシーを確認してください。組織リポジトリならオーナーに **Actions を有効化**してもらう必要があります（リポジトリの YAML だけでは解除できません）。
+
+**Cursor などエディタの「RUN（コマンド実行）を毎回確認」:** リポジトリ外の **Cursor / VS Code の設定**（エージェントの自動承認・ターミナル権限）で変えます。この NEAR リポジトリのファイルでは制御しません。
 
 ---
 

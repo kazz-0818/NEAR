@@ -2,7 +2,6 @@ import { pushText } from "../channels/line/client.js";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
-
 const LINE_TEXT_MAX = 4800;
 
 function clip(s: string, max = 3500): string {
@@ -10,10 +9,19 @@ function clip(s: string, max = 3500): string {
   return s.slice(0, max - 20) + "\n…(省略)";
 }
 
-async function send(adminUserId: string, body: string): Promise<void> {
+function resolveGrowthAdminPushTo(): string | null {
+  const env = getEnv();
+  if (env.GROWTH_APPROVAL_GROUP_ID) return env.GROWTH_APPROVAL_GROUP_ID;
+  if (env.ADMIN_LINE_USER_ID) return env.ADMIN_LINE_USER_ID;
+  return null;
+}
+
+async function sendGrowthAdminChannel(body: string): Promise<void> {
+  const to = resolveGrowthAdminPushTo();
+  if (!to) return;
   let text = body;
   if (text.length > LINE_TEXT_MAX) text = text.slice(0, LINE_TEXT_MAX - 20) + "\n…(省略)";
-  await pushText(adminUserId, text);
+  await pushText(to, text);
 }
 
 /** 依頼ユーザーへ: 成長候補として進めてよいか（管理者より先） */
@@ -37,7 +45,9 @@ export async function notifyUserGrowthConsent(input: {
     `（候補 #${input.suggestionId}）`,
   ].join("\n");
   try {
-    await send(input.lineUserId, body);
+    let text = body;
+    if (text.length > LINE_TEXT_MAX) text = text.slice(0, LINE_TEXT_MAX - 20) + "\n…(省略)";
+    await pushText(input.lineUserId, text);
   } catch (e) {
     log.warn({ err: e }, "user notify growth consent failed");
   }
@@ -72,7 +82,7 @@ export async function notifyGrowthFirstApproval(input: {
     .filter(Boolean)
     .join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify first approval failed");
   }
@@ -92,7 +102,7 @@ export async function notifyHearingQuestion(input: {
     `（suggestion #${input.suggestionId}）`,
   ].join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify hearing failed");
   }
@@ -151,7 +161,7 @@ export async function notifyFinalApproval(input: {
     .filter(Boolean)
     .join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify final approval failed");
   }
@@ -175,7 +185,7 @@ export async function notifyCodingReady(input: {
     `（suggestion #${input.suggestionId}）`,
   ].join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify coding ready failed");
   }
@@ -196,7 +206,7 @@ export async function notifyProgress(input: {
     `suggestion #${input.suggestionId}`,
   ].join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify progress failed");
   }
@@ -223,7 +233,7 @@ export async function notifyGrowthComplete(input: {
     `suggestion #${input.suggestionId}`,
   ].join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify complete failed");
   }
@@ -242,7 +252,7 @@ export async function notifyGrowthRejected(input: {
     `suggestion #${input.suggestionId}`,
   ].join("\n");
   try {
-    await send(input.adminUserId, body);
+    await sendGrowthAdminChannel(body);
   } catch (e) {
     log.warn({ err: e }, "admin notify rejected failed");
   }

@@ -12,6 +12,7 @@ import { replyOrPush } from "./channels/line/client.js";
 import { createAdminApp } from "./admin/routes.js";
 import { startReminderCron, dispatchDueReminders } from "./jobs/reminder_dispatcher.js";
 import {
+  isConfiguredGrowthApprovalGroup,
   isLineGroupOrRoomSource,
   textContainsNearNameReferral,
   textMessageMentionsBot,
@@ -105,12 +106,18 @@ async function lineMessagingWebhook(c: Context) {
       }
       const groupText = String(message.text ?? "").trim();
       if (!groupText) continue;
-      const botId = envLine.LINE_BOT_USER_ID;
-      const mentioned = botId ? textMessageMentionsBot(message, botId) : false;
-      const nameRef = textContainsNearNameReferral(groupText);
-      if (!mentioned && !nameRef) {
-        log.info({ messageId }, "group/room: skip (no bot mention and no NEAR/ニア in text)");
-        continue;
+      const isGrowthCapsule =
+        envLine.ADMIN_LINE_USER_ID &&
+        userId === envLine.ADMIN_LINE_USER_ID &&
+        isConfiguredGrowthApprovalGroup(source, envLine.GROWTH_APPROVAL_GROUP_ID);
+      if (!isGrowthCapsule) {
+        const botId = envLine.LINE_BOT_USER_ID;
+        const mentioned = botId ? textMessageMentionsBot(message, botId) : false;
+        const nameRef = textContainsNearNameReferral(groupText);
+        if (!mentioned && !nameRef) {
+          log.info({ messageId }, "group/room: skip (no bot mention and no NEAR/ニア in text)");
+          continue;
+        }
       }
     }
 

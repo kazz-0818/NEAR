@@ -22,6 +22,15 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /**
+   * 成長フローの**管理者向け**通知・承認のやりとりを行う LINE グループID または トークルームID（任意）。
+   * 例: 「ニア進化カプセル」グループを作り、ボットを招待したうえで Webhook の groupId / roomId を設定。
+   * 設定時は承認系プッシュがここへ届き、そのグループ内では ADMIN_LINE_USER_ID の送信者は @メンションなしで承認コマンド可。
+   */
+  GROWTH_APPROVAL_GROUP_ID: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
   /** 管理APIのベースURL表示用（末尾スラッシュなし推奨、任意） */
   PUBLIC_BASE_URL: z
     .string()

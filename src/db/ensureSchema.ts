@@ -10,6 +10,7 @@ const MIGRATION_FILES = [
   "002_growth.sql",
   "003_growth_flow.sql",
   "004_growth_user_flow.sql",
+  "005_near_line_groups.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

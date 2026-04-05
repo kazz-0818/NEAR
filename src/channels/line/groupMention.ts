@@ -35,3 +35,26 @@ export function textContainsNearNameReferral(raw: string): boolean {
   if (n.includes("ニア")) return true;
   return /(^|[^A-Za-z0-9])NEAR([^A-Za-z0-9]|$)/i.test(n);
 }
+
+/** グループなら groupId、トークルームなら roomId（それ以外は undefined） */
+export function getLineGroupOrRoomId(source: Record<string, unknown> | undefined): string | undefined {
+  if (!source) return undefined;
+  if (source.type === "group" && typeof source.groupId === "string" && source.groupId.trim()) {
+    return source.groupId.trim();
+  }
+  if (source.type === "room" && typeof source.roomId === "string" && source.roomId.trim()) {
+    return source.roomId.trim();
+  }
+  return undefined;
+}
+
+/** GROWTH_APPROVAL_GROUP_ID（環境変数）と同一のグループ／ルームか */
+export function isConfiguredGrowthApprovalGroup(
+  source: Record<string, unknown> | undefined,
+  configuredGroupOrRoomId: string | undefined
+): boolean {
+  const cfg = configuredGroupOrRoomId?.trim();
+  if (!cfg) return false;
+  const id = getLineGroupOrRoomId(source);
+  return id === cfg;
+}

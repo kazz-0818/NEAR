@@ -1,20 +1,16 @@
 import { getEnv } from "../config/env.js";
 import type { Db } from "../db/client.js";
+import { extractSpreadsheetIdFromText } from "../lib/googleSheetsAuth.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import type { ParsedIntent } from "../models/intent.js";
 import { loadUserSpreadsheetDefault } from "../modules/sheets_query.js";
 
-function extractSpreadsheetId(s: string): string | null {
-  const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  return m?.[1] ?? null;
-}
-
 /** 今回の発言と、それより前のユーザー発言（古い順）からスプレッドシート ID を探す（新しい方優先） */
 export function findSpreadsheetIdInUserThread(text: string, recentUserMessages: string[]): string | null {
-  const fromNow = extractSpreadsheetId(text);
+  const fromNow = extractSpreadsheetIdFromText(text);
   if (fromNow) return fromNow;
   for (let i = recentUserMessages.length - 1; i >= 0; i--) {
-    const id = extractSpreadsheetId(recentUserMessages[i]!);
+    const id = extractSpreadsheetIdFromText(recentUserMessages[i]!);
     if (id) return id;
   }
   return null;
@@ -22,8 +18,7 @@ export function findSpreadsheetIdInUserThread(text: string, recentUserMessages: 
 
 /** 会話内のユーザー発言にスプレッドシート URL が一度でも出ているか（続き質問の文脈があるか） */
 function spreadsheetUrlInUserThread(text: string, recentUserMessages: string[]): boolean {
-  if (extractSpreadsheetId(text)) return true;
-  return recentUserMessages.some((m) => extractSpreadsheetId(m) != null);
+  return findSpreadsheetIdInUserThread(text, recentUserMessages) != null;
 }
 
 /**

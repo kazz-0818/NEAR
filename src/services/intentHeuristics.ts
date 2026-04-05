@@ -1,3 +1,4 @@
+import { extractSpreadsheetIdFromText } from "../lib/googleSheetsAuth.js";
 import type { ParsedIntent } from "../models/intent.js";
 
 const base = (intent: ParsedIntent["intent"]): ParsedIntent => ({
@@ -91,13 +92,13 @@ function matchesHelpCore(core: string): boolean {
 
 /** Google スプレッドシートの共有 URL が含まれる → Sheets 参照モジュールへ（FAQ の「リンクは開けない」に落とさない） */
 function matchGoogleSheetsUrlHeuristic(userText: string): ParsedIntent | null {
-  const m = userText.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!m?.[1]) return null;
+  const id = extractSpreadsheetIdFromText(userText);
+  if (!id) return null;
   return {
     intent: "google_sheets_query",
     confidence: 1,
     can_handle: true,
-    required_params: { spreadsheet_id: m[1] },
+    required_params: { spreadsheet_id: id },
     needs_followup: false,
     followup_question: null,
     reason: "heuristic_sheets_url",

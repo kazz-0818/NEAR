@@ -54,8 +54,19 @@ export async function getSheetsAPI(): Promise<sheets_v4.Sheets> {
   return sheetsClient;
 }
 
-/** docs.google.com/spreadsheets/d/<id>/… から ID を取り出す */
+/**
+ * docs.google.com/.../spreadsheets/d/<id>/… から ID を取り出す。
+ * LINE 貼り付けのゼロ幅文字・改行・全半角ゆれを吸収する。
+ */
 export function extractSpreadsheetIdFromText(text: string): string | null {
-  const m = text.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const cleaned = text
+    .normalize("NFKC")
+    .replace(/\u200b|\u200c|\u200d|\ufeff/g, "")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const m =
+    cleaned.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{20,})/) ??
+    cleaned.match(/spreadsheets\/d\/([a-zA-Z0-9-_]{20,})/i);
   return m?.[1] ?? null;
 }

@@ -1,5 +1,7 @@
 # NEAR 成長フロー（設計メモ）
 
+**自己成長型の全体像・DB 拡張・フェーズ計画:** [`docs/NEAR_SELF_GROWTH_ARCHITECTURE.md`](docs/NEAR_SELF_GROWTH_ARCHITECTURE.md)
+
 ## 成果物インデックス
 
 1. **DB**: `src/db/migrations/003_growth_flow.sql`（`unsupported_requests` 拡張、`implementation_suggestions` 拡張、`growth_admin_sessions`、`growth_hearing_items`、`capability_registry`）

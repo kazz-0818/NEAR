@@ -19,9 +19,10 @@ import {
   evaluateGrowthSuggestionEligibility,
   markUnsupportedGrowthSkipped,
 } from "./growth_suggestion_gate.js";
-import { loadRecentUserMessages } from "./conversation_context.js";
+import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
 import { promoteGoogleSheetsFollowUp } from "./sheetsIntentFollowUp.js";
 import { tryHandleGoogleOAuthUserLine } from "./google_oauth_user_line.js";
+import { saveOutboundAssistantText } from "./outbound_store.js";
 
 async function saveIntentRun(
   db: Db,
@@ -36,6 +37,27 @@ async function saveIntentRun(
   );
 }
 
+async function replyLineAndRememberOutbound(
+  db: Db,
+  ctx: { channel: string; channelUserId: string; inboundMessageId: number },
+  replyToken: string,
+  lineUserId: string,
+  finalText: string,
+  log: ReturnType<typeof getLogger>
+): Promise<void> {
+  await replyOrPush(replyToken, lineUserId, finalText);
+  try {
+    await saveOutboundAssistantText(db, {
+      channel: ctx.channel,
+      channelUserId: ctx.channelUserId,
+      text: finalText,
+      inboundMessageId: ctx.inboundMessageId,
+    });
+  } catch (e) {
+    log.warn({ err: e }, "saveOutboundAssistantText failed");
+  }
+}
+
 export async function handleLineTextMessage(input: {
   db: Db;
   replyToken: string;
@@ -47,24 +69,25 @@ export async function handleLineTextMessage(input: {
   const { db, replyToken, channelUserId, text, inboundMessageId } = input;
   const channel = "line";
   const env = getEnv();
+  const outboundCtx = { channel, channelUserId, inboundMessageId };
 
   if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
     const growth = await tryHandleAdminGrowthLine({ db, adminUserId: channelUserId, text });
     if (growth.handled) {
-      await replyOrPush(replyToken, channelUserId, growth.reply);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, growth.reply, log);
       return;
     }
   }
 
   const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text });
   if (userGrowth.handled) {
-    await replyOrPush(replyToken, channelUserId, userGrowth.reply);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, userGrowth.reply, log);
     return;
   }
 
   const googleOauth = await tryHandleGoogleOAuthUserLine({ db, channelUserId, text });
   if (googleOauth.handled && googleOauth.reply) {
-    await replyOrPush(replyToken, channelUserId, googleOauth.reply);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, googleOauth.reply, log);
     return;
   }
 
@@ -76,7 +99,7 @@ export async function handleLineTextMessage(input: {
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed (deploy time path)");
     }
-    await replyOrPush(replyToken, channelUserId, finalText);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
     return;
   }
 
@@ -88,7 +111,7 @@ export async function handleLineTextMessage(input: {
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed (whats new path)");
     }
-    await replyOrPush(replyToken, channelUserId, finalText);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
     return;
   }
 
@@ -110,15 +133,12 @@ export async function handleLineTextMessage(input: {
   }
 
   let recentUserMessages: string[] = [];
+  let recentAssistantMessages: string[] = [];
   try {
-    recentUserMessages = await loadRecentUserMessages(
-      db,
-      channel,
-      channelUserId,
-      inboundMessageId
-    );
+    recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId);
+    recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId);
   } catch (ctxErr) {
-    log.warn({ err: ctxErr }, "loadRecentUserMessages failed; continuing without context");
+    log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }
 
   try {
@@ -172,11 +192,12 @@ export async function handleLineTextMessage(input: {
           situation: "unsupported",
           userMessage: text,
           recentUserMessages,
+          recentAssistantMessages,
         });
       } catch (ce) {
         log.warn({ err: ce }, "composeNearReply failed (unsupported path)");
       }
-      await replyOrPush(replyToken, channelUserId, finalText);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
       return;
     }
 
@@ -188,6 +209,7 @@ export async function handleLineTextMessage(input: {
       originalText: text,
       inboundMessageId,
       recentUserMessages,
+      recentAssistantMessages,
     });
 
     const situation =
@@ -230,11 +252,12 @@ export async function handleLineTextMessage(input: {
         situation,
         userMessage: text,
         recentUserMessages,
+        recentAssistantMessages,
       });
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed, sending draft as-is");
     }
-    await replyOrPush(replyToken, channelUserId, finalText);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
   } catch (e) {
     log.error({ err: e }, "orchestrator pipeline error");
     const draft =
@@ -246,10 +269,11 @@ export async function handleLineTextMessage(input: {
         situation: "error",
         userMessage: text,
         recentUserMessages,
+        recentAssistantMessages,
       });
     } catch {
       /* draft のまま */
     }
-    await replyOrPush(replyToken, channelUserId, finalText);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
   }
 }

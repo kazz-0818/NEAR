@@ -14,6 +14,7 @@ const MIGRATION_FILES = [
   "006_near_line_groups_auto_observe.sql",
   "007_user_sheet_defaults.sql",
   "008_user_google_oauth.sql",
+  "009_outbound_messages.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

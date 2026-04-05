@@ -36,3 +36,34 @@ export async function loadRecentUserMessages(
     return `${t.slice(0, maxChars)}…`;
   });
 }
+
+/**
+ * 同一ユーザーについて、今回の inbound より前に送った NEAR 側テキストを古い順で返す（続き一言の文脈用）。
+ */
+export async function loadRecentAssistantMessages(
+  db: Db,
+  channel: string,
+  channelUserId: string,
+  beforeInboundId: number,
+  options: LoadRecentUserMessagesOptions = {}
+): Promise<string[]> {
+  const limit = options.limit ?? 8;
+  const maxChars = options.maxCharsPerMessage ?? 12000;
+
+  const res = await db.query<{ text: string }>(
+    `SELECT text FROM outbound_messages
+     WHERE channel = $1 AND channel_user_id = $2
+       AND inbound_message_id IS NOT NULL
+       AND inbound_message_id < $3
+     ORDER BY inbound_message_id DESC
+     LIMIT $4`,
+    [channel, channelUserId, beforeInboundId, limit]
+  );
+
+  const chronological = [...res.rows].reverse();
+  return chronological.map((r) => {
+    const t = r.text.replace(/\s+/g, " ").trim();
+    if (t.length <= maxChars) return t;
+    return `${t.slice(0, maxChars)}…`;
+  });
+}

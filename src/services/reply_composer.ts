@@ -21,6 +21,8 @@ export type ComposeInput = {
   userMessage?: string;
   /** 今回より前のユーザー発言（古い順）。話題の踏襲用（任意） */
   recentUserMessages?: string[];
+  /** 今回より前の NEAR 返答（古い順）。続きの整形依頼の文脈用（任意） */
+  recentAssistantMessages?: string[];
 };
 
 function temperatureForSituation(s: ComposeInput["situation"]): number {
@@ -63,6 +65,19 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
     ];
     if (input.userMessage?.trim()) {
       userBits.push("", `ユーザー発言: ${input.userMessage.trim()}`);
+    }
+    if (input.recentAssistantMessages?.length) {
+      userBits.push(
+        "",
+        "このトークで今回より前の NEAR の返答（古い順・参考）:"
+      );
+      for (let i = 0; i < input.recentAssistantMessages.length; i++) {
+        userBits.push(`${i + 1}. ${input.recentAssistantMessages[i]}`);
+      }
+      userBits.push(
+        "",
+        "ユーザーが直前の返答の見せ方だけを変えているときは、ドラフトの数値・事実を変えず体裁だけ整える。"
+      );
     }
     if (input.recentUserMessages?.length) {
       userBits.push(

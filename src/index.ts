@@ -12,11 +12,13 @@ import { replyOrPush } from "./channels/line/client.js";
 import { createAdminApp } from "./admin/routes.js";
 import { startReminderCron, dispatchDueReminders } from "./jobs/reminder_dispatcher.js";
 import {
+  getLineGroupOrRoomId,
   isConfiguredGrowthApprovalGroup,
   isLineGroupOrRoomSource,
   textContainsNearNameReferral,
   textMessageMentionsBot,
 } from "./channels/line/groupMention.js";
+import { fireAndForgetObserveLineGroup } from "./services/line_group_observation.js";
 import { getDeployedAtIso } from "./lib/buildInfo.js";
 
 const app = new Hono();
@@ -96,6 +98,15 @@ async function lineMessagingWebhook(c: Context) {
     if (isDuplicate) {
       log.warn({ messageId }, "duplicate LINE message id (webhook retry?); skip to avoid double reply");
       continue;
+    }
+
+    const observedGroupId = getLineGroupOrRoomId(source);
+    if (observedGroupId) {
+      fireAndForgetObserveLineGroup(
+        db,
+        observedGroupId,
+        source?.type === "room" ? "room" : "group"
+      );
     }
 
     const inGroup = isLineGroupOrRoomSource(source);

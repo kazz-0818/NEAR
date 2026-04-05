@@ -157,6 +157,30 @@ const envSchema = z.object({
       const n = Number(s);
       return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.35;
     }),
+  /** Google Sheets API 用サービスアカウント鍵（JSON 文字列。改行を含む場合は B64 推奨） */
+  GOOGLE_SERVICE_ACCOUNT_JSON: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 上記 JSON を base64（Render 等での設定向け） */
+  GOOGLE_SERVICE_ACCOUNT_JSON_B64: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 全ユーザー共通の既定スプレッドシート ID（任意） */
+  GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 1シートあたり読み取る最大行数（既定 400、20〜2000） */
+  GOOGLE_SHEETS_MAX_ROWS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 400;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 20 && n <= 2000 ? n : 400;
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -53,7 +53,8 @@ export async function classifyIntent(userText: string): Promise<ParsedIntent> {
     if (
       parsed.intent === "greeting" ||
       parsed.intent === "help_capabilities" ||
-      parsed.intent === "simple_question"
+      parsed.intent === "simple_question" ||
+      parsed.intent === "google_sheets_query"
     ) {
       parsed = { ...parsed, can_handle: true };
     }

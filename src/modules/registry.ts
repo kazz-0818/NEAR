@@ -7,6 +7,7 @@ import { reminderManager } from "./reminder_manager.js";
 import { memoStore } from "./memo_store.js";
 import { summarizer } from "./summarizer.js";
 import { helpCapabilities } from "./capabilities.js";
+import { sheetsQuery } from "./sheets_query.js";
 
 const registry = new Map<IntentName, ModuleHandler>([
   ["greeting", greetingReply],
@@ -16,6 +17,7 @@ const registry = new Map<IntentName, ModuleHandler>([
   ["memo_save", memoStore],
   ["summarize", summarizer],
   ["help_capabilities", helpCapabilities],
+  ["google_sheets_query", sheetsQuery],
 ]);
 
 export function getHandler(intent: IntentName): ModuleHandler | undefined {

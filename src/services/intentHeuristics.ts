@@ -89,6 +89,22 @@ function matchesHelpCore(core: string): boolean {
   return false;
 }
 
+/** Google スプレッドシートの共有 URL が含まれる → Sheets 参照モジュールへ（FAQ の「リンクは開けない」に落とさない） */
+function matchGoogleSheetsUrlHeuristic(userText: string): ParsedIntent | null {
+  const m = userText.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!m?.[1]) return null;
+  return {
+    intent: "google_sheets_query",
+    confidence: 1,
+    can_handle: true,
+    required_params: { spreadsheet_id: m[1] },
+    needs_followup: false,
+    followup_question: null,
+    reason: "heuristic_sheets_url",
+    suggested_category: null,
+  };
+}
+
 /** 外部ツール連携・NEAR に専用実装を期待する依頼は unknown のまま（成長パイプライン用） */
 const INTEGRATION_OR_AUTOMATION = /スプレッドシート(に|へ)(書|記|追|保存|貼|出力)|シートに反映|セルに入れ|([Gg]oogle|Outlook)\s*カレンダー(に|へ)(予定|イベント|登録)|Notion(に)?(ページ|データベース)(を)?(作|保存|追記)|Slack(に)?(投稿|通知|送って)|Webhook|API\s*キー.*(で|を使って).*(連携|取得|書き込)|OAuth.*(連携|認証して).*(実行|取得)/i;
 
@@ -97,9 +113,12 @@ const INTEGRATION_OR_AUTOMATION = /スプレッドシート(に|へ)(書|記|追
  * 単語「予定」「会議」「メモ」単体などは含めない（雑談が未対応に落ちるのを防ぐ）。
  */
 const STRUCTURED_FEATURE_HINT =
-  /\b(TODO|ToDo)\b|タスク(を|に|の)?(作|追加|登録|記録|お願い|ください|頼)|メモ(に|を)(残|保存|書|取|記録)|メモして|スプレッド|カレンダー(に|へ)|会議のメモ|会議を記録|Notion|Slack(に)?(投稿|通知|送って)|Webhook|決済|請求書|パスワード管理|リマインド/i;
+  /\b(TODO|ToDo)\b|タスク(を|に|の)?(作|追加|登録|記録|お願い|ください|頼)|メモ(に|を)(残|保存|書|取|記録)|メモして|スプレッドシート(に|へ)(書|記|追|保存|貼|出力)|カレンダー(に|へ)|会議のメモ|会議を記録|Notion|Slack(に)?(投稿|通知|送って)|Webhook|決済|請求書|パスワード管理|リマインド/i;
 
 export function matchIntentHeuristic(userText: string): ParsedIntent | null {
+  const sheets = matchGoogleSheetsUrlHeuristic(userText);
+  if (sheets) return sheets;
+
   const normalized = normalizeForIntent(userText);
   const core = corePhrase(normalized);
   if (core.length === 0 || core.length > 56) return null;

@@ -32,8 +32,32 @@
 | `PUBLIC_BASE_URL` | 任意。上記通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし） |
 | `LINE_BOT_USER_ID` | 任意。グループ／トークルームでは **@ボットのメンション** か **本文に「NEAR」「ニア」** がないと返信しない（1:1 は従来どおり）。メンション判定に使う。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |
 | `NEAR_WHATS_NEW` | 任意。改行可。「最近できるようになったこと」を NEAR が短く話すときの本文（デプロイごとに手更新） |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | 任意。**Google Sheets 読み取り**。サービスアカウント鍵の JSON 文字列（1行推奨）。改行が難しいときは `GOOGLE_SERVICE_ACCOUNT_JSON_B64` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | 任意。上記 JSON を base64 エンコードしたもの（Render 等向け） |
+| `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` | 任意。全員共通の既定ブック ID（URL の `/d/` と次の `/` の間） |
+| `GOOGLE_SHEETS_MAX_ROWS` | 任意。1シートあたり読み取る最大行数（既定 `400`、20〜2000） |
 
-初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001`〜`003_growth_flow.sql`）。
+初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001`〜`007_user_sheet_defaults.sql` など）。
+
+## Google スプレッドシート（読み取り）
+
+LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEAR が **Sheets API で表を取得**し、**AI がシートを選んで内容を解釈**して答えます（[`src/modules/sheets_query.ts`](src/modules/sheets_query.ts)）。
+
+**あなたの個人 Google アカウントに「ログインさせる」OAuth は未実装**です。代わりに次の運用です。
+
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、**Google Sheets API** を有効化する。
+2. **サービスアカウント**を作成し、JSON 鍵をダウンロードする。
+3. 鍵の `client_email`（`….iam.gserviceaccount.com`）をコピーする。
+4. 参照したいスプレッドシートの **共有**で、そのメールアドレスに **閲覧者**（または編集者）を追加する。
+5. NEAR の環境変数に `GOOGLE_SERVICE_ACCOUNT_JSON`（または `_B64`）を設定してデプロイする。
+
+**ブックの指定**
+
+- メッセージに `https://docs.google.com/spreadsheets/d/xxxxxxxx/edit…` を含める、または
+- `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` を設定する、または
+- 一度「このシートを既定にして」と **URL 付き**で送ると、`user_sheet_defaults` に LINE ユーザー単位で保存される（[`007_user_sheet_defaults.sql`](src/db/migrations/007_user_sheet_defaults.sql)）。
+
+**注意:** 巨大なシートは先頭〜`GOOGLE_SHEETS_MAX_ROWS` 行・列 ZZ までに限ります。書き込みは行いません（読み取り専用スコープ）。
 
 ## NEAR 成長システム（運用の流れ）
 

@@ -91,6 +91,7 @@ export async function tryHandleAdminGrowthLine(input: {
     const r = await setImplementationState(input.db, suggestionId, "testing");
     if (r.ok && env.ADMIN_LINE_USER_ID) {
       await notifyProgress({
+        db: input.db,
         adminUserId: env.ADMIN_LINE_USER_ID,
         suggestionId,
         phase: "testing",
@@ -104,6 +105,7 @@ export async function tryHandleAdminGrowthLine(input: {
     const r = await setImplementationState(input.db, suggestionId, "deploy_candidate_ready");
     if (r.ok && env.ADMIN_LINE_USER_ID) {
       await notifyProgress({
+        db: input.db,
         adminUserId: env.ADMIN_LINE_USER_ID,
         suggestionId,
         phase: "deploy_candidate_ready",

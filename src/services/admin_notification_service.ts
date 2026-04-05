@@ -24,6 +24,33 @@ async function sendGrowthAdminChannel(body: string): Promise<void> {
   await pushText(to, text);
 }
 
+/** unsupported_requests から「誰の成長依頼か」（グループ発言も送信者 userId） */
+async function linesGrowthRequesterBySuggestion(
+  db: Db,
+  suggestionId: number
+): Promise<string[]> {
+  try {
+    const r = await db.query<{ channel_user_id: string; channel: string }>(
+      `SELECT u.channel_user_id, u.channel
+       FROM implementation_suggestions s
+       JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+       WHERE s.id = $1`,
+      [suggestionId]
+    );
+    const row = r.rows[0];
+    if (!row?.channel_user_id) return [];
+    const chLabel = row.channel === "line" ? "LINE" : row.channel;
+    return [
+      "【成長依頼元】",
+      `${chLabel} の userId（依頼メッセージを送ったユーザー）: ${row.channel_user_id}`,
+      "※ グループ／トークルームからの依頼でも、上記はその発言の送信者です。",
+      "",
+    ];
+  } catch {
+    return [];
+  }
+}
+
 /** 依頼ユーザーへ: 成長候補として進めてよいか（管理者より先） */
 export async function notifyUserGrowthConsent(input: {
   lineUserId: string;
@@ -64,9 +91,11 @@ export async function notifyGrowthFirstApproval(input: {
   const env = getEnv();
   const log = getLogger();
   const adminBase = env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL}/admin` : null;
+  const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   const body = [
     "こんにちは、NEAR です。ひとつ成長のご相談があります。",
     "",
+    ...requesterLines,
     `ご利用者の方から、次のようなお願いがありました（いまの私ではまだお手伝いできませんでした）。`,
     `「${clip(input.userOriginalSnippet, 400)}」`,
     "",
@@ -89,14 +118,17 @@ export async function notifyGrowthFirstApproval(input: {
 }
 
 export async function notifyHearingQuestion(input: {
+  db: Db;
   adminUserId: string;
   suggestionId: number;
   questionText: string;
 }): Promise<void> {
   const log = getLogger();
+  const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   const body = [
     "ありがとうございます。では、成長に必要な情報を順に確認させてください。",
     "",
+    ...requesterLines,
     input.questionText,
     "",
     `（suggestion #${input.suggestionId}）`,
@@ -117,13 +149,17 @@ export async function notifyFinalApproval(input: {
   let original = "";
   let summary = "";
   let hearingBlock = "";
+  let requesterLines: string[] = [];
   try {
     const r = await input.db.query<{
       original_message: string;
       summary: string;
       required_information: unknown;
+      channel_user_id: string;
+      channel: string;
     }>(
-      `SELECT u.original_message, s.summary, s.required_information
+      `SELECT u.original_message, s.summary, s.required_information,
+              u.channel_user_id, u.channel
        FROM implementation_suggestions s
        JOIN unsupported_requests u ON u.id = s.unsupported_request_id
        WHERE s.id = $1`,
@@ -137,6 +173,15 @@ export async function notifyFinalApproval(input: {
       if (ri && typeof ri === "object" && !Array.isArray(ri)) {
         hearingBlock = clip(JSON.stringify(ri, null, 2), 3500);
       }
+      if (row.channel_user_id) {
+        const chLabel = row.channel === "line" ? "LINE" : row.channel;
+        requesterLines = [
+          "【成長依頼元】",
+          `${chLabel} の userId（依頼メッセージを送ったユーザー）: ${row.channel_user_id}`,
+          "※ グループ／トークルームからの依頼でも、上記はその発言の送信者です。",
+          "",
+        ];
+      }
     }
   } catch (e) {
     log.warn({ err: e }, "notifyFinalApproval: load bundle failed");
@@ -145,6 +190,7 @@ export async function notifyFinalApproval(input: {
   const body = [
     "依頼ユーザーからのヒアリングが完了しました。実装に進む前の**最終確認**です。",
     "",
+    ...requesterLines,
     "【ユーザー当初の依頼】",
     original || "（取得できませんでした）",
     "",
@@ -168,15 +214,18 @@ export async function notifyFinalApproval(input: {
 }
 
 export async function notifyCodingReady(input: {
+  db: Db;
   adminUserId: string;
   suggestionId: number;
   cursorPrompt: string;
   runnerHint: string;
 }): Promise<void> {
   const log = getLogger();
+  const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   const body = [
     "第二承認ありがとうございます。Cursor 向けの実装指示を用意しました。",
     "",
+    ...requesterLines,
     input.runnerHint,
     "",
     "---- コピー用（cursor_prompt）----",
@@ -192,14 +241,17 @@ export async function notifyCodingReady(input: {
 }
 
 export async function notifyProgress(input: {
+  db: Db;
   adminUserId: string;
   suggestionId: number;
   phase: string;
   detail?: string;
 }): Promise<void> {
   const log = getLogger();
+  const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   const body = [
     "【NEAR・成長の進捗】",
+    ...requesterLines,
     `フェーズ: ${input.phase}`,
     input.detail ? `\n${input.detail}` : "",
     "",
@@ -213,6 +265,7 @@ export async function notifyProgress(input: {
 }
 
 export async function notifyGrowthComplete(input: {
+  db: Db;
   adminUserId: string;
   suggestionId: number;
   summary: string;
@@ -220,9 +273,11 @@ export async function notifyGrowthComplete(input: {
   notes?: string;
 }): Promise<void> {
   const log = getLogger();
+  const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   const body = [
     "成長処理が完了扱いになりました（手動フローでマークした場合は、実際のデプロイも済ませているかご確認ください）。",
     "",
+    ...requesterLines,
     "追加・反映したい機能の要約:",
     clip(input.summary, 600),
     "",
@@ -240,13 +295,17 @@ export async function notifyGrowthComplete(input: {
 }
 
 export async function notifyGrowthRejected(input: {
+  db: Db;
   adminUserId: string;
   suggestionId: number;
   reason: string;
 }): Promise<void> {
   const log = getLogger();
+  const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
   const body = [
     "了解しました。この成長候補はここでクローズしますね。",
+    "",
+    ...requesterLines,
     clip(input.reason, 500),
     "",
     `suggestion #${input.suggestionId}`,

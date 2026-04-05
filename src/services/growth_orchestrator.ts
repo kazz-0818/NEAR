@@ -270,6 +270,7 @@ export async function handleAdminAffirmativeFinalApproval(
   const run = await runner.onCodingPhaseEntered({ db, suggestionId, cursorPrompt: full });
 
   await notifyCodingReady({
+    db,
     adminUserId,
     suggestionId,
     cursorPrompt: full,
@@ -277,6 +278,7 @@ export async function handleAdminAffirmativeFinalApproval(
   });
 
   await notifyProgress({
+    db,
     adminUserId,
     suggestionId,
     phase: "coding",
@@ -295,6 +297,7 @@ export async function handleAdminNegativeFinalApproval(
 ): Promise<string> {
   await setFinalApprovalAndStartCoding(db, suggestionId, "rejected", null);
   await notifyGrowthRejected({
+    db,
     adminUserId,
     suggestionId,
     reason: "管理者の最終承認が「いいえ」でした。",
@@ -318,6 +321,7 @@ export async function handleAdminGrowthComplete(db: Db, adminUserId: string, sug
   }
 
   await notifyGrowthComplete({
+    db,
     adminUserId,
     suggestionId,
     summary: String(row?.summary ?? ""),

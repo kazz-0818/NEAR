@@ -68,6 +68,12 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
       );
     }
     userBits.push("", "【ドラフト】", input.draft);
+    if (input.situation === "unsupported") {
+      userBits.push(
+        "",
+        "【未対応時の追加ルール】ドラフトに既に謝意と「記録した」旨がある。**同じ意味の断りを繰り返さない**。**「成長」ネタで盛らない**（ドラフトに書いてある事実だけ）。全体は**短く**（目安3〜5文）。"
+      );
+    }
 
     const completion = await client.chat.completions.create({
       model: env.OPENAI_INTENT_MODEL,

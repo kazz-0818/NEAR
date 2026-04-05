@@ -51,7 +51,7 @@ export async function faqAnswerer(ctx: ModuleContext): Promise<ModuleResult> {
   return {
     success: false,
     draft:
-      "すみません、その件については今のところ自信を持ってお答えできません。別の言い方で伺えますと幸いです。",
-    situation: "unsupported",
+      "いまのところうまく言語化できませんでした。もう一度短く送ってもらえると助かります。",
+    situation: "error",
   };
 }

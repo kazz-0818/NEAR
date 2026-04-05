@@ -89,6 +89,16 @@ function matchesHelpCore(core: string): boolean {
   return false;
 }
 
+/** 外部ツール連携・NEAR に専用実装を期待する依頼は unknown のまま（成長パイプライン用） */
+const INTEGRATION_OR_AUTOMATION = /スプレッドシート(に|へ)(書|記|追|保存|貼|出力)|シートに反映|セルに入れ|([Gg]oogle|Outlook)\s*カレンダー(に|へ)(予定|イベント|登録)|Notion(に)?(ページ|データベース)(を)?(作|保存|追記)|Slack(に)?(投稿|通知|送って)|Webhook|API\s*キー.*(で|を使って).*(連携|取得|書き込)|OAuth.*(連携|認証して).*(実行|取得)/i;
+
+/**
+ * 「定型機能っぽい依頼」だけ broad rescue を止める。
+ * 単語「予定」「会議」「メモ」単体などは含めない（雑談が未対応に落ちるのを防ぐ）。
+ */
+const STRUCTURED_FEATURE_HINT =
+  /\b(TODO|ToDo)\b|タスク(を|に|の)?(作|追加|登録|記録|お願い|ください|頼)|メモ(に|を)(残|保存|書|取|記録)|メモして|スプレッド|カレンダー(に|へ)|会議のメモ|会議を記録|Notion|Slack(に)?(投稿|通知|送って)|Webhook|決済|請求書|パスワード管理|リマインド/i;
+
 export function matchIntentHeuristic(userText: string): ParsedIntent | null {
   const normalized = normalizeForIntent(userText);
   const core = corePhrase(normalized);
@@ -105,14 +115,11 @@ export function matchIntentHeuristic(userText: string): ParsedIntent | null {
   return null;
 }
 
-/** 依頼っぽい語が無い短い文は、未対応に落とさず雑談扱いにする */
-const TASK_LIKE = /タスク|TODO|ToDo|メモ|リマインド|要約|スプレッド|カレンダー|予定|会議|請求|決済|パスワード/i;
-
 /**
  * LLM が unknown / can_handle:false にしたあとでも、明らかに雑談なら simple_question に寄せる。
  */
 export function rescueCasualShortMessage(userText: string): ParsedIntent | null {
-  if (TASK_LIKE.test(userText)) return null;
+  if (STRUCTURED_FEATURE_HINT.test(userText)) return null;
 
   const normalized = normalizeForIntent(userText);
   const core = corePhrase(normalized);
@@ -159,16 +166,13 @@ export function rescueCasualShortMessage(userText: string): ParsedIntent | null 
 const SUMMARIZE_LIKE = /要約して|要約を|まとめて|箇条書きにして/i;
 const REMINDER_ACTION = /リマインド(して|を|に登録|お願い)|通知してくれ|思い出させて/i;
 
-/** 外部ツール連携・NEAR に専用実装を期待する依頼は unknown のまま（成長パイプライン用） */
-const INTEGRATION_OR_AUTOMATION = /スプレッドシート(に|へ)(書|記|追|保存|貼|出力)|シートに反映|セルに入れ|([Gg]oogle|Outlook)\s*カレンダー(に|へ)(予定|イベント|登録)|Notion(に)?(ページ|データベース)(を)?(作|保存|追記)|Slack(に)?(投稿|通知|送って)|Webhook|API\s*キー.*(で|を使って).*(連携|取得|書き込)|OAuth.*(連携|認証して).*(実行|取得)/i;
-
 const RESCUE_MAX_CODEPOINTS = 8000;
 
 /**
  * unknown / can_handle:false のあと、**除外に当たらないものはすべて** simple_question へ（GPT が対話で扱える範囲を広く逃がす）。
  */
 export function rescueBroadSimpleQuestion(userText: string): ParsedIntent | null {
-  if (TASK_LIKE.test(userText)) return null;
+  if (STRUCTURED_FEATURE_HINT.test(userText)) return null;
   if (SUMMARIZE_LIKE.test(userText)) return null;
   if (REMINDER_ACTION.test(userText)) return null;
   if (INTEGRATION_OR_AUTOMATION.test(userText)) return null;

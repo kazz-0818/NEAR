@@ -27,7 +27,7 @@
 | `GROWTH_SKIP_OUT_OF_SCOPE` | 既定オン相当。`false` で `out_of_scope` も提案対象に |
 | `GROWTH_SKIP_WHEN_FOLLOWUP` | 既定オン相当。`needs_followup` 時は suggestion 保留 |
 | `GROWTH_MIN_MESSAGE_CHARS` | 既定 `12`。未満はログのみ（`growth_skipped`）。`0` で無効 |
-| `GROWTH_MIN_FINGERPRINT_COUNT` | 既定 `2`。同一 fingerprint の件数が足りるまで保留（`1` で従来に近い） |
+| `GROWTH_MIN_FINGERPRINT_COUNT` | 既定 `1`（初回から成長候補化）。スパム抑制で `2` 以上にすると同一要約が溜まるまで保留 |
 | `GROWTH_MIN_CONFIDENCE_UNKNOWN` | 既定 `0.35`。`unknown_custom_request` かつ低 confidence はスキップ。`0` で無効 |
 | `PUBLIC_BASE_URL` | 任意。上記通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし） |
 | `LINE_BOT_USER_ID` | 任意。グループ／トークルームでは **@ボットのメンション** か **本文に「NEAR」「ニア」** がないと返信しない（1:1 は従来どおり）。メンション判定に使う。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |

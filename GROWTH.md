@@ -34,7 +34,7 @@ stateDiagram-v2
 
 ## Suggestion ゲート（既定）
 
-`evaluateGrowthSuggestionEligibility` が `scheduleFeatureSuggestion` より前に動く。`out_of_scope`、短文、`needs_followup`、低 confidence の `unknown`、同一 fingerprint 件数不足などで `growth_skipped` になる。環境変数は `DEPLOY.md` 参照。
+`evaluateGrowthSuggestionEligibility` が `scheduleFeatureSuggestion` より前に動く。`out_of_scope`、短文、`needs_followup`、低 confidence の `unknown`、同一 fingerprint 件数不足（`GROWTH_MIN_FINGERPRINT_COUNT`、既定は 1）などで `growth_skipped` になる。環境変数は `DEPLOY.md` 参照。
 
 ## 成長難易度（E〜SSS）
 

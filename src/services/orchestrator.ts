@@ -150,7 +150,7 @@ export async function handleLineTextMessage(input: {
       }
 
       const draft =
-        "すいません、今はまだそのお願いには対応できません。ただ、できるように改善していきます。内容は記録いたしました。";
+        "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
       let finalText = draft;
       try {
         finalText = await composeNearReply({

@@ -136,15 +136,15 @@ const envSchema = z.object({
     }),
   /**
    * 同一 message_fingerprint の unsupported がこの件数に達したら suggestion 可（INSERT 後の COUNT）。
-   * 1 で初回から従来同等。既定 2。
+   * 1 で初回から成長候補化。スパム抑制で 2 にしたい場合は環境変数で指定。
    */
   GROWTH_MIN_FINGERPRINT_COUNT: z
     .string()
     .optional()
     .transform((s) => {
-      if (s == null || s.trim() === "") return 2;
+      if (s == null || s.trim() === "") return 1;
       const n = parseInt(s, 10);
-      return Number.isFinite(n) && n >= 1 ? n : 2;
+      return Number.isFinite(n) && n >= 1 ? n : 1;
     }),
   /**
    * unknown_custom_request かつ confidence がこの値未満（かつ confidence>0）のときスキップ。0 で無効。既定 0.35。

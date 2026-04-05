@@ -60,11 +60,49 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim() : undefined)),
-  /** true / 1 で有効。未設定はオフ。自動コーディング runner（アダプタ未接続時はスタブ） */
+  /** true / 1 で有効。未設定はオフ。自動コーディング runner（GitHub／エージェント未設定時はスタブ） */
   GROWTH_AUTO_CODING_ENABLED: z
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
+  /** GitHub Issue 作成用（`GROWTH_GITHUB_REPO` とセット） */
+  GITHUB_TOKEN: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** `owner/repo`。第二承認後に Issue を作るとき `GITHUB_TOKEN` とセット */
+  GROWTH_GITHUB_REPO: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 社内コーディングエージェントの Webhook URL（GitHub 未設定時のフォールバック） */
+  GROWTH_CODING_AGENT_URL: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim();
+      if (!t) return undefined;
+      try {
+        new URL(t);
+        return t;
+      } catch {
+        return undefined;
+      }
+    }),
+  /** 設定時、POST 本文に対する HMAC-SHA256 を `X-NEAR-Signature: sha256=<hex>` で付与 */
+  GROWTH_CODING_AGENT_SECRET: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** エージェント POST のレート上限（1 分あたり、既定 10） */
+  GROWTH_CODING_AGENT_RPM: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 10;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 ? n : 10;
+    }),
   /** true / 1 で有効。未設定はオフ。自動デプロイ runner（アダプタ未接続時はスタブ） */
   GROWTH_AUTO_DEPLOY_ENABLED: z
     .string()

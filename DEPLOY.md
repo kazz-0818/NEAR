@@ -16,7 +16,12 @@
 | `PORT` | 未設定なら `3000`。Render 等が自動で付与する場合はそのまま |
 | `CRON_SECRET` | 任意（`/internal/reminders/dispatch` を保護する場合） |
 | `ADMIN_LINE_USER_ID` | 任意。**成長フロー**で管理者へ第一段階承認・ヒアリング・最終承認・実装指示・進捗を LINE プッシュ（あなたの userId を設定） |
-| `GROWTH_AUTO_CODING_ENABLED` | 任意 `true`/`1`。自動コーディング runner（**未接続時はスタブ**で手動運用推奨） |
+| `GROWTH_AUTO_CODING_ENABLED` | 任意 `true`/`1`。自動コーディング runner を有効化。**下記 GitHub／エージェントが未設定ならスタブ**（手動運用推奨） |
+| `GITHUB_TOKEN` | 任意。`GROWTH_GITHUB_REPO` と組み合わせて第二承認後に **GitHub Issue を自動作成**（classic PAT または fine-grained で `issues: write`） |
+| `GROWTH_GITHUB_REPO` | 任意。`owner/repo` 形式（例: `kazz-0818/NEAR`）。`GITHUB_TOKEN` とセットで有効 |
+| `GROWTH_CODING_AGENT_URL` | 任意。第二承認後に **JSON POST** で `cursorPrompt` を渡す社内エージェントの URL（**GitHub Issue 連携が無効なとき**に使われる。`GITHUB_TOKEN`+`GROWTH_GITHUB_REPO` の両方がある場合は **GitHub を優先**） |
+| `GROWTH_CODING_AGENT_SECRET` | 任意。設定時、リクエスト本文の HMAC-SHA256 を `X-NEAR-Signature: sha256=<hex>` で付与 |
+| `GROWTH_CODING_AGENT_RPM` | 任意。エージェント POST のレート上限（**1分あたり**、既定 `10`） |
 | `GROWTH_AUTO_DEPLOY_ENABLED` | 任意 `true`/`1`。自動デプロイ runner（**未接続時はスタブ**。本番は既定オフ推奨） |
 | `GROWTH_SUGGESTION_GATE_ENABLED` | 任意 `false`/`0` で無効＝**毎回** suggestion。有効時（既定）はルール通過時だけ suggestion（[`growth_suggestion_gate`](src/services/growth_suggestion_gate.ts)） |
 | `GROWTH_SKIP_OUT_OF_SCOPE` | 既定オン相当。`false` で `out_of_scope` も提案対象に |
@@ -37,14 +42,38 @@
 3. 管理者は LINE で「はい／いいえ」→**ヒアリング**（1問ずつ）→**第二承認**→**Cursor 向け指示の再生成＋プッシュ**、の順で進めます。メッセージ例: 進行中は `テスト完了`→`デプロイ準備OK`→実装後 `成長完了`（または管理 API の `complete`）。
 4. 管理 API（`Authorization: Bearer <ADMIN_API_KEY>`）の例:
    - `GET /admin/suggestions?status=pending` … 第一段階 `approval_status` フィルタ
-   - `GET /admin/suggestions/:id` … 1件
+   - `GET /admin/suggestions/:id` … 1件（JSON。`cursor_prompt` に全文）
+   - `GET /admin/suggestions/:id/cursor-prompt` … **`cursor_prompt` 本文のみ**（`text/plain`。CLI でファイル化しやすい）
    - `GET /admin/suggestions/:id/hearing` … ヒアリング Q&A
    - `PATCH /admin/suggestions/:id` … `approval_status`（`pending`→`approved`|`rejected`）、`implementation_state`、`deploy_safety_confirmed`（`deploying` へ進むとき必須）、`failure_reason` / `review_notes`
    - `POST /admin/suggestions/:id/growth/second-approve` … 第二承認相当（LINE と同じ処理）
    - `POST /admin/suggestions/:id/growth/complete` … 成長完了（`capability_registry` 追記・通知）
-5. **自動コーディング／自動デプロイ**は `coding_runner` / `deploy_runner` のアダプタ差し替えで拡張します。フラグオンでも未接続ならスタブが返るだけです。
+5. **自動コーディング／自動デプロイ**は `coding_runner` / `deploy_runner` のアダプタ差し替えで拡張します。`GROWTH_AUTO_CODING_ENABLED` がオンのとき、`GITHUB_TOKEN`+`GROWTH_GITHUB_REPO` があれば **Issue 作成**、なければ `GROWTH_CODING_AGENT_URL` があれば **エージェント POST**、どちらもなければ **スタブ**です。
 
 設計メモはリポジトリ内 `GROWTH.md` を参照してください。
+
+## NEAR → Cursor（手動運用の標準）
+
+第二承認まで進むと、サーバーが **Cursor 向け実装指示（Markdown 1 本）** を `implementation_suggestions.cursor_prompt` に保存し、管理者 LINE にも概要が届きます。**LINE 本文は長いと省略される**ため、**全文は必ず管理 API から取得**してください。
+
+1. `PUBLIC_BASE_URL` を設定しておくと、通知にベース URL の案内を載せやすくなります（任意）。
+2. 第二承認直後、次のいずれかで **全文**を取得する:
+   - `curl -sS -H "Authorization: Bearer $ADMIN_API_KEY" "$PUBLIC_BASE_URL/admin/suggestions/<id>" | jq -r '.cursor_prompt' > task.md`
+   - または `curl -sS -H "Authorization: Bearer $ADMIN_API_KEY" "$PUBLIC_BASE_URL/admin/suggestions/<id>/cursor-prompt" -o task.md`
+3. ローカルで NEAR リポジトリを開いた **Cursor** の Composer / Agent に `task.md` の内容を貼り、実装・`npm run build`・動作確認を行う。
+4. 完了後、管理者 LINE で「成長完了」、または `POST /admin/suggestions/<id>/growth/complete`。
+
+半自動にする場合は `GROWTH_AUTO_CODING_ENABLED` と `GITHUB_TOKEN` / `GROWTH_CODING_AGENT_URL` を参照してください（上表）。
+
+### 社内エージェント（`GROWTH_CODING_AGENT_URL`）の受信形式
+
+第二承認時に **POST**（`Content-Type: application/json`）で次の JSON が送られます。
+
+```json
+{ "source": "near", "suggestionId": 123, "cursorPrompt": "…Markdown 全文…" }
+```
+
+`GROWTH_CODING_AGENT_SECRET` を設定した場合、同じ生本文の HMAC-SHA256（16進）がヘッダ `X-NEAR-Signature: sha256=<hex>` に入ります（共有秘密で改ざん検知用）。**1 分あたりの送信回数**は `GROWTH_CODING_AGENT_RPM`（既定 10）で抑えます。
 
 ## LINE Webhook
 

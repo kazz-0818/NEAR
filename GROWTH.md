@@ -30,7 +30,7 @@ stateDiagram-v2
 ## Cursor 向け指示
 
 - `cursor_prompt_builder.buildFinalCursorPrompt` が第二承認後にフル文を生成し DB に保存。
-- 手動モード（既定）: `coding_runner` は説明メッセージのみ。自動モードは `GROWTH_AUTO_CODING_ENABLED`＋将来のアダプタ接続。
+- 手動モード（既定）: `coding_runner` は説明メッセージのみ。自動モードは `GROWTH_AUTO_CODING_ENABLED` と `GITHUB_TOKEN`+`GROWTH_GITHUB_REPO`（Issue 作成）または `GROWTH_CODING_AGENT_URL`（POST）。未設定はスタブ。
 
 ## Suggestion ゲート（既定）
 

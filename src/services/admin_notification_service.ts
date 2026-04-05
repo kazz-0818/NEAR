@@ -4,6 +4,8 @@ import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
 import { formatGrowthDifficultyLines } from "../lib/growth_tiers.js";
 const LINE_TEXT_MAX = 4800;
+/** LINE に載せる cursor_prompt 断片の上限（超過分は管理 API で全文取得） */
+const CURSOR_PROMPT_LINE_SNIPPET_MAX = 7000;
 
 function clip(s: string, max = 3500): string {
   if (s.length <= max) return s;
@@ -242,18 +244,34 @@ export async function notifyCodingReady(input: {
   runnerHint: string;
 }): Promise<void> {
   const log = getLogger();
+  const env = getEnv();
   const requesterLines = await linesGrowthRequesterBySuggestion(input.db, input.suggestionId);
+  const adminBase = env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL}/admin` : null;
+  const fullTextUrl = adminBase
+    ? `${adminBase}/suggestions/${input.suggestionId}/cursor-prompt`
+    : null;
+  const promptSnippet = clip(input.cursorPrompt, CURSOR_PROMPT_LINE_SNIPPET_MAX);
+  const promptWasTruncated = input.cursorPrompt.length > CURSOR_PROMPT_LINE_SNIPPET_MAX;
   const body = [
     "第二承認ありがとうございます。Cursor 向けの実装指示を用意しました。",
     "",
     ...requesterLines,
     input.runnerHint,
     "",
-    "---- コピー用（cursor_prompt）----",
-    clip(input.cursorPrompt, 7000),
+    fullTextUrl
+      ? `【全文取得】${fullTextUrl}\n（Authorization: Bearer <ADMIN_API_KEY> で GET。下のコピー用は長いと省略されます）`
+      : "※ 全文は GET /admin/suggestions/" +
+        input.suggestionId +
+        "/cursor-prompt（Authorization: Bearer <ADMIN_API_KEY>）。PUBLIC_BASE_URL を設定すると URL をここに載せられます。",
+    promptWasTruncated ? "※ 以下の「コピー用」は文字数のため途中までです。全文は上記 URL または cursor-prompt エンドポイントで取得してください。" : "",
+    "",
+    "---- コピー用（cursor_prompt・省略の可能性あり）----",
+    promptSnippet,
     "",
     `（suggestion #${input.suggestionId}）`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
   try {
     await sendGrowthAdminChannel(body);
   } catch (e) {

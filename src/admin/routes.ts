@@ -92,6 +92,22 @@ export function createAdminApp(): Hono {
     return c.json({ items: r.rows });
   });
 
+  /** `cursor_prompt` 全文を text/plain で返す（curl でファイル化しやすい） */
+  app.get("/suggestions/:id/cursor-prompt", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isFinite(id) || id < 1) {
+      return c.text("invalid id", 400);
+    }
+    const pool = getPool();
+    const r = await pool.query<{ cursor_prompt: string | null }>(
+      `SELECT cursor_prompt FROM implementation_suggestions WHERE id = $1`,
+      [id]
+    );
+    if (r.rows.length === 0) return c.text("not found", 404);
+    const text = r.rows[0]?.cursor_prompt ?? "";
+    return c.text(text, 200, { "Content-Type": "text/plain; charset=utf-8" });
+  });
+
   app.get("/suggestions/:id", async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isFinite(id) || id < 1) {

@@ -2,11 +2,8 @@ import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
 import {
   handleAdminAffirmativeFinalApproval,
-  handleAdminAffirmativeFirstApproval,
   handleAdminGrowthComplete,
   handleAdminNegativeFinalApproval,
-  handleAdminNegativeFirstApproval,
-  handleHearingReply,
   resolveSuggestionIdForAdmin,
 } from "./growth_orchestrator.js";
 import { setImplementationState } from "./approval_service.js";
@@ -42,7 +39,7 @@ function isNegative(text: string): boolean {
 
 /**
  * 管理者の LINE テキストを成長フローが処理すべきか判定し、処理する。
- * @returns handled true のときは通常の intent 分類に回さない
+ * 第一段階・ヒアリングは依頼ユーザー側のため、ここでは最終承認以降のみ。
  */
 export async function tryHandleAdminGrowthLine(input: {
   db: Db;
@@ -72,41 +69,12 @@ export async function tryHandleAdminGrowthLine(input: {
   if (row.rows.length === 0) return { handled: false, reply: "" };
   const { approval_status: ap, implementation_state: st } = row.rows[0]!;
 
-  if (isNegative(text) && ap === "pending" && st === "not_started") {
-    const reply = await handleAdminNegativeFirstApproval(input.db, input.adminUserId, suggestionId);
-    return { handled: true, reply };
-  }
-
-  if (isAffirmative(text) && ap === "pending" && st === "not_started") {
-    await handleAdminAffirmativeFirstApproval(input.db, input.adminUserId, suggestionId);
-    return { handled: true, reply: "ありがとうございます。続けてヒアリングをお送りしますね。" };
-  }
-
-  if (ap === "approved" && st === "hearing_required") {
-    if (isNegative(text) && text.length < 40) {
-      return {
-        handled: true,
-        reply: "ヒアリングを中断しますか？ 中断する場合は「ヒアリングキャンセル」と送ってください。",
-      };
-    }
-    if (norm(text) === "ヒアリングキャンセル") {
-      await input.db.query(
-        `UPDATE implementation_suggestions SET implementation_state = 'failed',
-         failure_reason = '管理者がヒアリングを中断', updated_at = now() WHERE id = $1`,
-        [suggestionId]
-      );
-      return { handled: true, reply: "ヒアリングを中断し、この候補を止めました。" };
-    }
-    const reply = await handleHearingReply(input.db, input.adminUserId, suggestionId, raw);
-    return { handled: true, reply };
-  }
-
-  if (isNegative(text) && ap === "approved" && st === "awaiting_final_approval") {
+  if (isNegative(text) && ap === "pending" && st === "awaiting_final_approval") {
     const reply = await handleAdminNegativeFinalApproval(input.db, input.adminUserId, suggestionId);
     return { handled: true, reply };
   }
 
-  if (isAffirmative(text) && ap === "approved" && st === "awaiting_final_approval") {
+  if (isAffirmative(text) && ap === "pending" && st === "awaiting_final_approval") {
     const reply = await handleAdminAffirmativeFinalApproval(input.db, input.adminUserId, suggestionId);
     return { handled: true, reply };
   }

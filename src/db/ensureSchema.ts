@@ -5,7 +5,12 @@ import { getPool } from "./client.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const MIGRATION_FILES = ["001_init.sql", "002_growth.sql", "003_growth_flow.sql"] as const;
+const MIGRATION_FILES = [
+  "001_init.sql",
+  "002_growth.sql",
+  "003_growth_flow.sql",
+  "004_growth_user_flow.sql",
+] as const;
 
 /** Idempotent: safe to run on every server start. */
 export async function ensureSchema(): Promise<void> {

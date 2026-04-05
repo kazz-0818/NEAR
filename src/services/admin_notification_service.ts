@@ -16,7 +16,34 @@ async function send(adminUserId: string, body: string): Promise<void> {
   await pushText(adminUserId, text);
 }
 
-/** 新規成長候補＋第一段階承認のお願い */
+/** 依頼ユーザーへ: 成長候補として進めてよいか（管理者より先） */
+export async function notifyUserGrowthConsent(input: {
+  lineUserId: string;
+  suggestionId: number;
+  userOriginalSnippet: string;
+  userSummary: string;
+}): Promise<void> {
+  const log = getLogger();
+  const body = [
+    "NEAR です。あなたからいただいた次のご依頼は、いまの私ではまだお手伝いできませんでした。",
+    `「${clip(input.userOriginalSnippet, 420)}」`,
+    "",
+    "内容の要約:",
+    clip(input.userSummary, 480),
+    "",
+    "この機能を「成長候補」として開発側に検討してもよいでしょうか？",
+    "よろしければ「はい」、見送る場合は「いいえ」と返信してください。",
+    "",
+    `（候補 #${input.suggestionId}）`,
+  ].join("\n");
+  try {
+    await send(input.lineUserId, body);
+  } catch (e) {
+    log.warn({ err: e }, "user notify growth consent failed");
+  }
+}
+
+/** 新規成長候補＋第一段階承認のお願い（レガシー／手動運用用） */
 export async function notifyGrowthFirstApproval(input: {
   db: Db;
   adminUserId: string;
@@ -72,17 +99,57 @@ export async function notifyHearingQuestion(input: {
 }
 
 export async function notifyFinalApproval(input: {
+  db: Db;
   adminUserId: string;
   suggestionId: number;
 }): Promise<void> {
   const log = getLogger();
+  let original = "";
+  let summary = "";
+  let hearingBlock = "";
+  try {
+    const r = await input.db.query<{
+      original_message: string;
+      summary: string;
+      required_information: unknown;
+    }>(
+      `SELECT u.original_message, s.summary, s.required_information
+       FROM implementation_suggestions s
+       JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+       WHERE s.id = $1`,
+      [input.suggestionId]
+    );
+    const row = r.rows[0];
+    if (row) {
+      original = clip(String(row.original_message ?? ""), 500);
+      summary = clip(String(row.summary ?? ""), 600);
+      const ri = row.required_information;
+      if (ri && typeof ri === "object" && !Array.isArray(ri)) {
+        hearingBlock = clip(JSON.stringify(ri, null, 2), 3500);
+      }
+    }
+  } catch (e) {
+    log.warn({ err: e }, "notifyFinalApproval: load bundle failed");
+  }
+
   const body = [
-    "必要な情報がそろいました。",
-    "この内容で、成長処理（コード生成・リポジトリ反映の準備）に進んでよいでしょうか？",
-    "よろしければ「はい」、調整したい場合は「いいえ」と返信ください。",
+    "依頼ユーザーからのヒアリングが完了しました。実装に進む前の**最終確認**です。",
+    "",
+    "【ユーザー当初の依頼】",
+    original || "（取得できませんでした）",
+    "",
+    "【成長候補の要約】",
+    summary || "（取得できませんでした）",
+    "",
+    hearingBlock ? "【ヒアリング回答（JSON）】\n" + hearingBlock : "",
+    "",
+    "この内容で成長処理（コード生成・リポジトリ反映の準備）に進んでよいでしょうか？",
+    "よろしければ「はい」、見送る場合は「いいえ」と返信ください。",
     "",
     `（suggestion #${input.suggestionId}）`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
   try {
     await send(input.adminUserId, body);
   } catch (e) {

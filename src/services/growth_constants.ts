@@ -5,6 +5,7 @@ export type GrowthApprovalStatus = (typeof GROWTH_APPROVAL_STATUSES)[number];
 /** implementation_suggestions.implementation_state */
 export const IMPLEMENTATION_STATES = [
   "not_started",
+  "awaiting_user_consent",
   "hearing_required",
   "awaiting_final_approval",
   "coding",
@@ -20,7 +21,9 @@ export type ImplementationState = (typeof IMPLEMENTATION_STATES)[number];
 export const UNSUPPORTED_FLOW_STATUSES = [
   "logged",
   "suggestion_created",
+  "user_consent_requested",
   "admin_approval_requested",
+  "user_hearing_in_progress",
   "hearing_in_progress",
   "final_approval_requested",
   "implementation_started",

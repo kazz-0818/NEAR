@@ -14,6 +14,7 @@ import {
 import { getLogger } from "../lib/logger.js";
 import { buildWhatsNewDraft, isWhatsNewCapabilityQuestion } from "../lib/whatsNew.js";
 import { tryHandleAdminGrowthLine } from "./growth_admin_line.js";
+import { tryHandleGrowthRequestingUserLine } from "./growth_user_line.js";
 import {
   evaluateGrowthSuggestionEligibility,
   markUnsupportedGrowthSkipped,
@@ -51,6 +52,12 @@ export async function handleLineTextMessage(input: {
       await replyOrPush(replyToken, channelUserId, growth.reply);
       return;
     }
+  }
+
+  const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text });
+  if (userGrowth.handled) {
+    await replyOrPush(replyToken, channelUserId, userGrowth.reply);
+    return;
   }
 
   if (isDeployTimeQuestion(text)) {

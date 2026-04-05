@@ -7,7 +7,8 @@ const log = getLogger();
 
 /** implementation_state の許容遷移（専用サービス経由のみ更新すること） */
 const STATE_EDGES: Record<ImplementationState, ImplementationState[]> = {
-  not_started: ["hearing_required", "awaiting_final_approval", "failed"],
+  not_started: ["awaiting_user_consent", "hearing_required", "awaiting_final_approval", "failed"],
+  awaiting_user_consent: ["hearing_required", "failed"],
   hearing_required: ["awaiting_final_approval", "failed"],
   awaiting_final_approval: ["coding", "failed"],
   coding: ["testing", "implemented", "failed"],
@@ -68,27 +69,26 @@ export async function setFirstApproval(
       `UPDATE implementation_suggestions
        SET approval_status = 'rejected',
            implementation_state = 'failed',
-           failure_reason = COALESCE($1, '管理者が第一段階承認を見送りました'),
+           failure_reason = COALESCE($1, '成長候補が見送られました'),
            review_notes = COALESCE($2, review_notes),
            reviewed_at = now(),
            updated_at = now()
        WHERE id = $3`,
-      [reviewNotes ?? "第一段階承認: いいえ", reviewNotes, suggestionId]
+      [reviewNotes ?? "承認: いいえ", reviewNotes, suggestionId]
     );
     await syncUnsupportedStatusForSuggestion(db, suggestionId, "rejected");
     return { ok: true };
   }
   await db.query(
     `UPDATE implementation_suggestions
-     SET approval_status = 'approved',
-         implementation_state = 'hearing_required',
+     SET implementation_state = 'hearing_required',
          review_notes = COALESCE($1, review_notes),
          reviewed_at = now(),
          updated_at = now()
      WHERE id = $2`,
     [reviewNotes, suggestionId]
   );
-  await syncUnsupportedStatusForSuggestion(db, suggestionId, "hearing_in_progress");
+  await syncUnsupportedStatusForSuggestion(db, suggestionId, "user_hearing_in_progress");
   return { ok: true };
 }
 
@@ -103,9 +103,6 @@ export async function setFinalApprovalAndStartCoding(
     [suggestionId]
   );
   if (cur.rows.length === 0) return { ok: false, error: "not found" };
-  if (cur.rows[0].approval_status !== "approved") {
-    return { ok: false, error: "first approval required" };
-  }
   if (cur.rows[0].implementation_state !== "awaiting_final_approval") {
     return { ok: false, error: "not awaiting final approval" };
   }
@@ -118,7 +115,7 @@ export async function setFinalApprovalAndStartCoding(
            reviewed_at = now(),
            updated_at = now()
        WHERE id = $3`,
-      [reviewNotes ?? "第二段階承認: いいえ", reviewNotes, suggestionId]
+      [reviewNotes ?? "管理者最終承認: いいえ", reviewNotes, suggestionId]
     );
     await syncUnsupportedStatusForSuggestion(db, suggestionId, "failed");
     return { ok: true };
@@ -126,7 +123,12 @@ export async function setFinalApprovalAndStartCoding(
   const r = await setImplementationState(db, suggestionId, "coding");
   if (!r.ok) return r;
   await db.query(
-    `UPDATE implementation_suggestions SET review_notes = COALESCE($1, review_notes), updated_at = now() WHERE id = $2`,
+    `UPDATE implementation_suggestions
+     SET approval_status = 'approved',
+         review_notes = COALESCE($1, review_notes),
+         reviewed_at = now(),
+         updated_at = now()
+     WHERE id = $2`,
     [reviewNotes, suggestionId]
   );
   await syncUnsupportedStatusForSuggestion(db, suggestionId, "implementation_started");
@@ -225,6 +227,18 @@ export async function patchApprovalStatus(
     return { ok: true };
   }
   if (from === "pending" && to === "approved") {
+    const st = await db.query<{ implementation_state: string }>(
+      `SELECT implementation_state FROM implementation_suggestions WHERE id = $1`,
+      [suggestionId]
+    );
+    const impl = st.rows[0]?.implementation_state;
+    if (impl === "awaiting_user_consent") {
+      return {
+        ok: false,
+        error:
+          "いまは依頼ユーザーの同意待ちです。管理APIの第一段階承認は使えません（ユーザーがLINEで返信するまでお待ちください）。",
+      };
+    }
     return setFirstApproval(db, suggestionId, "approved", reviewNotes);
   }
   if (from === "pending" && to === "rejected") {

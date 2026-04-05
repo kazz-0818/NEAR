@@ -77,7 +77,7 @@ export async function generateAndSaveSuggestion(input: {
          approval_status, cursor_prompt, improvement_kind, risk_level, estimated_effort,
          implementation_state
        ) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8, $9::jsonb,
-         'pending', $10, $11, $12, $13, 'not_started')
+         'pending', $10, $11, $12, $13, 'awaiting_user_consent')
        RETURNING id`,
       [
         input.unsupportedId,

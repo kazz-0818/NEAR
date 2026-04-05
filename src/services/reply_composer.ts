@@ -18,6 +18,8 @@ export type ComposeInput = {
   situation: "success" | "unsupported" | "error" | "followup";
   /** ユーザーのその発言。言い回しのバリエーション・軽い相槌に使う（任意） */
   userMessage?: string;
+  /** 今回より前のユーザー発言（古い順）。話題の踏襲用（任意） */
+  recentUserMessages?: string[];
 };
 
 function temperatureForSituation(s: ComposeInput["situation"]): number {
@@ -51,6 +53,19 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
     ];
     if (input.userMessage?.trim()) {
       userBits.push("", `ユーザー発言: ${input.userMessage.trim()}`);
+    }
+    if (input.recentUserMessages?.length) {
+      userBits.push(
+        "",
+        "このトークで今回より前のユーザー発言（古い順・参考。話題の継続に使う）:"
+      );
+      for (let i = 0; i < input.recentUserMessages.length; i++) {
+        userBits.push(`${i + 1}. ${input.recentUserMessages[i]}`);
+      }
+      userBits.push(
+        "",
+        "直前の発言とドラフトの内容がずれないように。事実・手順・約束はドラフトを優先。"
+      );
     }
     userBits.push("", "【ドラフト】", input.draft);
 

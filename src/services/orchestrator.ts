@@ -18,6 +18,7 @@ import {
   evaluateGrowthSuggestionEligibility,
   markUnsupportedGrowthSkipped,
 } from "./growth_suggestion_gate.js";
+import { loadRecentUserMessages } from "./conversation_context.js";
 
 async function saveIntentRun(
   db: Db,
@@ -95,6 +96,18 @@ export async function handleLineTextMessage(input: {
 
   await saveIntentRun(db, inboundMessageId, parsed, { ok: true });
 
+  let recentUserMessages: string[] = [];
+  try {
+    recentUserMessages = await loadRecentUserMessages(
+      db,
+      channel,
+      channelUserId,
+      inboundMessageId
+    );
+  } catch (ctxErr) {
+    log.warn({ err: ctxErr }, "loadRecentUserMessages failed; continuing without context");
+  }
+
   const handler = getHandler(parsed.intent);
   const routable =
     parsed.can_handle === true && parsed.intent !== "unknown_custom_request" && handler !== undefined;
@@ -133,7 +146,12 @@ export async function handleLineTextMessage(input: {
         "すいません、今はまだそのお願いには対応できません。ただ、できるように改善していきます。内容は記録いたしました。";
       let finalText = draft;
       try {
-        finalText = await composeNearReply({ draft, situation: "unsupported", userMessage: text });
+        finalText = await composeNearReply({
+          draft,
+          situation: "unsupported",
+          userMessage: text,
+          recentUserMessages,
+        });
       } catch (ce) {
         log.warn({ err: ce }, "composeNearReply failed (unsupported path)");
       }
@@ -148,6 +166,7 @@ export async function handleLineTextMessage(input: {
       intent: parsed,
       originalText: text,
       inboundMessageId,
+      recentUserMessages,
     });
 
     const situation =
@@ -185,7 +204,12 @@ export async function handleLineTextMessage(input: {
 
     let finalText = modResult.draft;
     try {
-      finalText = await composeNearReply({ draft: modResult.draft, situation, userMessage: text });
+      finalText = await composeNearReply({
+        draft: modResult.draft,
+        situation,
+        userMessage: text,
+        recentUserMessages,
+      });
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReply failed, sending draft as-is");
     }
@@ -196,7 +220,12 @@ export async function handleLineTextMessage(input: {
       "申し訳ございません、少し調子が悪いようです。お手数ですが、もう一度お試しください。";
     let finalText = draft;
     try {
-      finalText = await composeNearReply({ draft, situation: "error", userMessage: text });
+      finalText = await composeNearReply({
+        draft,
+        situation: "error",
+        userMessage: text,
+        recentUserMessages,
+      });
     } catch {
       /* draft のまま */
     }

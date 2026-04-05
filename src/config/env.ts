@@ -181,6 +181,38 @@ const envSchema = z.object({
       const n = parseInt(s, 10);
       return Number.isFinite(n) && n >= 20 && n <= 2000 ? n : 400;
     }),
+  /** ユーザー Google OAuth（Web クライアント）。Sheets をユーザー権限で読むときに使用 */
+  GOOGLE_OAUTH_CLIENT_ID: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  GOOGLE_OAUTH_CLIENT_SECRET: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 例: https://near-xxx.onrender.com/oauth/google/callback（Google Cloud Console に完全一致登録） */
+  GOOGLE_OAUTH_REDIRECT_URI: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim();
+      if (!t) return undefined;
+      try {
+        new URL(t);
+        return t;
+      } catch {
+        return undefined;
+      }
+    }),
+  /** refresh_token 暗号化用（16文字以上推奨。漏洩厳禁） */
+  GOOGLE_OAUTH_TOKEN_SECRET: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim();
+      if (!t || t.length < 16) return undefined;
+      return t;
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

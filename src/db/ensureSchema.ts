@@ -13,6 +13,7 @@ const MIGRATION_FILES = [
   "005_near_line_groups.sql",
   "006_near_line_groups_auto_observe.sql",
   "007_user_sheet_defaults.sql",
+  "008_user_google_oauth.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

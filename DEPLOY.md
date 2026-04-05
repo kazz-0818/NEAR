@@ -36,20 +36,45 @@
 | `GOOGLE_SERVICE_ACCOUNT_JSON_B64` | 任意。上記 JSON を base64 エンコードしたもの（Render 等向け） |
 | `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` | 任意。全員共通の既定ブック ID（URL の `/d/` と次の `/` の間） |
 | `GOOGLE_SHEETS_MAX_ROWS` | 任意。1シートあたり読み取る最大行数（既定 `400`、20〜2000） |
+| `GOOGLE_OAUTH_CLIENT_ID` | 任意。**ユーザー Google OAuth** 用（Web クライアント ID） |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | 任意。上記クライアントのシークレット |
+| `GOOGLE_OAUTH_REDIRECT_URI` | 任意。**完全一致**で Google Cloud に登録。例: `https://<本番ホスト>/oauth/google/callback` |
+| `GOOGLE_OAUTH_TOKEN_SECRET` | 任意。refresh_token 暗号化用（**16文字以上**、漏洩厳禁） |
 
-初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001`〜`007_user_sheet_defaults.sql` など）。
+初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001`〜`008_user_google_oauth.sql` など）。
 
 ## Google スプレッドシート（読み取り）
 
 LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEAR が **Sheets API で表を取得**し、**AI がシートを選んで内容を解釈**して答えます（[`src/modules/sheets_query.ts`](src/modules/sheets_query.ts)）。
 
-**あなたの個人 Google アカウントに「ログインさせる」OAuth は未実装**です。代わりに次の運用です。
+認証は次の **どちらか一方または両方**を設定できます。
+
+### A. サービスアカウント（従来）
 
 1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、**Google Sheets API** を有効化する。
 2. **サービスアカウント**を作成し、JSON 鍵をダウンロードする。
 3. 鍵の `client_email`（`….iam.gserviceaccount.com`）をコピーする。
 4. 参照したいスプレッドシートの **共有**で、そのメールアドレスに **閲覧者**（または編集者）を追加する。
 5. NEAR の環境変数に `GOOGLE_SERVICE_ACCOUNT_JSON`（または `_B64`）を設定してデプロイする。
+
+### B. ユーザー OAuth（自分の Google 権限で読む）
+
+サービスアカウントに共有しなくても、**ユーザー本人の Google で開けるシート**を読み取れます。
+
+1. 同じ（または別）GCP プロジェクトで **OAuth クライアント ID（ウェブアプリケーション）** を作成する。
+2. **承認済みのリダイレクト URI** に `https://<本番>/oauth/google/callback` を**完全一致**で追加する。
+3. **Google Sheets API** を有効にする。
+4. （外部ユーザーに使わせる場合）**OAuth 同意画面**でスコープ `.../auth/spreadsheets.readonly` を追加し、テストユーザーまたは本番公開を設定する。
+5. 環境変数に `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REDIRECT_URI` / `GOOGLE_OAUTH_TOKEN_SECRET` を設定する。
+6. `PUBLIC_BASE_URL`（または Render の `RENDER_EXTERNAL_URL`）が連携 URL の生成に使われる。
+
+**利用者の操作:** LINE で **「Google連携」** と送る → 返信の URL をブラウザで開く → Google で許可。refresh_token は DB に暗号化保存されます。
+
+エンドポイント: `GET /oauth/google/start?link=…` → Google へリダイレクト → `GET /oauth/google/callback`。
+
+### 読み取りの優先順位
+
+同一ユーザーで **OAuth 連携済みならユーザーのトークンを優先**し、無ければサービスアカウントを使います。
 
 **ブックの指定**
 

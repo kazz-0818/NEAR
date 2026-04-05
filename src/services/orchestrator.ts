@@ -21,6 +21,7 @@ import {
 } from "./growth_suggestion_gate.js";
 import { loadRecentUserMessages } from "./conversation_context.js";
 import { promoteGoogleSheetsFollowUp } from "./sheetsIntentFollowUp.js";
+import { tryHandleGoogleOAuthUserLine } from "./google_oauth_user_line.js";
 
 async function saveIntentRun(
   db: Db,
@@ -58,6 +59,12 @@ export async function handleLineTextMessage(input: {
   const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text });
   if (userGrowth.handled) {
     await replyOrPush(replyToken, channelUserId, userGrowth.reply);
+    return;
+  }
+
+  const googleOauth = await tryHandleGoogleOAuthUserLine({ db, channelUserId, text });
+  if (googleOauth.handled && googleOauth.reply) {
+    await replyOrPush(replyToken, channelUserId, googleOauth.reply);
     return;
   }
 

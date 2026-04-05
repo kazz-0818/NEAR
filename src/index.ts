@@ -25,6 +25,7 @@ import {
   getEffectivePublicBaseUrl,
   getRenderRuntimeInfo,
 } from "./lib/renderRuntime.js";
+import { createGoogleOAuthApp } from "./routes/oauthGoogle.js";
 
 const app = new Hono();
 const log = getLogger();
@@ -105,6 +106,7 @@ app.post("/internal/reminders/dispatch", async (c) => {
 
 const admin = createAdminApp();
 app.route("/admin", admin);
+app.route("/oauth/google", createGoogleOAuthApp());
 
 /** LINE Webhook（Messaging API）。検証・本番とも必ず 200 を返す経路にする。 */
 async function lineMessagingWebhook(c: Context) {

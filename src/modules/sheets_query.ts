@@ -1,12 +1,9 @@
 import OpenAI from "openai";
 import type { Db } from "../db/client.js";
 import { getEnv } from "../config/env.js";
-import {
-  extractSpreadsheetIdFromText,
-  getServiceAccountClientEmail,
-  getSheetsAPI,
-  googleSheetsConfigured,
-} from "../lib/googleSheetsAuth.js";
+import { extractSpreadsheetIdFromText, getServiceAccountClientEmail } from "../lib/googleSheetsAuth.js";
+import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
+import { getSheetsForLineUser, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { getLogger } from "../lib/logger.js";
 import type { ParsedIntent } from "../models/intent.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
@@ -145,11 +142,11 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const log = getLogger();
   const env = getEnv();
 
-  if (!googleSheetsConfigured()) {
+  if (!sheetsReadIntegrationEnabled()) {
     return {
       success: false,
       draft:
-        "Googleスプレッドシートを読む機能は、管理者がサービスアカウント連携（環境変数）を設定し、あなたのシートをそのアカウントに共有すると使えます。手順は NEAR の DEPLOY.md「Google スプレッドシート」を参照してください。",
+        "Googleスプレッドシートを読む機能は、**あなたの Google で連携**（LINE で「Google連携」）または**管理者のサービスアカウント連携**のどちらかが必要です。手順は NEAR の DEPLOY.md「Google スプレッドシート」を参照してください。",
       situation: "unsupported",
     };
   }
@@ -190,7 +187,17 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const maxRows = env.GOOGLE_SHEETS_MAX_ROWS;
 
   try {
-    const sheets = await getSheetsAPI();
+    const sheets = await getSheetsForLineUser(ctx.db, ctx.channelUserId);
+    if (!sheets) {
+      return {
+        success: true,
+        draft:
+          "スプレッドシート用の認証がありません。\n" +
+          "・トークで「**Google連携**」と送ると、ブラウザで許可する URL を出します（あなたの Google で見えるシートを読みます）。\n" +
+          "・または管理者にサービスアカウント連携とシート共有を依頼してください（DEPLOY.md）。",
+        situation: "followup",
+      };
+    }
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
 
     const titles =
@@ -240,9 +247,13 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
 
     if (/PERMISSION_DENIED|403/i.test(msg) || /The caller does not have permission/i.test(msg)) {
       const email = getServiceAccountClientEmail();
-      const shareHint = email
+      let shareHint = email
         ? `スプレッドシートの「共有」で、次のサービスアカウントに**閲覧者**以上を追加してください:\n${email}`
         : "スプレッドシートを、NEAR 用サービスアカウントに共有してください（閲覧者以上）。";
+      if (googleUserOAuthEnvConfigured()) {
+        shareHint +=
+          "\n\n※ **Google 連携**で読んでいる場合は、その Google アカウントから当該シートを開けるか確認してください。別アカウントのシートなら共有が必要です。未連携なら「Google連携」から許可してください。";
+      }
       return {
         success: false,
         draft: `シートを読めませんでした（権限がありません）。\n${shareHint}`,

@@ -1,6 +1,6 @@
 import { getEnv } from "../config/env.js";
 import type { Db } from "../db/client.js";
-import { googleSheetsConfigured } from "../lib/googleSheetsAuth.js";
+import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import type { ParsedIntent } from "../models/intent.js";
 import { loadUserSpreadsheetDefault } from "../modules/sheets_query.js";
 
@@ -62,7 +62,7 @@ export async function promoteGoogleSheetsFollowUp(
 ): Promise<ParsedIntent> {
   if (parsed.intent !== "simple_question") return parsed;
   if (!looksLikeSheetsThreadFollowUp(text)) return parsed;
-  if (!googleSheetsConfigured()) return parsed;
+  if (!sheetsReadIntegrationEnabled()) return parsed;
 
   let id = findSpreadsheetIdInUserThread(text, recentUserMessages);
   if (!id) {

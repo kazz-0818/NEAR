@@ -27,6 +27,15 @@ export function findSpreadsheetIdInUserThread(text: string, recentUserMessages: 
 const ANALYZE_OR_CONTINUE_SHEETS =
   /(これ|それ|上|さっき|先|直前|このデータ|この表|この一覧|一覧).{0,30}(見て|読んで|分析|解析|どう思|教えて|解説|コメント|判断|説明)|分析(して|できますか|できる)|見て.{0,12}(判断|どう|分析)|^ニア[,、\s]*(これ|それ|上).{0,25}(見て|分析)/i;
 
+/** 期間・集計・所感など、続きのシート質問（既定シート／スレ内 URL があるときだけ昇格に使う） */
+const SHEETS_NUMERIC_OR_OPINION_FOLLOWUP =
+  /\d{1,2}月(だけ|のみ|分)?\s*(の|で)?\s*(算出|集計|データ|結果|教えて|見て|出して|抽出|一覧|リスト|件)|\d{1,2}月(について|の件|の分)|(?:^|[\s、。])(算出|集計|合計|平均(値)?|件数|内訳)(\s|を)?(して|してほしい|ください|お願い|できる)|どう思(う|います|いる)|所感|印象|読み取って|傾向|比較して|前年|先月|昨年|四半期|\bQ[1-4]\b|増えた|減った|落ちた|上がった/i;
+
+export function looksLikeSheetsThreadFollowUp(text: string): boolean {
+  const t = text.trim();
+  return ANALYZE_OR_CONTINUE_SHEETS.test(t) || SHEETS_NUMERIC_OR_OPINION_FOLLOWUP.test(t);
+}
+
 function looksLikeSpreadsheetId(id: string): boolean {
   return /^[a-zA-Z0-9-_]{20,}$/.test(id.trim());
 }
@@ -39,7 +48,7 @@ export async function promoteGoogleSheetsFollowUp(
   channelUserId: string
 ): Promise<ParsedIntent> {
   if (parsed.intent !== "simple_question") return parsed;
-  if (!ANALYZE_OR_CONTINUE_SHEETS.test(text.trim())) return parsed;
+  if (!looksLikeSheetsThreadFollowUp(text)) return parsed;
   if (!googleSheetsConfigured()) return parsed;
 
   let id = findSpreadsheetIdInUserThread(text, recentUserMessages);

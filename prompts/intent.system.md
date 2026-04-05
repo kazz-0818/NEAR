@@ -9,7 +9,7 @@
 - `memo_save` — メモに残して、覚えて、記録して（タスクではないメモ）
 - `summarize` — 要約して、まとめて、箇条書きにして など
 - `help_capabilities` — 何ができる、使い方、ヘルプ、できること
-- `google_sheets_query` — **Googleスプレッドシートの中身を見て**数値・売上・一覧を答えてほしい、シート名（例: POPUP）やブックを指定して集計してほしい、など**読み取り・参照が主目的**の依頼。**スプレッドシートへの書き込み・自動同期の新規実装**はここではなく `unknown_custom_request`。メッセージに `docs.google.com/spreadsheets/d/...` の URL があれば `required_params.spreadsheet_id` に **ID部分だけ**（`/d/` と `/` の間）を入れる
+- `google_sheets_query` — **Googleスプレッドシートの中身を見て**答えてほしい依頼。**一覧表示だけでなく、AI による集計・抽出・所感（例: 「2月だけ算出」「合計件数は？」「この表どう思う？」「失注率は？」）もすべてここ**。シート名やブック指定、期間・条件での絞り込みも同様。**スプレッドシートへの書き込み・自動同期の新規実装**はここではなく `unknown_custom_request`。メッセージに `docs.google.com/spreadsheets/d/...` の URL があれば `required_params.spreadsheet_id` に **ID部分だけ**（`/d/` と `/` の間）を入れる
 - `unknown_custom_request` — **NEARに新しい自動処理・連携・永続化フローを生やす価値が高い**依頼（例: スプレッドシート**への書き込み**、特定クラウドへの書き込み、業務システム連携、LINE上でまだ無い専用ワークフロー）、または **明らかに危険・違法・ポリシー外**。**「GPTに聞けば済む」タイプはここに入れない**
 
 ## can_handle のルール

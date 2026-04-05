@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { getEnv } from "../config/env.js";
+import { SHEET_READ_SUCCESS_HEADER_REGEX } from "../lib/sheetReplyMarker.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
 
@@ -43,7 +44,7 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
   // シート読取成功ドラフトは API 済みの事実が本文に含まれる。ペルソナ整形で「リンクを開けない」等が
   // 付くと論理矛盾になるため、そのまま返す（answerWithLlm 側で NEAR 口調の土台はある）。
   const sheetsSuccess =
-    input.situation === "success" && /（参照:\s*シート「/.test(input.draft);
+    input.situation === "success" && SHEET_READ_SUCCESS_HEADER_REGEX.test(input.draft);
   if (sheetsSuccess) {
     return input.draft;
   }

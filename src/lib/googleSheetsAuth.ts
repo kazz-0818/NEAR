@@ -54,6 +54,11 @@ export async function getSheetsAPI(): Promise<sheets_v4.Sheets> {
   return sheetsClient;
 }
 
+/** intent の `spreadsheet_id` や環境変数の生 ID 用（Sheets API のブック ID 形式の最低限チェック） */
+export function isValidSpreadsheetId(id: string): boolean {
+  return /^[a-zA-Z0-9-_]{20,}$/.test(id.trim());
+}
+
 /**
  * docs.google.com/.../spreadsheets/d/<id>/… から ID を取り出す。
  * LINE 貼り付けのゼロ幅文字・改行・全半角ゆれを吸収する。
@@ -66,7 +71,15 @@ export function extractSpreadsheetIdFromText(text: string): string | null {
     .replace(/\s+/g, " ")
     .trim();
   const m =
-    cleaned.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]{20,})/) ??
-    cleaned.match(/spreadsheets\/d\/([a-zA-Z0-9-_]{20,})/i);
-  return m?.[1] ?? null;
+    cleaned.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) ??
+    cleaned.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/i);
+  const id = m?.[1];
+  return id && isValidSpreadsheetId(id) ? id : null;
+}
+
+export function spreadsheetIdFromIntentParams(
+  requiredParams: Record<string, unknown> | undefined
+): string | null {
+  const p = requiredParams?.spreadsheet_id;
+  return typeof p === "string" && isValidSpreadsheetId(p) ? p.trim() : null;
 }

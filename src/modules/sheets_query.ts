@@ -1,144 +1,22 @@
-import OpenAI from "openai";
-import type { Db } from "../db/client.js";
+import { loadUserSpreadsheetDefault, saveUserSpreadsheetDefault } from "../db/user_sheet_defaults_repo.js";
 import { getEnv } from "../config/env.js";
-import { extractSpreadsheetIdFromText, getServiceAccountClientEmail } from "../lib/googleSheetsAuth.js";
+import {
+  extractSpreadsheetIdFromText,
+  getServiceAccountClientEmail,
+  spreadsheetIdFromIntentParams,
+} from "../lib/googleSheetsAuth.js";
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
+import { buildSheetReadSuccessHeader } from "../lib/sheetReplyMarker.js";
+import { clipTsv, escapeSheetTitleForA1, resolveSheetTitle, valuesToTsv } from "../lib/sheetFormat.js";
 import { getSheetsForLineUser, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { getLogger } from "../lib/logger.js";
-import type { ParsedIntent } from "../models/intent.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
+import { answerSheetQuestionWithLlm, pickSheetWithLlm } from "./sheets_query_llm.js";
 
 const SET_DEFAULT_RE =
   /(常用|既定|デフォルト|いつも|デフォ).{0,20}(スプレッド|シート)|(スプレッド|シート).{0,12}(常用|既定|デフォルト|いつも)/i;
 
-const PICK_SHEET_SCHEMA = {
-  name: "near_sheet_pick",
-  strict: true,
-  schema: {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      sheetTitle: { type: "string" },
-      reasoning: { type: "string" },
-    },
-    required: ["sheetTitle", "reasoning"],
-  },
-} as const;
-
-function paramSpreadsheetId(intent: ParsedIntent): string | null {
-  const p = intent.required_params?.spreadsheet_id;
-  return typeof p === "string" && /^[a-zA-Z0-9-_]{20,}$/.test(p.trim()) ? p.trim() : null;
-}
-
-function escapeSheetTitleForA1(title: string): string {
-  return `'${title.replace(/'/g, "''")}'`;
-}
-
-function valuesToTsv(rows: unknown[][] | null | undefined): string {
-  if (!rows || rows.length === 0) return "(データなし)";
-  return rows
-    .map((r) => (Array.isArray(r) ? r.map((c) => (c == null ? "" : String(c))).join("\t") : ""))
-    .join("\n");
-}
-
-function clipTsv(s: string, max = 28000): string {
-  if (s.length <= max) return s;
-  return s.slice(0, max - 40) + "\n…(以降省略。必要なら範囲を指定してください)";
-}
-
-function resolveSheetTitle(pick: string, titles: string[]): string {
-  const t = pick.trim();
-  if (titles.includes(t)) return t;
-  const lower = t.toLowerCase();
-  const partial = titles.find(
-    (x) =>
-      x.toLowerCase().includes(lower) ||
-      lower.includes(x.toLowerCase()) ||
-      x.replace(/\s/g, "").toLowerCase().includes(lower.replace(/\s/g, ""))
-  );
-  if (partial) return partial;
-  return titles[0] ?? t;
-}
-
-export async function loadUserSpreadsheetDefault(db: Db, lineUserId: string): Promise<string | null> {
-  try {
-    const r = await db.query<{ spreadsheet_id: string }>(
-      `SELECT spreadsheet_id FROM user_sheet_defaults WHERE line_user_id = $1`,
-      [lineUserId]
-    );
-    return r.rows[0]?.spreadsheet_id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function saveUserDefault(db: Db, lineUserId: string, spreadsheetId: string): Promise<void> {
-  await db.query(
-    `INSERT INTO user_sheet_defaults (line_user_id, spreadsheet_id, updated_at)
-     VALUES ($1, $2, now())
-     ON CONFLICT (line_user_id) DO UPDATE SET
-       spreadsheet_id = EXCLUDED.spreadsheet_id,
-       updated_at = now()`,
-    [lineUserId, spreadsheetId]
-  );
-}
-
-async function pickSheetWithLlm(userQuestion: string, sheetTitles: string[]): Promise<string> {
-  const env = getEnv();
-  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-  const list = sheetTitles.map((t, i) => `${i + 1}. ${t}`).join("\n");
-  const completion = await client.chat.completions.create({
-    model: env.OPENAI_INTENT_MODEL,
-    messages: [
-      {
-        role: "system",
-        content:
-          "あなたはスプレッドシートのシート名選択器です。ユーザーの質問に答えるのに最も適切な1つのシート名を、次の一覧から選びます。\n" +
-          "ユーザーは「購入代行シート」「POPUP」「3月の売上は？」のように**ざっくり言う**ことがあります。**会話に出た名前・業務名に最も近いタブ名**を選び、一覧に完全一致する文字列を sheetTitle に入れてください（「シート」接尾辞だけ違う場合は一致する本体名を選ぶ）。",
-      },
-      {
-        role: "user",
-        content: `質問:\n${userQuestion}\n\nシート一覧:\n${list}`,
-      },
-    ],
-    response_format: { type: "json_schema", json_schema: PICK_SHEET_SCHEMA },
-    max_tokens: 200,
-    temperature: 0.2,
-  });
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) return sheetTitles[0] ?? "";
-  const j = JSON.parse(raw) as { sheetTitle?: string };
-  return typeof j.sheetTitle === "string" ? j.sheetTitle : sheetTitles[0] ?? "";
-}
-
-async function answerWithLlm(userQuestion: string, sheetTitle: string, tsv: string): Promise<string> {
-  const env = getEnv();
-  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-  const completion = await client.chat.completions.create({
-    model: env.OPENAI_INTENT_MODEL,
-    messages: [
-      {
-        role: "system",
-        content:
-          "あなたはAI秘書「NEAR」です。与えられた表データ（タブ区切り・1行目が見出しのことが多い）**だけ**を根拠に答えてください。\n\n" +
-          "**最優先: ユーザーの指示に合わせて提示する（臨機応変）**\n" +
-          "- 質問に**形式・長さ・切り口**の希望があれば、それに最優先で従う（例: 「一覧だけ」「箇条書き」「結論だけ」「詳しく」「報告書調」「短文で」「表っぽく」「ワンポイント」「比較して」「ランキング」「日別に」など）。\n" +
-          "- 指定が無いときは読みやすさ優先。集計・件数が主目的なら、見出し＋・行の一覧でもよいが、**決まったテンプレに縛らない**。\n" +
-          "- ユーザーが**締め・所感・雑談を不要**と言っていれば付けない。必要なら最後に**短い1文** NEAR らしく（従順＋軽口）。サービス定型の長いお礼は使わない。\n\n" +
-          "**内容:** 丸写しや列の機械羅列**だけ**で終わらせない。依頼に応じて (1)集計・算出 (2)条件・期間での抽出 (3)比較・傾向・所感 を必要な分だけ含める。「一覧だけ」と明示されていても、最低限の見出しや区切りで読みやすくしてよい。見出し行から列を推定し、日付表記のゆれに注意。データに無いことは書かない。\n\n" +
-          "日本語で。数値・結論は落とさない。\n\n" +
-          "**前置き禁止:** 表はシステムが**既に**シートから取得済み。「リンクを直接開けない」「URLを開けない」「提供されたデータから」など**アクセス不能を示す文は一切書かない**（内容と矛盾する）。いきなり依頼への回答から始める。",
-      },
-      {
-        role: "user",
-        content: `シート名: ${sheetTitle}\n\n質問:\n${userQuestion}\n\n表データ:\n${tsv}`,
-      },
-    ],
-    max_tokens: 1200,
-    temperature: 0.35,
-  });
-  return completion.choices[0]?.message?.content?.trim() ?? "すみません、回答を組み立てられませんでした。";
-}
+export { loadUserSpreadsheetDefault } from "../db/user_sheet_defaults_repo.js";
 
 export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const log = getLogger();
@@ -156,19 +34,19 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const idFromMessage = extractSpreadsheetIdFromText(ctx.originalText);
   if (idFromMessage && SET_DEFAULT_RE.test(ctx.originalText)) {
     try {
-      await saveUserDefault(ctx.db, ctx.channelUserId, idFromMessage);
+      await saveUserSpreadsheetDefault(ctx.db, ctx.channelUserId, idFromMessage);
       return {
         success: true,
         draft: `このスプレッドシートを、あなたの**既定**に保存しました。\n次から URL を省略して「POPUPシートの売上は？」のように聞いても試せます（他に既定が無い場合）。`,
         situation: "success",
       };
     } catch (e) {
-      log.warn({ err: e }, "saveUserDefault failed");
+      log.warn({ err: e }, "saveUserSpreadsheetDefault failed");
     }
   }
 
   let spreadsheetId =
-    paramSpreadsheetId(ctx.intent) ??
+    spreadsheetIdFromIntentParams(ctx.intent.required_params) ??
     idFromMessage ??
     (await loadUserSpreadsheetDefault(ctx.db, ctx.channelUserId)) ??
     env.GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID?.trim() ??
@@ -230,14 +108,13 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
 
     const tsv = clipTsv(valuesToTsv(valuesRes.data.values as unknown[][]));
     const bookTitle = meta.data.properties?.title ?? "";
-    const answer = await answerWithLlm(
+    const answer = await answerSheetQuestionWithLlm(
       ctx.originalText + (bookTitle ? `\n（ブック名の参考: ${bookTitle}）` : ""),
       sheetTitle,
       tsv
     );
 
-    const header =
-      `（参照: シート「${sheetTitle}」の先頭〜${lastRow}行・列ZZまで。ブックID ${spreadsheetId.slice(0, 8)}…）\n\n`;
+    const header = buildSheetReadSuccessHeader(sheetTitle, lastRow, spreadsheetId);
     return {
       success: true,
       draft: header + answer,

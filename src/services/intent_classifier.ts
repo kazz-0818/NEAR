@@ -8,7 +8,6 @@ import {
   parsedIntentSchema,
 } from "../models/intent.js";
 import { buildIntentUserEnvelope } from "../lib/datetimeContext.js";
-import { extractSpreadsheetIdFromText } from "../lib/googleSheetsAuth.js";
 import {
   matchIntentHeuristic,
   rescueBroadSimpleQuestion,
@@ -27,20 +26,6 @@ export async function classifyIntent(userText: string): Promise<ParsedIntent> {
   const heuristic = matchIntentHeuristic(userText);
   if (heuristic) {
     return heuristic;
-  }
-
-  const sheetIdForced = extractSpreadsheetIdFromText(userText);
-  if (sheetIdForced) {
-    return {
-      intent: "google_sheets_query",
-      confidence: 1,
-      can_handle: true,
-      required_params: { spreadsheet_id: sheetIdForced },
-      needs_followup: false,
-      followup_question: null,
-      reason: "spreadsheet_url_embedded",
-      suggested_category: null,
-    };
   }
 
   const env = getEnv();

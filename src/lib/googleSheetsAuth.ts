@@ -1,9 +1,31 @@
 import { JWT } from "google-auth-library";
 import { google } from "googleapis";
+import type { drive_v3 } from "googleapis";
 import type { sheets_v4 } from "googleapis";
 import { getEnv } from "../config/env.js";
 
+let saJwt: JWT | null = null;
 let sheetsClient: sheets_v4.Sheets | null = null;
+let driveClient: drive_v3.Drive | null = null;
+
+const SA_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets.readonly",
+  "https://www.googleapis.com/auth/drive.metadata.readonly",
+] as const;
+
+function serviceAccountJwtOrThrow(): JWT {
+  if (saJwt) return saJwt;
+  const j = parseServiceAccountJson();
+  if (!j?.client_email || !j.private_key) {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON missing or invalid");
+  }
+  saJwt = new JWT({
+    email: String(j.client_email),
+    key: String(j.private_key),
+    scopes: [...SA_SCOPES],
+  });
+  return saJwt;
+}
 
 export function googleSheetsConfigured(): boolean {
   const env = getEnv();
@@ -38,20 +60,20 @@ export function getServiceAccountClientEmail(): string | null {
   return typeof email === "string" ? email : null;
 }
 
-/** Google Sheets API v4 クライアント（読み取り専用スコープ） */
+/** Google Sheets API v4 クライアント（読み取り専用 + Drive メタデータは同一 SA JWT） */
 export async function getSheetsAPI(): Promise<sheets_v4.Sheets> {
   if (sheetsClient) return sheetsClient;
-  const j = parseServiceAccountJson();
-  if (!j?.client_email || !j.private_key) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON missing or invalid");
-  }
-  const auth = new JWT({
-    email: String(j.client_email),
-    key: String(j.private_key),
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
+  const auth = serviceAccountJwtOrThrow();
   sheetsClient = google.sheets({ version: "v4", auth });
   return sheetsClient;
+}
+
+/** Drive API v3（スプレッドシートの files.list 用。メタデータ readonly） */
+export async function getDriveAPI(): Promise<drive_v3.Drive> {
+  if (driveClient) return driveClient;
+  const auth = serviceAccountJwtOrThrow();
+  driveClient = google.drive({ version: "v3", auth });
+  return driveClient;
 }
 
 /** intent の `spreadsheet_id` や環境変数の生 ID 用（Sheets API のブック ID 形式の最低限チェック） */

@@ -52,7 +52,7 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 
 ### A. サービスアカウント（従来）
 
-1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、**Google Sheets API** を有効化する。
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作り、**Google Sheets API** と **Google Drive API** を有効化する（リンク無しの**ファイル名検索**に Drive が必要です）。
 2. **サービスアカウント**を作成し、JSON 鍵をダウンロードする。
 3. 鍵の `client_email`（`….iam.gserviceaccount.com`）をコピーする。
 4. 参照したいスプレッドシートの **共有**で、そのメールアドレスに **閲覧者**（または編集者）を追加する。
@@ -64,8 +64,8 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 
 1. 同じ（または別）GCP プロジェクトで **OAuth クライアント ID（ウェブアプリケーション）** を作成する。
 2. **承認済みのリダイレクト URI** に `https://<本番>/oauth/google/callback` を**完全一致**で追加する。
-3. **Google Sheets API** を有効にする。
-4. （外部ユーザーに使わせる場合）**OAuth 同意画面**でスコープ `.../auth/spreadsheets.readonly` を追加し、テストユーザーまたは本番公開を設定する。
+3. **Google Sheets API** と **Google Drive API** を有効にする。
+4. （外部ユーザーに使わせる場合）**OAuth 同意画面**でスコープ `.../auth/spreadsheets.readonly` と `.../auth/drive.metadata.readonly`（Drive のメタデータ・ファイル名検索のみ）を追加し、テストユーザーまたは本番公開を設定する。
 5. 環境変数に `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REDIRECT_URI` / `GOOGLE_OAUTH_TOKEN_SECRET` を設定する。
 6. `PUBLIC_BASE_URL`（または Render の `RENDER_EXTERNAL_URL`）が連携 URL の生成に使われる。
 
@@ -79,9 +79,12 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 
 **ブックの指定**
 
+- **Google 連携済み**のとき、メッセージ内のキーワードから **Drive 上のファイル名**を検索し、スプレッドシートを自動特定することがあります（名前に「購入代行」「管理」などが含まれる場合など）。
 - メッセージに `https://docs.google.com/spreadsheets/d/xxxxxxxx/edit…` を含める、または
 - `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` を設定する、または
 - 一度「このシートを既定にして」と **URL 付き**で送ると、`user_sheet_defaults` に LINE ユーザー単位で保存される（[`007_user_sheet_defaults.sql`](src/db/migrations/007_user_sheet_defaults.sql)）。
+
+**注意（再連携）:** 以前は `spreadsheets.readonly` のみだった場合、**Drive 検索**のために LINE で「Google連携」をもう一度行い、新しいスコープを許可する必要があります。
 
 **注意:** 巨大なシートは先頭〜`GOOGLE_SHEETS_MAX_ROWS` 行・列 ZZ までに限ります。書き込みは行いません（読み取り専用スコープ）。
 

@@ -12,7 +12,7 @@ const ANALYZE_OR_CONTINUE_SHEETS =
 const SHEETS_NUMERIC_OR_OPINION_FOLLOWUP =
   /\d{1,2}月(だけ|のみ|分)?\s*(の|で)?\s*(算出|集計|データ|結果|教えて|見て|出して|抽出|一覧|リスト|件|売上|売り上げ|売上高|売行|粗利|利益|実績|件数|個数|人数|台数|数量|注文|受注)|\d{1,2}月(について|の件|の分|の状況|の数字)|(?:^|[\s、。])(算出|集計|合計|平均(値)?|件数|内訳)(\s|を)?(して|してほしい|ください|お願い|できる)|どう思(う|います|いる)|所感|印象|読み取って|傾向|比較して|前年|先月|昨年|今月|四半期|\bQ[1-4]\b|増えた|減った|落ちた|上がった/i;
 
-function roughSheetsBusinessRequest(text: string): boolean {
+export function roughSheetsBusinessRequest(text: string): boolean {
   const t = text.trim();
   if (
     /(シート|スプシ|スプレッド).{0,55}(の|で|は)?\s*(売上|売り上げ|集計|件数|合計|平均|一覧|データ|数字|\d{1,2}月|先月|今月|昨日|教えて|ください|いくら|どのくらい|どれくらい)/i.test(
@@ -22,23 +22,64 @@ function roughSheetsBusinessRequest(text: string): boolean {
     return true;
   }
   if (/(売上|売り上げ|件数|集計|一覧|実績|予算).{0,35}(シート|スプシ|表で|表の|タブ)/i.test(t)) return true;
-  if (/(POPUP|ポップアップ|代行|在庫|受注|発注|売上|仕入).{0,25}(シート|表)/i.test(t)) return true;
+  // 購入代行】管理シート のように記号・中黒が挟まっても代行〜シートを拾う
+  if (/(POPUP|ポップアップ|購入代行|代行|在庫|受注|発注|売上|仕入).{0,40}(シート|表)/i.test(t)) return true;
   if (
     /(売上|売り上げ|件数|合計).{0,18}(教えて|ください|いくら|どのくらい|どれくらい)/i.test(t) &&
     /(シート|表|スプシ|\d{1,2}月|先月|今月|タブ|データ)/i.test(t)
   ) {
     return true;
   }
+  // 「○○シートを読んで」「管理シートを読んで」
+  if (/(管理|業務|売上|在庫|代行).{0,12}シート.{0,12}(を)?(読み|見て|開いて|教えて)/i.test(t)) return true;
+  if (/シート.{0,20}(を)?(読み|読んで|読み上げ|見て|見せて|開いて)/i.test(t)) return true;
   return false;
 }
 
-export function looksLikeSheetsThreadFollowUp(text: string): boolean {
+/** 過去のユーザー発言にシート・業務表の話題があったか（続きの短文用） */
+export function recentUserThreadHadSheetsTopic(recentUserMessages: string[]): boolean {
+  for (const m of recentUserMessages) {
+    const t = m.trim();
+    if (!t) continue;
+    if (SHEETS_TOPIC_EXPLICIT.test(t) || roughSheetsBusinessRequest(t)) return true;
+  }
+  return false;
+}
+
+const SHORT_SHEETS_CONTINUATION =
+  /売上|売り上げ|読み|読んで|上げて|ざっくり|箇条書き|部分|担当|推移|タブ|シート|一覧|集計|教えて|出力|見せ|数字|いくら|件数|内訳/i;
+
+/**
+ * シート会話の続きの短文（「売上の部分」「ざっくり読み上げて」）をスレッド文脈と組み合わせて検出する。
+ */
+function looksLikeShortSheetsContinuation(text: string, recentUserMessages: string[]): boolean {
+  const t = text.trim();
+  if (t.length > 120) return false;
+  if (!recentUserThreadHadSheetsTopic(recentUserMessages)) return false;
+  return SHORT_SHEETS_CONTINUATION.test(t);
+}
+
+export function looksLikeSheetsThreadFollowUp(text: string, recentUserMessages: string[] = []): boolean {
   const t = text.trim();
   return (
     ANALYZE_OR_CONTINUE_SHEETS.test(t) ||
     SHEETS_NUMERIC_OR_OPINION_FOLLOWUP.test(t) ||
-    roughSheetsBusinessRequest(t)
+    roughSheetsBusinessRequest(t) ||
+    looksLikeShortSheetsContinuation(t, recentUserMessages)
   );
+}
+
+/**
+ * ブック ID が未特定でも、Sheets モジュールに回して「リンクを送って」と案内すべき依頼か。
+ * （FAQ が空振りするループを防ぐ）
+ */
+export function explicitUnanchoredSheetReadIntent(text: string, recentUserMessages: string[]): boolean {
+  const t = text.trim();
+  if (roughSheetsBusinessRequest(t)) return true;
+  if (allowDefaultSheetPromotionWithoutUrl(t)) return true;
+  if (looksLikeShortSheetsContinuation(t, recentUserMessages)) return true;
+  if (/読み上げ|読んで|読み取って/.test(t) && /シート|表|スプシ|売上|管理|代行|推移|担当/i.test(t)) return true;
+  return false;
 }
 
 /** 会話にスプレッドシート URL が無いとき、既定ブックへ昇格してよいか */

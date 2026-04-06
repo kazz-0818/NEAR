@@ -20,7 +20,7 @@ import {
   markUnsupportedGrowthSkipped,
 } from "./growth_suggestion_gate.js";
 import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
-import { promoteGoogleSheetsFollowUp } from "./sheetsIntentFollowUp.js";
+import { promoteGoogleSheetsFollowUp, promoteSheetsPendingAffirmative } from "./sheetsIntentFollowUp.js";
 import { tryHandleGoogleOAuthUserLine } from "./google_oauth_user_line.js";
 import { saveOutboundAssistantText } from "./outbound_store.js";
 import { interpretSecretaryRequest } from "./request_interpreter.js";
@@ -222,6 +222,7 @@ export async function handleLineTextMessage(input: {
   }
 
   try {
+    parsed = await promoteSheetsPendingAffirmative(text, parsed, db, channelUserId);
     parsed = await promoteGoogleSheetsFollowUp(text, parsed, recentUserMessages, db, channelUserId);
   } catch (promoErr) {
     log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");

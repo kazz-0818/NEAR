@@ -4,9 +4,8 @@ import { getPool } from "../db/client.js";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import { encryptRefreshToken } from "../lib/googleOAuthTokenCrypto.js";
+import { GOOGLE_USER_SHEET_SCOPES } from "../lib/googleOAuthScopes.js";
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
-
-const SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 
 function esc(s: string): string {
   return s
@@ -53,7 +52,7 @@ export function createGoogleOAuthApp(): Hono {
     const url = client.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
-      scope: [SCOPE],
+      scope: [...GOOGLE_USER_SHEET_SCOPES],
       state: link,
     });
     return c.redirect(url, 302);
@@ -104,7 +103,7 @@ export function createGoogleOAuthApp(): Hono {
            refresh_token_ciphertext = EXCLUDED.refresh_token_ciphertext,
            scope = EXCLUDED.scope,
            updated_at = now()`,
-        [lineUserId, cipher, tokens.scope ?? SCOPE]
+        [lineUserId, cipher, tokens.scope ?? GOOGLE_USER_SHEET_SCOPES.join(" ")]
       );
       await db.query(`DELETE FROM google_oauth_link_tokens WHERE token = $1`, [state]);
     } catch (e) {
@@ -116,7 +115,7 @@ export function createGoogleOAuthApp(): Hono {
     }
 
     return c.html(
-      `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>連携完了</title></head><body style="font-family:system-ui,sans-serif;padding:1.5rem;line-height:1.5"><h1>連携できました</h1><p>このウィンドウを閉じて、LINE の NEAR に戻り、スプレッドシートの URL 付きで質問してみてください。</p></body></html>`
+      `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>連携完了</title></head><body style="font-family:system-ui,sans-serif;padding:1.5rem;line-height:1.5"><h1>連携できました</h1><p>このウィンドウを閉じて、LINE の NEAR に戻ってください。</p><p>スプレッドシートは <strong>URL を送らなくても</strong>、あなたの Google ドライブ上の<strong>ファイル名</strong>から探せる場合があります。見つからないときだけ共有リンクを送ってください。</p></body></html>`
     );
   });
 

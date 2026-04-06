@@ -1,14 +1,22 @@
 import { loadUserSpreadsheetDefault, saveUserSpreadsheetDefault } from "../db/user_sheet_defaults_repo.js";
+import {
+  clearPendingSpreadsheetConfirm,
+  isSpreadsheetConfirmNegative,
+  savePendingSpreadsheetConfirm,
+  tryConsumePendingSpreadsheetConfirm,
+} from "../db/user_sheet_pending_confirm_repo.js";
 import { getEnv } from "../config/env.js";
 import {
   extractSpreadsheetIdFromText,
   getServiceAccountClientEmail,
+  isValidSpreadsheetId,
   spreadsheetIdFromIntentParams,
 } from "../lib/googleSheetsAuth.js";
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
 import { buildSheetReadSuccessHeader } from "../lib/sheetReplyMarker.js";
 import { clipTsv, escapeSheetTitleForA1, resolveSheetTitle, valuesToTsv } from "../lib/sheetFormat.js";
-import { getSheetsForLineUser, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
+import { searchSpreadsheetByUserHint } from "../lib/googleDriveSpreadsheetSearch.js";
+import { getSheetsAndDriveForLineUser, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { getLogger } from "../lib/logger.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
 import { answerSheetQuestionWithLlm, pickSheetWithLlm } from "./sheets_query_llm.js";
@@ -29,6 +37,14 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
         "Googleスプレッドシートを読む機能は、**あなたの Google で連携**（LINE で「Google連携」）または**管理者のサービスアカウント連携**のどちらかが必要です。手順は NEAR の DEPLOY.md「Google スプレッドシート」を参照してください。",
       situation: "unsupported",
     };
+  }
+
+  if (isSpreadsheetConfirmNegative(ctx.originalText)) {
+    try {
+      await clearPendingSpreadsheetConfirm(ctx.db, ctx.channelUserId);
+    } catch (e) {
+      log.warn({ err: e }, "clearPendingSpreadsheetConfirm failed");
+    }
   }
 
   const idFromMessage = extractSpreadsheetIdFromText(ctx.originalText);
@@ -53,13 +69,73 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     null;
 
   if (!spreadsheetId) {
+    try {
+      const affirmed = await tryConsumePendingSpreadsheetConfirm(ctx.db, ctx.channelUserId, ctx.originalText);
+      if (affirmed && isValidSpreadsheetId(affirmed)) spreadsheetId = affirmed;
+    } catch (e) {
+      log.warn({ err: e }, "tryConsumePendingSpreadsheetConfirm failed");
+    }
+  }
+
+  let clients: Awaited<ReturnType<typeof getSheetsAndDriveForLineUser>> = null;
+  try {
+    clients = await getSheetsAndDriveForLineUser(ctx.db, ctx.channelUserId);
+  } catch (e) {
+    log.warn({ err: e }, "getSheetsAndDriveForLineUser failed");
+    clients = null;
+  }
+
+  let driveSearchInsufficientScope = false;
+
+  if (!spreadsheetId && clients) {
+    try {
+      const outcome = await searchSpreadsheetByUserHint(clients.drive, ctx.originalText);
+      if (outcome.kind === "one") {
+        spreadsheetId = outcome.id;
+        log.info({ bookName: outcome.name }, "sheets drive search resolved spreadsheet");
+      } else if (outcome.kind === "confirm") {
+        const { suggested, alternatives } = outcome;
+        let draft =
+          "あなたの言い方はざっくりでも大丈夫です。Drive 上で似た名前のシートが複数あったので、まずは次を**第一候補**にしています。\n\n" +
+          `**「${suggested.name}」**\n\n` +
+          "**これでよろしかったですか？**\n" +
+          "・**合っていれば**「はい」「それで」「OK」など一言送ってください（この候補で読みにいきます）。\n" +
+          "・**違う場合**は、正しい**ファイル名をそのまま**送るか、**共有リンク**を送ってください。\n";
+        if (alternatives.length > 0) {
+          draft += "\n**他の候補（参考）**\n" + alternatives.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+        }
+        try {
+          await savePendingSpreadsheetConfirm(ctx.db, ctx.channelUserId, suggested.id, suggested.name);
+        } catch (e) {
+          log.warn({ err: e }, "savePendingSpreadsheetConfirm failed");
+        }
+        return {
+          success: true,
+          draft,
+          situation: "followup",
+        };
+      } else if (outcome.kind === "insufficient_scope") {
+        driveSearchInsufficientScope = true;
+      }
+    } catch (e) {
+      log.warn({ err: e }, "searchSpreadsheetByUserHint failed");
+    }
+  }
+
+  if (!spreadsheetId) {
+    let draft =
+      "どのスプレッドシートを見るか決められませんでした。\n" +
+      "・あなたの Google ドライブ上の**ファイル名**にキーワード（例:【購入代行】）が入っていれば、**リンク無しでも自動で探す**ことがあります。\n" +
+      "・見つからないときは共有リンク（`https://docs.google.com/spreadsheets/d/...`）を送るか、\n" +
+      "・管理者が `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` を設定しているか、\n" +
+      "・一度「このシートを既定にして」とリンク付きで言って保存してください。";
+    if (driveSearchInsufficientScope && googleUserOAuthEnvConfigured()) {
+      draft +=
+        "\n\n※ **名前からの自動検索**には、Google 連携に **Drive（ファイル名の参照）** の許可が必要です。LINE で「**Google連携**」から、もう一度ブラウザで許可し直してください。";
+    }
     return {
       success: true,
-      draft:
-        "どのスプレッドシートを見るか決められませんでした。\n" +
-        "・Google の共有リンク（`https://docs.google.com/spreadsheets/d/...`）を送るか、\n" +
-        "・管理者が `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` を設定しているか、\n" +
-        "・一度「このシートを既定にして」とリンク付きで言って保存してください。",
+      draft,
       situation: "followup",
     };
   }
@@ -67,8 +143,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const maxRows = env.GOOGLE_SHEETS_MAX_ROWS;
 
   try {
-    const sheets = await getSheetsForLineUser(ctx.db, ctx.channelUserId);
-    if (!sheets) {
+    if (!clients) {
       return {
         success: true,
         draft:
@@ -78,6 +153,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
         situation: "followup",
       };
     }
+    const sheets = clients.sheets;
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
 
     const titles =

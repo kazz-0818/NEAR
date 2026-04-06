@@ -256,11 +256,92 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /**
+   * true / 1 で Web 検索付与に優先順位ポリシーを適用（明示キーワード・短文・シート文脈で抑制）。
+   * オフ時は従来どおり NEAR_AGENT_WEB_SEARCH のみで付与する。
+   */
+  NEAR_WEB_SEARCH_POLICY_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /** ポリシー適用時、本文がこの文字数未満なら検索ツールを付けない（1〜200、既定 24） */
+  NEAR_WEB_SEARCH_MIN_CHARS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 24;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 200 ? n : 24;
+    }),
+  /**
+   * agent_search_runs への行挿入。未設定時: NEAR_WEB_SEARCH_POLICY_ENABLED と同じ（ポリシー ON ならログ ON）。
+   * false / 0 で明示オフ、true / 1 で明示オン。
+   */
+  NEAR_AGENT_SEARCH_RUNS_LOG: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return undefined as boolean | undefined;
+      if (s === "true" || s === "1") return true;
+      if (s === "false" || s === "0") return false;
+      return undefined;
+    }),
+  /** true / 1 でエージェント副作用ツール（タスク・メモ・リマインド）の確認フローを有効化。既定オフ。 */
+  NEAR_TOOL_CONFIRM_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /** 確認対象ツール名をカンマ区切り。未設定時は near_save_reminder,near_save_task,near_save_memo */
+  NEAR_TOOL_CONFIRM_TOOLS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const raw = (s?.trim() || "near_save_reminder,near_save_task,near_save_memo").split(",");
+      const names = raw.map((x) => x.trim()).filter(Boolean);
+      return names.length ? names : ["near_save_reminder", "near_save_task", "near_save_memo"];
+    }),
+  /** 保留の有効期限（分）。1〜120、既定 30 */
+  NEAR_TOOL_CONFIRM_TTL_MINUTES: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 30;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 120 ? n : 30;
+    }),
+  /**
+   * false / 0 のとき、保留中でも肯定/否定以外の発話は通常ルートへ通す（非ブロッキング）。
+   * 未設定時は true（保留中は他処理に進ませない）。
+   */
+  NEAR_TOOL_CONFIRM_BLOCKING: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /** true / 1 でエージェント返信を composeNearReply せずそのまま送る（レイテンシ・トークン削減） */
   NEAR_AGENT_SKIP_COMPOSE: z
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
+  /**
+   * Phase2: true / 1 かつ NEAR_AGENT_ENABLED のとき、task / memo / reminder / summarize を
+   * レガシー registry ではなくエージェント経路（ツール実行）に寄せる。
+   */
+  NEAR_PHASE2_SIDE_EFFECTS_VIA_AGENT: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /**
+   * 返信整形モード。auto = skip/light/full をドラフトから判定。full = 事実保護スキップ以外は常にフル整形。
+   */
+  NEAR_COMPOSE_MODE: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() === "full" ? "full" : "auto")),
+  /** false / 0 のとき auto モードでの「軽微整形」はスキップ（ドラフトそのまま） */
+  NEAR_COMPOSE_LIGHT_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
 });
 
 export type Env = z.infer<typeof envSchema>;

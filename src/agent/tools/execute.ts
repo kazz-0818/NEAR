@@ -1,4 +1,6 @@
+import { getEnv } from "../../config/env.js";
 import { insertAgentToolRun } from "../../db/agent_tool_runs_repo.js";
+import { replacePendingToolConfirmation } from "../../db/pending_tool_confirm_repo.js";
 import { isValidSpreadsheetId } from "../../lib/googleSheetsAuth.js";
 import { memoStore } from "../../modules/memo_store.js";
 import { reminderManager } from "../../modules/reminder_manager.js";
@@ -15,6 +17,12 @@ const MAX_DRAFT_CHARS = 14_000;
 
 function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+function shouldDeferForToolConfirmation(toolApiName: string): boolean {
+  const env = getEnv();
+  if (!env.NEAR_TOOL_CONFIRM_ENABLED) return false;
+  return env.NEAR_TOOL_CONFIRM_TOOLS.includes(toolApiName);
 }
 
 function moduleResultToToolPayload(mod: ModuleResult): Record<string, unknown> {
@@ -153,6 +161,38 @@ export async function executeNearAgentFunction(
           );
         }
         const notesVal = rec.notes;
+        if (shouldDeferForToolConfirmation("near_save_task")) {
+          const env = getEnv();
+          const argsJson: Record<string, unknown> = {
+            title,
+            notes: typeof notesVal === "string" && notesVal.trim() ? notesVal.trim() : null,
+          };
+          await replacePendingToolConfirmation(input.db, {
+            channel: input.channel,
+            channelUserId: input.channelUserId,
+            toolName: "near_save_task",
+            argsJson,
+            inboundMessageId: input.inboundMessageId,
+            ttlMinutes: env.NEAR_TOOL_CONFIRM_TTL_MINUTES,
+          });
+          const draft =
+            `次のタスクを登録しようとしています。\n・${title}` +
+            (typeof argsJson.notes === "string" ? `\n・${argsJson.notes}` : "") +
+            `\n\nよろしければ「はい」、取りやめるときは「いいえ」と送ってください。`;
+          return finishToolExecution(
+            input,
+            name,
+            started,
+            JSON.stringify({
+              ok: true,
+              situation: "followup",
+              draft,
+              draft_truncated: false,
+              hint: "ユーザーがはい/いいえで答えるまで確定しない。確定は DB に保存した引数のみで行う。",
+            }),
+            "followup"
+          );
+        }
         const params: Record<string, unknown> = { title };
         if (typeof notesVal === "string" && notesVal.trim()) {
           params.notes = notesVal.trim();
@@ -175,6 +215,33 @@ export async function executeNearAgentFunction(
             name,
             started,
             JSON.stringify({ ok: false, error: "body_required" })
+          );
+        }
+        if (shouldDeferForToolConfirmation("near_save_memo")) {
+          const env = getEnv();
+          await replacePendingToolConfirmation(input.db, {
+            channel: input.channel,
+            channelUserId: input.channelUserId,
+            toolName: "near_save_memo",
+            argsJson: { body },
+            inboundMessageId: input.inboundMessageId,
+            ttlMinutes: env.NEAR_TOOL_CONFIRM_TTL_MINUTES,
+          });
+          const preview = body.length > 280 ? `${body.slice(0, 280)}…` : body;
+          const draft =
+            `次のメモを保存しようとしています。\n\n${preview}\n\nよろしければ「はい」、取りやめるときは「いいえ」と送ってください。`;
+          return finishToolExecution(
+            input,
+            name,
+            started,
+            JSON.stringify({
+              ok: true,
+              situation: "followup",
+              draft,
+              draft_truncated: body.length > 280,
+              hint: "ユーザーがはい/いいえで答えるまで確定しない。確定は DB に保存した引数のみで行う。",
+            }),
+            "followup"
           );
         }
         const intent = syntheticAgentIntent("memo_save", { body });
@@ -216,6 +283,31 @@ export async function executeNearAgentFunction(
             name,
             started,
             JSON.stringify({ ok: false, error: "reminder_message_and_when_required" })
+          );
+        }
+        if (shouldDeferForToolConfirmation("near_save_reminder")) {
+          const env = getEnv();
+          await replacePendingToolConfirmation(input.db, {
+            channel: input.channel,
+            channelUserId: input.channelUserId,
+            toolName: "near_save_reminder",
+            argsJson: { reminder_message: msg, when_description: when },
+            inboundMessageId: input.inboundMessageId,
+            ttlMinutes: env.NEAR_TOOL_CONFIRM_TTL_MINUTES,
+          });
+          const draft = `次のリマインドを設定しようとしています。\n・時期: ${when}\n・内容: ${msg}\n\nよろしければ「はい」、取りやめるときは「いいえ」と送ってください。`;
+          return finishToolExecution(
+            input,
+            name,
+            started,
+            JSON.stringify({
+              ok: true,
+              situation: "followup",
+              draft,
+              draft_truncated: false,
+              hint: "ユーザーがはい/いいえで答えるまで確定しない。確定は DB に保存した引数のみで行う。",
+            }),
+            "followup"
           );
         }
         const originalText = `${when} ${msg}`.trim();

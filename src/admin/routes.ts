@@ -75,6 +75,32 @@ export function createAdminApp(): Hono {
     return c.json({ items: r.rows });
   });
 
+  /** Web 検索ツール付与判定ログ（Phase2 ポリシー／監査用） */
+  app.get("/agent-search-runs", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 80), 300);
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, created_at, channel, channel_user_id, inbound_message_id, policy_enabled, attached_web_search, reason_code, user_text_chars, tool_names
+       FROM agent_search_runs ORDER BY id DESC LIMIT $1`,
+      [limit]
+    );
+    return c.json({ items: r.rows });
+  });
+
+  /** エージェント副作用ツールの保留中確認（args は保存済みスナップショット） */
+  app.get("/pending-tool-confirmations", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, created_at, expires_at, channel, channel_user_id, status, tool_name, args_json, inbound_message_id
+       FROM pending_tool_confirmations
+       WHERE status = 'pending' AND expires_at > now()
+       ORDER BY id DESC LIMIT $1`,
+      [limit]
+    );
+    return c.json({ items: r.rows });
+  });
+
   app.get("/unsupported", async (c) => {
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
     const pool = getPool();

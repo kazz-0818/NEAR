@@ -5,17 +5,9 @@ import { logUnsupportedRequest } from "../modules/unsupported_request_logger.js"
 import { scheduleFeatureSuggestion } from "../modules/feature_suggester.js";
 import type { ParsedIntent } from "../models/intent.js";
 import { classifyIntent } from "./intent_classifier.js";
-import { composeNearReply } from "./reply_composer.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
-import {
-  buildDeployTimeDraft,
-  isDeployTimeQuestion,
-} from "../lib/buildInfo.js";
 import { getLogger } from "../lib/logger.js";
-import { buildWhatsNewDraft, isWhatsNewCapabilityQuestion } from "../lib/whatsNew.js";
-import { tryHandleAdminGrowthLine } from "./growth_admin_line.js";
-import { tryHandleGrowthRequestingUserLine } from "./growth_user_line.js";
 import {
   evaluateGrowthSuggestionEligibility,
   markUnsupportedGrowthSkipped,
@@ -30,18 +22,17 @@ import {
   explicitUnanchoredSheetReadIntent,
   looksLikeSheetsThreadFollowUp,
 } from "./sheetsIntentPatterns.js";
-import {
-  tryHandleGoogleAccountListOrSwitch,
-  tryHandleGoogleOAuthUserLine,
-} from "./google_oauth_user_line.js";
 import { saveOutboundAssistantText } from "./outbound_store.js";
 import { interpretSecretaryRequest } from "./request_interpreter.js";
 import { resolveLatestAssistantTextForEdit } from "./conversation_target_resolver.js";
 import { editPreviousOutput } from "./previous_output_editor.js";
 import { buildSecretaryClarificationReply } from "./secretary_clarification_handler.js";
 import { syntheticIntentForSecretaryLayer } from "../models/requestInterpretation.js";
-import { shouldUseNearAgent } from "../agent/eligibility.js";
+import { shouldInvokeNearAgent } from "../orchestrator/routingDecision.js";
+import { runThinRouterPhase } from "../orchestrator/thinRouter.js";
 import { runNearAgentTurn } from "../agent/runner.js";
+import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
+import { tryHandlePendingToolConfirmation } from "./pending_tool_confirm_handler.js";
 
 async function saveIntentRun(
   db: Db,
@@ -90,53 +81,9 @@ export async function handleLineTextMessage(input: {
   const env = getEnv();
   const outboundCtx = { channel, channelUserId, inboundMessageId };
 
-  if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
-    const growth = await tryHandleAdminGrowthLine({ db, adminUserId: channelUserId, text });
-    if (growth.handled) {
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, growth.reply, log);
-      return;
-    }
-  }
-
-  const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text });
-  if (userGrowth.handled) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, userGrowth.reply, log);
-    return;
-  }
-
-  const googleOauth = await tryHandleGoogleOAuthUserLine({ db, channelUserId, text });
-  if (googleOauth.handled && googleOauth.reply) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, googleOauth.reply, log);
-    return;
-  }
-
-  const googleAcct = await tryHandleGoogleAccountListOrSwitch({ db, channelUserId, text });
-  if (googleAcct.handled && googleAcct.reply) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, googleAcct.reply, log);
-    return;
-  }
-
-  if (isDeployTimeQuestion(text)) {
-    const draft = buildDeployTimeDraft();
-    let finalText = draft;
-    try {
-      finalText = await composeNearReply({ draft, situation: "success", userMessage: text });
-    } catch (ce) {
-      log.warn({ err: ce }, "composeNearReply failed (deploy time path)");
-    }
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
-    return;
-  }
-
-  if (isWhatsNewCapabilityQuestion(text)) {
-    const draft = await buildWhatsNewDraft(db);
-    let finalText = draft;
-    try {
-      finalText = await composeNearReply({ draft, situation: "success", userMessage: text });
-    } catch (ce) {
-      log.warn({ err: ce }, "composeNearReply failed (whats new path)");
-    }
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+  const thin = await runThinRouterPhase({ db, env, channelUserId, text });
+  if (thin.handled) {
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
     return;
   }
 
@@ -147,6 +94,20 @@ export async function handleLineTextMessage(input: {
     recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId);
   } catch (ctxErr) {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
+  }
+
+  const pendingHit = await tryHandlePendingToolConfirmation({
+    db,
+    channel,
+    channelUserId,
+    text,
+    inboundMessageId,
+    recentUserMessages,
+    recentAssistantMessages,
+  });
+  if (pendingHit.handled && pendingHit.finalText != null) {
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log);
+    return;
   }
 
   if (!env.NEAR_SECRETARY_LAYER_DISABLED) {
@@ -168,7 +129,7 @@ export async function handleLineTextMessage(input: {
             });
             let finalText = edited;
             try {
-              finalText = await composeNearReply({
+              finalText = await composeNearReplyUnified({
                 draft: edited,
                 situation: "success",
                 userMessage: text,
@@ -176,7 +137,7 @@ export async function handleLineTextMessage(input: {
                 recentAssistantMessages,
               });
             } catch (ce) {
-              log.warn({ err: ce }, "composeNearReply failed (secretary edit path)");
+              log.warn({ err: ce }, "composeNearReplyUnified failed (secretary edit path)");
             }
             await saveIntentRun(db, inboundMessageId, syntheticIntentForSecretaryLayer("edit_previous_output", interpretation.confidence), {
               secretary_interpretation: interpretation,
@@ -209,7 +170,7 @@ export async function handleLineTextMessage(input: {
             });
             let finalText = clarifyDraft;
             try {
-              finalText = await composeNearReply({
+              finalText = await composeNearReplyUnified({
                 draft: clarifyDraft,
                 situation: "followup",
                 userMessage: text,
@@ -217,7 +178,7 @@ export async function handleLineTextMessage(input: {
                 recentAssistantMessages,
               });
             } catch (ce) {
-              log.warn({ err: ce }, "composeNearReply failed (secretary clarify path)");
+              log.warn({ err: ce }, "composeNearReplyUnified failed (secretary clarify path)");
             }
             await saveIntentRun(db, inboundMessageId, syntheticIntentForSecretaryLayer("clarify_missing_info", interpretation.confidence), {
               secretary_interpretation: interpretation,
@@ -260,19 +221,16 @@ export async function handleLineTextMessage(input: {
     log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");
   }
 
-  await saveIntentRun(db, inboundMessageId, parsed, { ok: true });
+  await saveIntentRun(db, inboundMessageId, parsed, {
+    ok: true,
+    routing_meta: { phase: "post_promote" },
+  });
 
   const handler = getHandler(parsed.intent);
   const routable =
     parsed.can_handle === true && parsed.intent !== "unknown_custom_request" && handler !== undefined;
 
-  if (
-    shouldUseNearAgent({
-      env,
-      intent: parsed.intent,
-      legacyRoutable: routable,
-    })
-  ) {
+  if (shouldInvokeNearAgent(env, parsed.intent, routable)) {
     try {
       const agentResult = await runNearAgentTurn({
         db,
@@ -297,7 +255,7 @@ export async function handleLineTextMessage(input: {
         let finalText = trimmed;
         if (!env.NEAR_AGENT_SKIP_COMPOSE) {
           try {
-            finalText = await composeNearReply({
+            finalText = await composeNearReplyUnified({
               draft: trimmed,
               situation: agentResult.composeSituation,
               userMessage: text,
@@ -305,7 +263,7 @@ export async function handleLineTextMessage(input: {
               recentAssistantMessages,
             });
           } catch (ce) {
-            log.warn({ err: ce }, "composeNearReply failed (near agent path)");
+            log.warn({ err: ce }, "composeNearReplyUnified failed (near agent path)");
           }
         }
         await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
@@ -350,7 +308,7 @@ export async function handleLineTextMessage(input: {
         "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
       let finalText = draft;
       try {
-        finalText = await composeNearReply({
+        finalText = await composeNearReplyUnified({
           draft,
           situation: "unsupported",
           userMessage: text,
@@ -358,7 +316,7 @@ export async function handleLineTextMessage(input: {
           recentAssistantMessages,
         });
       } catch (ce) {
-        log.warn({ err: ce }, "composeNearReply failed (unsupported path)");
+        log.warn({ err: ce }, "composeNearReplyUnified failed (unsupported path)");
       }
       await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
       return;
@@ -410,7 +368,7 @@ export async function handleLineTextMessage(input: {
 
     let finalText = modResult.draft;
     try {
-      finalText = await composeNearReply({
+      finalText = await composeNearReplyUnified({
         draft: modResult.draft,
         situation,
         userMessage: text,
@@ -418,7 +376,7 @@ export async function handleLineTextMessage(input: {
         recentAssistantMessages,
       });
     } catch (ce) {
-      log.warn({ err: ce }, "composeNearReply failed, sending draft as-is");
+      log.warn({ err: ce }, "composeNearReplyUnified failed, sending draft as-is");
     }
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
   } catch (e) {
@@ -427,7 +385,7 @@ export async function handleLineTextMessage(input: {
       "申し訳ございません、少し調子が悪いようです。お手数ですが、もう一度お試しください。";
     let finalText = draft;
     try {
-      finalText = await composeNearReply({
+      finalText = await composeNearReplyUnified({
         draft,
         situation: "error",
         userMessage: text,

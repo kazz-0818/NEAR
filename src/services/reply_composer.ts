@@ -118,3 +118,46 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
   }
   return input.draft;
 }
+
+/**
+ * 軽微整形: 口調・改行のみ。数値・固有名・箇条書きの内容は変えない。前置きを足さない。
+ */
+export async function composeNearReplyLight(input: ComposeInput): Promise<string> {
+  const env = getEnv();
+  const log = getLogger();
+
+  if (input.situation === "success" && SHEET_READ_SUCCESS_HEADER_REGEX.test(input.draft)) {
+    return input.draft;
+  }
+
+  const persona = await getPersona();
+
+  try {
+    const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+    const userBits: string[] = [
+      `状況: ${input.situation}`,
+      "次のドラフトはユーザーへの返信本文です。**内容・数値・固有名・箇条書きの事実は1文字も変えず**、改行と丁寧さだけ整えてください。",
+      "- 新しい情報・前置き・「調べたところ」などの追加は禁止。",
+      "- ドラフトが既に丁寧なら、ほぼそのままでよい。",
+    ];
+    if (input.userMessage?.trim()) {
+      userBits.push("", `ユーザー発言（参考のみ）: ${input.userMessage.trim()}`);
+    }
+    userBits.push("", "【ドラフト】", input.draft);
+
+    const completion = await client.chat.completions.create({
+      model: env.OPENAI_INTENT_MODEL,
+      messages: [
+        { role: "system", content: persona },
+        { role: "user", content: userBits.join("\n") },
+      ],
+      max_tokens: 380,
+      temperature: 0.28,
+    });
+    const text = completion.choices[0]?.message?.content?.trim();
+    if (text) return text;
+  } catch (e) {
+    log.warn({ err: e }, "composeNearReplyLight failed, using draft");
+  }
+  return input.draft;
+}

@@ -6,8 +6,10 @@ import type {
   Tool,
 } from "openai/resources/responses/responses";
 import { getEnv } from "../config/env.js";
+import { insertAgentSearchRun } from "../db/agent_search_runs_repo.js";
 import { getLogger } from "../lib/logger.js";
 import { mergeModuleSituations, type AgentComposeSituation } from "./composeSituation.js";
+import { evaluateWebSearchPolicy } from "./policies/webSearchPolicy.js";
 import { extractVisibleAssistantText } from "./responseText.js";
 import { loadNearAgentInstructions } from "./loadInstructions.js";
 import type { NearAgentTurnInput, NearAgentTurnResult } from "./types.js";
@@ -41,12 +43,47 @@ function buildAgentUserContent(input: NearAgentTurnInput): string {
   return blocks.join("\n\n");
 }
 
-function buildTools(env: ReturnType<typeof getEnv>): Tool[] {
+function functionToolNames(): string[] {
+  return NEAR_AGENT_FUNCTION_TOOLS.filter((t) => t.type === "function").map((t) => t.name);
+}
+
+function shouldLogAgentSearchRun(env: ReturnType<typeof getEnv>): boolean {
+  if (env.NEAR_AGENT_SEARCH_RUNS_LOG === false) return false;
+  if (env.NEAR_AGENT_SEARCH_RUNS_LOG === true) return true;
+  return env.NEAR_WEB_SEARCH_POLICY_ENABLED;
+}
+
+function resolveWebSearchForTurn(
+  env: ReturnType<typeof getEnv>,
+  userText: string
+): { attach: boolean; reasonCode: string } {
+  if (!env.NEAR_AGENT_WEB_SEARCH) {
+    return { attach: false, reasonCode: "env_master_off" };
+  }
+  if (!env.NEAR_WEB_SEARCH_POLICY_ENABLED) {
+    return { attach: true, reasonCode: "policy_disabled_legacy_attach" };
+  }
+  return evaluateWebSearchPolicy({ userText, minChars: env.NEAR_WEB_SEARCH_MIN_CHARS });
+}
+
+function buildTools(attachWebSearch: boolean): Tool[] {
   const tools: Tool[] = [...NEAR_AGENT_FUNCTION_TOOLS];
-  if (env.NEAR_AGENT_WEB_SEARCH) {
+  if (attachWebSearch) {
     tools.unshift({ type: "web_search_preview" });
   }
   return tools;
+}
+
+function turnLogBase(
+  env: ReturnType<typeof getEnv>,
+  ws: { attach: boolean; reasonCode: string }
+): Pick<NearAgentTurnResult["log"], "webSearchEnabled" | "webSearchAttached" | "webSearchReasonCode" | "webSearchPolicyEnabled"> {
+  return {
+    webSearchEnabled: env.NEAR_AGENT_WEB_SEARCH,
+    webSearchAttached: ws.attach,
+    webSearchReasonCode: ws.reasonCode,
+    webSearchPolicyEnabled: env.NEAR_WEB_SEARCH_POLICY_ENABLED,
+  };
 }
 
 function softFailureMessage(): string {
@@ -69,7 +106,27 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
   const log = getLogger();
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
   const instructions = await loadNearAgentInstructions();
-  const tools = buildTools(env);
+  const ws = resolveWebSearchForTurn(env, input.userText);
+  const tools = buildTools(ws.attach);
+  const fnNames = functionToolNames();
+
+  if (shouldLogAgentSearchRun(env)) {
+    try {
+      await insertAgentSearchRun(input.db, {
+        channel: input.channel,
+        channelUserId: input.channelUserId,
+        inboundMessageId: input.inboundMessageId,
+        policyEnabled: env.NEAR_WEB_SEARCH_POLICY_ENABLED,
+        attachedWebSearch: ws.attach,
+        reasonCode: ws.reasonCode,
+        userTextLen: input.userText.trim().length,
+        toolNames: fnNames,
+      });
+    } catch (e) {
+      log.warn({ err: e }, "insertAgentSearchRun failed");
+    }
+  }
+
   const toolsInvoked: string[] = [];
   const maxSteps = env.NEAR_AGENT_MAX_STEPS;
 
@@ -115,7 +172,7 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
         steps: step,
         toolsInvoked,
         model: env.OPENAI_AGENT_MODEL,
-        webSearchEnabled: env.NEAR_AGENT_WEB_SEARCH,
+        ...turnLogBase(env, ws),
       }, "error");
     }
 
@@ -143,7 +200,7 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
           steps: step,
           toolsInvoked,
           model: env.OPENAI_AGENT_MODEL,
-          webSearchEnabled: env.NEAR_AGENT_WEB_SEARCH,
+          ...turnLogBase(env, ws),
         },
         composeSituation
       );
@@ -157,7 +214,7 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
           steps: step,
           toolsInvoked,
           model: env.OPENAI_AGENT_MODEL,
-          webSearchEnabled: env.NEAR_AGENT_WEB_SEARCH,
+          ...turnLogBase(env, ws),
         },
         mergeModuleSituations(composeSituation, "error")
       );
@@ -181,7 +238,7 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
       steps: maxSteps,
       toolsInvoked,
       model: env.OPENAI_AGENT_MODEL,
-      webSearchEnabled: env.NEAR_AGENT_WEB_SEARCH,
+      ...turnLogBase(env, ws),
     },
     mergeModuleSituations(composeSituation, "error")
   );

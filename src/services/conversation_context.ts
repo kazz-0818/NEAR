@@ -8,6 +8,28 @@ export type LoadRecentUserMessagesOptions = {
 /**
  * 同一 channel / ユーザーについて、現在の inbound より前のユーザー発言を古い順で返す（会話の踏襲用）。
  */
+/** 直前のユーザー inbound（今回より前の最新 1 件）。短時間再発話シグナル用。 */
+export async function getPreviousInboundMeta(
+  db: Db,
+  channel: string,
+  channelUserId: string,
+  beforeInboundId: number
+): Promise<{ id: number; created_at: Date; text: string } | null> {
+  const res = await db.query<{ id: string; created_at: string; text: string | null }>(
+    `SELECT id, created_at::text, text FROM inbound_messages
+     WHERE channel = $1 AND channel_user_id = $2 AND id < $3
+     ORDER BY id DESC LIMIT 1`,
+    [channel, channelUserId, beforeInboundId]
+  );
+  const row = res.rows[0];
+  if (!row) return null;
+  return {
+    id: Number(row.id),
+    created_at: new Date(row.created_at),
+    text: row.text ?? "",
+  };
+}
+
 export async function loadRecentUserMessages(
   db: Db,
   channel: string,

@@ -26,6 +26,7 @@ const MIGRATION_FILES = [
   "018_growth_funnel.sql",
   "019_growth_candidate_signals.sql",
   "020_growth_signal_buckets.sql",
+  "021_growth_unified_promotion.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

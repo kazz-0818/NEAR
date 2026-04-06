@@ -38,12 +38,16 @@ export function computeSignalPriorityScore(source: string, reasonCode: string): 
   if (source === "faq_answerer") base = 82;
   else if (source === "legacy_module") base = 74;
   else if (source === "agent_path") base = 62;
+  else if (source === "short_interval_followup") base = 58;
 
   if (rc.includes("compose_error")) base += 12;
   if (rc.includes("soft_failure")) base += 6;
   if (rc.includes("no_tools")) base += 4;
   if (rc.includes("capability_deflection") || rc.includes("deflection")) base += 8;
   if (rc.includes("module_situation_error")) base += 10;
+  if (rc.includes("ambiguous_short_reply_no_tools")) base += 6;
+  if (rc.includes("agent_empty_or_fallback_reply")) base += 5;
+  if (rc.includes("agent_step_budget") || rc.includes("agent_max_steps")) base += 4;
 
   return Math.min(100, Math.max(1, Math.round(base)));
 }

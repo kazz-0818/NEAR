@@ -147,6 +147,31 @@ const envSchema = z.object({
       return Number.isFinite(n) && n >= 1 ? n : 1;
     }),
   /**
+   * ゲートの fingerprint 件数に、同一 user_message_fingerprint の growth_signal_buckets の hit を加算する（既定オン）。
+   */
+  GROWTH_FINGERPRINT_INCLUDE_BUCKETS: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /** バケット hit 証拠に掛ける重み（既定 1）。 */
+  GROWTH_BUCKET_FP_WEIGHT: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 1;
+      const n = parseFloat(s);
+      return Number.isFinite(n) && n >= 0 && n <= 10 ? n : 1;
+    }),
+  /** バケットごとの hit_count の加算上限（既定 5）。 */
+  GROWTH_BUCKET_FP_HIT_CAP: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 5;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 100 ? n : 5;
+    }),
+  /**
    * unknown_custom_request かつ confidence がこの値未満（かつ confidence>0）のときスキップ。0 で無効。既定 0.35。
    */
   GROWTH_MIN_CONFIDENCE_UNKNOWN: z
@@ -189,6 +214,51 @@ const envSchema = z.object({
       if (s == null || s.trim() === "") return 0;
       const n = parseFloat(s);
       return Number.isFinite(n) && n >= 0 && n <= 168 ? n : 0;
+    }),
+  /**
+   * true / 1: growth_signal_buckets から合成 unsupported を経由して suggestion 生成まで進める（段階導入。既定オフ）。
+   */
+  NEAR_GROWTH_BUCKET_PROMOTION_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  NEAR_GROWTH_PROMOTE_MIN_BUCKET_HITS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 2;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 1000 ? n : 2;
+    }),
+  NEAR_GROWTH_PROMOTE_MIN_PRIORITY: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 55;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 100 ? n : 55;
+    }),
+  /**
+   * 昇格対象の primary_source（カンマ区切り）。空＝すべて。例: faq_answerer,agent_path,legacy_module,short_interval_followup
+   */
+  NEAR_GROWTH_PROMOTE_SOURCES: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = s?.trim();
+      if (!t) return null as string[] | null;
+      return t.split(",").map((x) => x.trim()).filter(Boolean);
+    }),
+  /**
+   * 直前のユーザー発言からこの分数以内の再発言を「短時間再質問」シグナルにする（0 で無効。既定 15）。
+   */
+  NEAR_GROWTH_SHORT_FOLLOWUP_MINUTES: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 15;
+      const n = parseFloat(s);
+      return Number.isFinite(n) && n >= 0 && n <= 1440 ? n : 15;
     }),
   /**
    * false / 0 でオフ。未設定はオン。

@@ -121,7 +121,8 @@ export function createAdminApp(): Hono {
         : null;
     const pool = getPool();
     const r = await pool.query(
-      `SELECT id, created_at, inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail
+      `SELECT id, created_at, inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail,
+              growth_signal_bucket_id, implementation_suggestion_id
        FROM growth_funnel_events
        WHERE ($1::bigint IS NULL OR unsupported_request_id = $1)
        ORDER BY id DESC LIMIT $2`,

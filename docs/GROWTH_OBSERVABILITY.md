@@ -15,6 +15,12 @@
 | `growth_candidate_signals` | unsupported 以外のシグナル（エージェント・レガシー error、**FAQ が「準備中／未対応」系で断った文案** など） |
 | `growth_signal_buckets` | 同一種別のシグナルを **bucket_key** で集約（`hit_count`・`priority_score`）。raw 行の「重複排除ビュー」 |
 
+### agent 時代の昇格（2026-04 追記）
+
+- **`NEAR_GROWTH_BUCKET_PROMOTION_ENABLED=true`** のとき、`growth_signal_buckets` が閾値を満たすと **合成 `unsupported_requests`**（`entry_source=growth_signal_bucket`）を 1 行作り、**既存と同じ gate → `feature_suggester`** へ進む（`growth_pipeline.ts`）。
+- ゲートの **fingerprint 件数**は、既定で **`unsupported_requests` + `growth_signal_buckets` の hit（重み付き）**（`GROWTH_FINGERPRINT_INCLUDE_BUCKETS` 等）。
+- ファネル: `candidate_signal_recorded` →（昇格時）`growth_bucket_synthetic_unsupported` → `growth_gate` → `suggestion_scheduled` → …。事前ゲート不通過は `growth_promotion_evaluated`（`allowed=false`）。
+
 ### 重複排除・優先度・gate との関係（設計）
 
 - **raw 行**（`growth_candidate_signals`）: メッセージ単位の監査ログ。任意で `NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS` により同一 `bucket_key` では raw を抑制できる（抑制時もバケットの `hit_count` は増える）。

@@ -51,7 +51,7 @@ export async function evaluateGrowthSuggestionEligibility(input: {
 
   const minHits = env.GROWTH_MIN_FINGERPRINT_COUNT;
   if (minHits > 1) {
-    const cnt = await countByFingerprint(input.db, fingerprint);
+    const cnt = await countFingerprintEvidence(input.db, fingerprint);
     if (cnt < minHits) {
       return { allow: false, reason: `fingerprint_count_${cnt}_lt_${minHits}` };
     }
@@ -60,13 +60,34 @@ export async function evaluateGrowthSuggestionEligibility(input: {
   return { allow: true, reason: "ok" };
 }
 
-async function countByFingerprint(db: Db, fingerprint: string): Promise<number> {
+async function countUnsupportedByFingerprint(db: Db, fingerprint: string): Promise<number> {
   const r = await db.query<{ c: string }>(
     `SELECT COUNT(*)::text AS c FROM unsupported_requests WHERE message_fingerprint = $1`,
     [fingerprint]
   );
   const n = Number(r.rows[0]?.c ?? 0);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** growth_signal_buckets の hit を同一 user_message_fingerprint で足し込み（agent 経路の「証拠」）。 */
+async function sumBucketHitEvidence(db: Db, fingerprint: string, capPerBucket: number): Promise<number> {
+  const r = await db.query<{ s: string }>(
+    `SELECT COALESCE(SUM(LEAST(GREATEST(hit_count, 0), $2)), 0)::text AS s
+     FROM growth_signal_buckets WHERE user_message_fingerprint = $1`,
+    [fingerprint, capPerBucket]
+  );
+  const n = Number(r.rows[0]?.s ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function countFingerprintEvidence(db: Db, fingerprint: string): Promise<number> {
+  const env = getEnv();
+  let cnt = await countUnsupportedByFingerprint(db, fingerprint);
+  if (env.GROWTH_FINGERPRINT_INCLUDE_BUCKETS) {
+    const b = await sumBucketHitEvidence(db, fingerprint, env.GROWTH_BUCKET_FP_HIT_CAP);
+    cnt += Math.floor(b * env.GROWTH_BUCKET_FP_WEIGHT);
+  }
+  return cnt;
 }
 
 /** 成長パイプラインに載せなかったときの status / notes */

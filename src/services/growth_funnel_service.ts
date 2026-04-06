@@ -17,6 +17,7 @@ export async function recordGrowthGateEvaluated(
     channel: string;
     channelUserId: string;
     gate: GrowthGateResult;
+    growthSignalBucketId?: number | null;
   }
 ): Promise<void> {
   await updateUnsupportedGrowthGate(db, input.unsupportedRequestId, input.gate.allow, input.gate.reason);
@@ -28,7 +29,8 @@ export async function recordGrowthGateEvaluated(
     channelUserId: input.channelUserId,
     allowed: input.gate.allow,
     reasonCode: input.gate.reason,
-    detail: { gate: input.gate },
+    detail: { gate: input.gate, phase: "entered" },
+    growthSignalBucketId: input.growthSignalBucketId ?? null,
   });
 }
 
@@ -43,6 +45,8 @@ export async function recordFunnelStep(
     allowed?: boolean | null;
     reasonCode?: string | null;
     detail?: Record<string, unknown>;
+    growthSignalBucketId?: number | null;
+    implementationSuggestionId?: number | null;
   }
 ): Promise<void> {
   await insertGrowthFunnelEvent(db, input);

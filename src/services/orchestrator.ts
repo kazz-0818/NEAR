@@ -2,25 +2,24 @@ import { getEnv } from "../config/env.js";
 import type { Db } from "../db/client.js";
 import { getHandler } from "../modules/registry.js";
 import { logUnsupportedRequest } from "../modules/unsupported_request_logger.js";
-import { scheduleFeatureSuggestion } from "../modules/feature_suggester.js";
 import type { ParsedIntent } from "../models/intent.js";
 import { classifyIntent } from "./intent_classifier.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
 import { getLogger } from "../lib/logger.js";
-import { insertGrowthFunnelEvent } from "../db/growth_funnel_repo.js";
-import { recordGrowthGateEvaluated, recordFunnelStep } from "./growth_funnel_service.js";
-import {
-  evaluateGrowthSuggestionEligibility,
-  markUnsupportedGrowthSkipped,
-  type GrowthGateResult,
-} from "./growth_suggestion_gate.js";
+import type { GrowthGateResult } from "./growth_suggestion_gate.js";
+import { runGrowthPipelineAfterUnsupported } from "./growth_pipeline.js";
 import {
   maybeRecordAgentPathGrowthSignals,
   maybeRecordFaqDeflectionGrowthSignal,
   maybeRecordLegacyModuleErrorSignal,
+  maybeRecordShortIntervalFollowupSignal,
 } from "./growth_candidate_signal_service.js";
-import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
+import {
+  getPreviousInboundMeta,
+  loadRecentAssistantMessages,
+  loadRecentUserMessages,
+} from "./conversation_context.js";
 import {
   promoteGoogleSheetsFollowUp,
   promoteSheetsPendingAffirmative,
@@ -74,79 +73,6 @@ async function replyLineAndRememberOutbound(
   } catch (e) {
     log.warn({ err: e }, "saveOutboundAssistantText failed");
   }
-}
-
-/** unsupported 記録〜gate〜（通過時）提案スケジュールまで。gate 結果はユーザー向け一文に使う。 */
-async function runGrowthPipelineAfterUnsupported(
-  db: Db,
-  log: ReturnType<typeof getLogger>,
-  input: {
-    unsupportedId: number;
-    inboundMessageId: number;
-    channel: string;
-    channelUserId: string;
-    text: string;
-    parsed: ParsedIntent;
-  }
-): Promise<GrowthGateResult> {
-  try {
-    await insertGrowthFunnelEvent(db, {
-      step: "unsupported_recorded",
-      unsupportedRequestId: input.unsupportedId,
-      inboundMessageId: input.inboundMessageId,
-      channel: input.channel,
-      channelUserId: input.channelUserId,
-      reasonCode: input.parsed.intent,
-      detail: {
-        can_handle: input.parsed.can_handle,
-        needs_followup: input.parsed.needs_followup,
-      },
-    });
-  } catch (e) {
-    log.warn({ err: e }, "growth funnel unsupported_recorded failed");
-  }
-
-  const gate = await evaluateGrowthSuggestionEligibility({ db, text: input.text, parsed: input.parsed });
-  try {
-    await recordGrowthGateEvaluated(db, {
-      unsupportedRequestId: input.unsupportedId,
-      inboundMessageId: input.inboundMessageId,
-      channel: input.channel,
-      channelUserId: input.channelUserId,
-      gate,
-    });
-  } catch (e) {
-    log.warn({ err: e }, "recordGrowthGateEvaluated failed");
-  }
-
-  if (gate.allow) {
-    try {
-      await recordFunnelStep(db, {
-        step: "suggestion_scheduled",
-        unsupportedRequestId: input.unsupportedId,
-        inboundMessageId: input.inboundMessageId,
-        channel: input.channel,
-        channelUserId: input.channelUserId,
-        reasonCode: gate.reason,
-      });
-    } catch (e) {
-      log.warn({ err: e }, "growth funnel suggestion_scheduled failed");
-    }
-    scheduleFeatureSuggestion({
-      db,
-      unsupportedId: input.unsupportedId,
-      originalMessage: input.text,
-      intent: input.parsed,
-      inboundMessageId: input.inboundMessageId,
-      channel: input.channel,
-      channelUserId: input.channelUserId,
-    });
-  } else {
-    await markUnsupportedGrowthSkipped(db, input.unsupportedId, gate.reason);
-    log.info({ unsupportedId: input.unsupportedId, reason: gate.reason }, "growth suggestion skipped by gate");
-  }
-
-  return gate;
 }
 
 export async function handleLineTextMessage(input: {
@@ -306,6 +232,28 @@ export async function handleLineTextMessage(input: {
     ok: true,
     routing_meta: { phase: "post_promote" },
   });
+
+  if (env.NEAR_GROWTH_SHORT_FOLLOWUP_MINUTES > 0 && env.NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED) {
+    try {
+      const prev = await getPreviousInboundMeta(db, channel, channelUserId, inboundMessageId);
+      if (prev) {
+        const mins = (Date.now() - prev.created_at.getTime()) / 60000;
+        if (mins >= 0 && mins <= env.NEAR_GROWTH_SHORT_FOLLOWUP_MINUTES) {
+          await maybeRecordShortIntervalFollowupSignal({
+            db,
+            channel,
+            channelUserId,
+            inboundMessageId,
+            userText: text,
+            parsed,
+            minutesSincePrevious: mins,
+          });
+        }
+      }
+    } catch (se) {
+      log.warn({ err: se }, "short interval followup signal failed");
+    }
+  }
 
   const handler = getHandler(parsed.intent);
   const routable =

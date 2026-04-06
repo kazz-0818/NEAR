@@ -16,7 +16,10 @@ export type GrowthFunnelStep =
   | "agent_path_completed"
   | "legacy_module_unresolved_signal"
   | "faq_deflection_signal"
-  | "growth_signal_raw_suppressed";
+  | "growth_signal_raw_suppressed"
+  | "candidate_signal_recorded"
+  | "growth_promotion_evaluated"
+  | "growth_bucket_synthetic_unsupported";
 
 export async function insertGrowthFunnelEvent(
   db: Db,
@@ -29,12 +32,15 @@ export async function insertGrowthFunnelEvent(
     allowed?: boolean | null;
     reasonCode?: string | null;
     detail?: Record<string, unknown>;
+    growthSignalBucketId?: number | null;
+    implementationSuggestionId?: number | null;
   }
 ): Promise<void> {
   await db.query(
     `INSERT INTO growth_funnel_events (
-       inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+       inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail,
+       growth_signal_bucket_id, implementation_suggestion_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
     [
       input.inboundMessageId ?? null,
       input.unsupportedRequestId ?? null,
@@ -44,6 +50,8 @@ export async function insertGrowthFunnelEvent(
       input.allowed ?? null,
       input.reasonCode ?? null,
       JSON.stringify(input.detail ?? {}),
+      input.growthSignalBucketId ?? null,
+      input.implementationSuggestionId ?? null,
     ]
   );
 }

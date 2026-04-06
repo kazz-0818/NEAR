@@ -13,6 +13,7 @@ import {
 import { listCapabilityLines } from "./capabilities.js";
 import { listRegisteredIntents } from "./registry.js";
 import type { Db } from "../db/client.js";
+import { updateBucketImplementationSuggestionId } from "../db/growth_signal_bucket_repo.js";
 
 let systemCache: string | null = null;
 
@@ -30,6 +31,8 @@ export async function generateAndSaveSuggestion(input: {
   inboundMessageId?: number;
   channel?: string;
   channelUserId?: string;
+  /** growth_signal_buckets 昇格経路のとき、提案作成後にバケットへ紐づけ */
+  growthSignalBucketId?: number;
 }): Promise<void> {
   const env = getEnv();
   const log = getLogger();
@@ -149,6 +152,14 @@ export async function generateAndSaveSuggestion(input: {
       [input.unsupportedId]
     );
 
+    if (input.growthSignalBucketId != null && input.growthSignalBucketId > 0) {
+      try {
+        await updateBucketImplementationSuggestionId(input.db, input.growthSignalBucketId, suggestionId);
+      } catch (be) {
+        log.warn({ err: be, suggestionId, bucketId: input.growthSignalBucketId }, "updateBucketImplementationSuggestionId failed");
+      }
+    }
+
     try {
       await recordFunnelStep(input.db, {
         step: "suggestion_created",
@@ -158,7 +169,9 @@ export async function generateAndSaveSuggestion(input: {
         channelUserId: input.channelUserId,
         allowed: true,
         reasonCode: "ok",
-        detail: { suggestion_id: suggestionId },
+        detail: { suggestion_id: suggestionId, growth_signal_bucket_id: input.growthSignalBucketId ?? undefined },
+        growthSignalBucketId: input.growthSignalBucketId ?? null,
+        implementationSuggestionId: suggestionId,
       });
     } catch (evErr) {
       log.warn({ err: evErr }, "growth funnel suggestion_created event failed");
@@ -175,6 +188,7 @@ export async function generateAndSaveSuggestion(input: {
         channel: input.channel,
         channelUserId: input.channelUserId,
         reasonCode: "exception",
+        growthSignalBucketId: input.growthSignalBucketId ?? null,
         detail: {
           message: e && typeof e === "object" && "message" in e ? String((e as Error).message).slice(0, 400) : "unknown",
         },
@@ -193,6 +207,7 @@ export function scheduleFeatureSuggestion(input: {
   inboundMessageId?: number;
   channel?: string;
   channelUserId?: string;
+  growthSignalBucketId?: number;
 }): void {
   setImmediate(() => {
     void generateAndSaveSuggestion(input).catch(() => undefined);

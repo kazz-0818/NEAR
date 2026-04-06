@@ -221,6 +221,46 @@ const envSchema = z.object({
       if (!t || t.length < 16) return undefined;
       return t;
     }),
+  /**
+   * true / 1 で有効。Responses API ベースのエージェント経路（Web 検索・カスタムツール）。
+   * 既定オフ。有効時も NEAR_AGENT_SHADOW でレガシー優先範囲を切り替え。
+   */
+  NEAR_AGENT_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /**
+   * 既定 true（影モード）。true のとき、従来ルートで処理できる発話はレガシーのまま。
+   * false のときは「エージェント担当 intent」（simple_question / unknown 等）をエージェントが主担当。
+   */
+  NEAR_AGENT_SHADOW: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s === undefined || s.trim() === "") return true;
+      return !(s === "false" || s === "0");
+    }),
+  /** エージェント用モデル（Web 検索ツール対応のものを推奨。例: gpt-4o） */
+  OPENAI_AGENT_MODEL: z.string().default("gpt-4o"),
+  /** ツール呼び出しループの最大回数（1〜24） */
+  NEAR_AGENT_MAX_STEPS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 8;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 24 ? n : 8;
+    }),
+  /** false / 0 で Web 検索ツールを渡さない（コスト抑止・オフライン寄りテスト用） */
+  NEAR_AGENT_WEB_SEARCH: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /** true / 1 でエージェント返信を composeNearReply せずそのまま送る（レイテンシ・トークン削減） */
+  NEAR_AGENT_SKIP_COMPOSE: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
 });
 
 export type Env = z.infer<typeof envSchema>;

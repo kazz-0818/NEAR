@@ -63,6 +63,18 @@ export function createAdminApp(): Hono {
     return c.json({ items: r.rows });
   });
 
+  /** エージェント経路のカスタムツール実行ログ */
+  app.get("/agent-tool-runs", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 80), 300);
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, created_at, channel, channel_user_id, inbound_message_id, tool_name, ok, situation, duration_ms, error_code
+       FROM agent_tool_runs ORDER BY id DESC LIMIT $1`,
+      [limit]
+    );
+    return c.json({ items: r.rows });
+  });
+
   app.get("/unsupported", async (c) => {
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
     const pool = getPool();

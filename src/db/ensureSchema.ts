@@ -19,6 +19,7 @@ const MIGRATION_FILES = [
   "011_user_sheet_pending_confirm.sql",
   "012_user_google_oauth_multi.sql",
   "013_user_sheet_pending_pick.sql",
+  "014_agent_tool_runs.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

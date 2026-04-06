@@ -40,6 +40,8 @@ import { resolveLatestAssistantTextForEdit } from "./conversation_target_resolve
 import { editPreviousOutput } from "./previous_output_editor.js";
 import { buildSecretaryClarificationReply } from "./secretary_clarification_handler.js";
 import { syntheticIntentForSecretaryLayer } from "../models/requestInterpretation.js";
+import { shouldUseNearAgent } from "../agent/eligibility.js";
+import { runNearAgentTurn } from "../agent/runner.js";
 
 async function saveIntentRun(
   db: Db,
@@ -263,6 +265,56 @@ export async function handleLineTextMessage(input: {
   const handler = getHandler(parsed.intent);
   const routable =
     parsed.can_handle === true && parsed.intent !== "unknown_custom_request" && handler !== undefined;
+
+  if (
+    shouldUseNearAgent({
+      env,
+      intent: parsed.intent,
+      legacyRoutable: routable,
+    })
+  ) {
+    try {
+      const agentResult = await runNearAgentTurn({
+        db,
+        channel,
+        channelUserId,
+        inboundMessageId,
+        userText: text,
+        recentUserMessages,
+        recentAssistantMessages,
+      });
+      const trimmed = agentResult.text.trim();
+      if (trimmed) {
+        log.info(
+          {
+            inboundMessageId,
+            agentSteps: agentResult.log.steps,
+            agentTools: agentResult.log.toolsInvoked,
+            agentModel: agentResult.log.model,
+          },
+          "near agent path replied"
+        );
+        let finalText = trimmed;
+        if (!env.NEAR_AGENT_SKIP_COMPOSE) {
+          try {
+            finalText = await composeNearReply({
+              draft: trimmed,
+              situation: agentResult.composeSituation,
+              userMessage: text,
+              recentUserMessages,
+              recentAssistantMessages,
+            });
+          } catch (ce) {
+            log.warn({ err: ce }, "composeNearReply failed (near agent path)");
+          }
+        }
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        return;
+      }
+    } catch (e) {
+      log.error({ err: e }, "near agent failed; continuing with legacy routing");
+    }
+  }
 
   try {
     if (!routable) {

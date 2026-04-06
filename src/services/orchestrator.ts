@@ -6,6 +6,7 @@ import { scheduleFeatureSuggestion } from "../modules/feature_suggester.js";
 import type { ParsedIntent } from "../models/intent.js";
 import { classifyIntent } from "./intent_classifier.js";
 import { composeNearReply } from "./reply_composer.js";
+import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
 import {
   buildDeployTimeDraft,
@@ -21,6 +22,10 @@ import {
 } from "./growth_suggestion_gate.js";
 import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
 import { promoteGoogleSheetsFollowUp, promoteSheetsPendingAffirmative } from "./sheetsIntentFollowUp.js";
+import {
+  explicitUnanchoredSheetReadIntent,
+  looksLikeSheetsThreadFollowUp,
+} from "./sheetsIntentPatterns.js";
 import {
   tryHandleGoogleAccountListOrSwitch,
   tryHandleGoogleOAuthUserLine,
@@ -180,32 +185,43 @@ export async function handleLineTextMessage(input: {
       }
 
       if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.52) {
-        try {
-          const clarifyDraft = await buildSecretaryClarificationReply({
-            userMessage: text,
-            recentUserMessages,
-            recentAssistantMessages,
-          });
-          let finalText = clarifyDraft;
+        if (
+          sheetsReadIntegrationEnabled() &&
+          (looksLikeSheetsThreadFollowUp(text, recentUserMessages) ||
+            explicitUnanchoredSheetReadIntent(text, recentUserMessages))
+        ) {
+          log.info(
+            { mode: interpretation.mode },
+            "secretary clarify skipped: sheet read / drive search routing likely"
+          );
+        } else {
           try {
-            finalText = await composeNearReply({
-              draft: clarifyDraft,
-              situation: "followup",
+            const clarifyDraft = await buildSecretaryClarificationReply({
               userMessage: text,
               recentUserMessages,
               recentAssistantMessages,
             });
-          } catch (ce) {
-            log.warn({ err: ce }, "composeNearReply failed (secretary clarify path)");
+            let finalText = clarifyDraft;
+            try {
+              finalText = await composeNearReply({
+                draft: clarifyDraft,
+                situation: "followup",
+                userMessage: text,
+                recentUserMessages,
+                recentAssistantMessages,
+              });
+            } catch (ce) {
+              log.warn({ err: ce }, "composeNearReply failed (secretary clarify path)");
+            }
+            await saveIntentRun(db, inboundMessageId, syntheticIntentForSecretaryLayer("clarify_missing_info", interpretation.confidence), {
+              secretary_interpretation: interpretation,
+              shortcut: "clarify_missing_info",
+            });
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+            return;
+          } catch (e) {
+            log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
           }
-          await saveIntentRun(db, inboundMessageId, syntheticIntentForSecretaryLayer("clarify_missing_info", interpretation.confidence), {
-            secretary_interpretation: interpretation,
-            shortcut: "clarify_missing_info",
-          });
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
-          return;
-        } catch (e) {
-          log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
         }
       }
     } catch (e) {

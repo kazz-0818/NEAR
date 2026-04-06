@@ -8,7 +8,7 @@ import {
 import { isValidSpreadsheetId } from "../lib/googleSheetsAuth.js";
 import { findSpreadsheetIdInUserThread, spreadsheetUrlInUserThread } from "../lib/spreadsheetThread.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
-import type { ParsedIntent } from "../models/intent.js";
+import type { IntentName, ParsedIntent } from "../models/intent.js";
 import {
   allowDefaultSheetPromotionWithoutUrl,
   explicitUnanchoredSheetReadIntent,
@@ -44,6 +44,12 @@ export async function promoteSheetsPendingAffirmative(
  * 「一覧出して」続けて「これ分析して」のように、URL 無しの続きを Sheets 参照に乗せる。
  * ブック ID が無くても、明らかにシート読取なら google_sheets_query へ回しフォローアップ文案にする（FAQ 空振り防止）。
  */
+const INTENTS_ALLOW_SHEETS_PROMOTION: ReadonlySet<IntentName> = new Set([
+  "simple_question",
+  "summarize",
+  "unknown_custom_request",
+]);
+
 export async function promoteGoogleSheetsFollowUp(
   text: string,
   parsed: ParsedIntent,
@@ -51,7 +57,8 @@ export async function promoteGoogleSheetsFollowUp(
   db: Db,
   channelUserId: string
 ): Promise<ParsedIntent> {
-  if (parsed.intent !== "simple_question" && parsed.intent !== "summarize") return parsed;
+  if (parsed.intent === "google_sheets_query") return parsed;
+  if (!INTENTS_ALLOW_SHEETS_PROMOTION.has(parsed.intent)) return parsed;
   if (parsed.intent === "summarize" && !looksLikeSheetsThreadFollowUp(text, recentUserMessages)) return parsed;
   if (!looksLikeSheetsThreadFollowUp(text, recentUserMessages)) return parsed;
   if (!sheetsReadIntegrationEnabled()) return parsed;

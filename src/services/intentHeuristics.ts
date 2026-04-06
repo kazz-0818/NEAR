@@ -1,5 +1,6 @@
 import { extractSpreadsheetIdFromText } from "../lib/googleSheetsAuth.js";
 import type { ParsedIntent } from "../models/intent.js";
+import { indirectSheetReadOrReviewRequest, roughSheetsBusinessRequest } from "./sheetsIntentPatterns.js";
 
 const base = (intent: ParsedIntent["intent"]): ParsedIntent => ({
   intent,
@@ -119,6 +120,20 @@ const STRUCTURED_FEATURE_HINT =
 export function matchIntentHeuristic(userText: string): ParsedIntent | null {
   const sheets = matchGoogleSheetsUrlHeuristic(userText);
   if (sheets) return sheets;
+
+  const n = normalizeForIntent(userText);
+  if (roughSheetsBusinessRequest(n) || indirectSheetReadOrReviewRequest(n)) {
+    return {
+      intent: "google_sheets_query",
+      confidence: 1,
+      can_handle: true,
+      required_params: {},
+      needs_followup: false,
+      followup_question: null,
+      reason: "heuristic_sheets_business_or_indirect",
+      suggested_category: null,
+    };
+  }
 
   const normalized = normalizeForIntent(userText);
   const core = corePhrase(normalized);

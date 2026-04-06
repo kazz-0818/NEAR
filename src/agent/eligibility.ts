@@ -15,7 +15,11 @@ export function shouldUseNearAgent(input: {
 }): boolean {
   if (!input.env.NEAR_AGENT_ENABLED) return false;
 
-  if (input.intent === "google_sheets_query" && input.legacyRoutable) return false;
+  if (
+    (input.intent === "google_sheets_query" || input.intent === "google_calendar_query") &&
+    input.legacyRoutable
+  )
+    return false;
 
   if (input.env.NEAR_AGENT_SHADOW) {
     return !input.legacyRoutable;

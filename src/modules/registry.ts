@@ -8,6 +8,7 @@ import { memoStore } from "./memo_store.js";
 import { summarizer } from "./summarizer.js";
 import { helpCapabilities } from "./capabilities.js";
 import { sheetsQuery } from "./sheets_query.js";
+import { googleCalendarQuery } from "./google_calendar_query.js";
 
 const registry = new Map<IntentName, ModuleHandler>([
   ["greeting", greetingReply],
@@ -18,6 +19,7 @@ const registry = new Map<IntentName, ModuleHandler>([
   ["summarize", summarizer],
   ["help_capabilities", helpCapabilities],
   ["google_sheets_query", sheetsQuery],
+  ["google_calendar_query", googleCalendarQuery],
 ]);
 
 export function getHandler(intent: IntentName): ModuleHandler | undefined {

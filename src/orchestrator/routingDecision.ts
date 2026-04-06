@@ -34,7 +34,8 @@ export function shouldInvokeNearAgent(
 ): boolean {
   if (!env.NEAR_AGENT_ENABLED) return false;
 
-  if (intent === "google_sheets_query" && legacyRoutable) return false;
+  if ((intent === "google_sheets_query" || intent === "google_calendar_query") && legacyRoutable)
+    return false;
 
   if (
     userText &&

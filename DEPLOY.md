@@ -64,8 +64,8 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 
 1. 同じ（または別）GCP プロジェクトで **OAuth クライアント ID（ウェブアプリケーション）** を作成する。
 2. **承認済みのリダイレクト URI** に `https://<本番>/oauth/google/callback` を**完全一致**で追加する。
-3. **Google Sheets API** と **Google Drive API** を有効にする。
-4. （外部ユーザーに使わせる場合）**OAuth 同意画面**で次を追加し、テストユーザーまたは本番公開を設定する: `openid` / `email` / `userinfo.profile`（アカウント識別・表示用）、`.../auth/spreadsheets.readonly`、`.../auth/drive.metadata.readonly`（Drive のファイル名検索）。
+3. **Google Sheets API** と **Google Drive API** を有効にする。カレンダー連携（予定の一覧・追加）を使う場合は **Google Calendar API** も有効にする。
+4. （外部ユーザーに使わせる場合）**OAuth 同意画面**で次を追加し、テストユーザーまたは本番公開を設定する: `openid` / `email` / `userinfo.profile`（アカウント識別・表示用）、`.../auth/spreadsheets.readonly`、`.../auth/drive.metadata.readonly`（Drive のファイル名検索）、`.../auth/calendar.events`（カレンダー予定の読み書き・primary）。
 5. 環境変数に `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REDIRECT_URI` / `GOOGLE_OAUTH_TOKEN_SECRET` を設定する。
 6. `PUBLIC_BASE_URL`（または Render の `RENDER_EXTERNAL_URL`）が連携 URL の生成に使われる。
 

@@ -10,6 +10,7 @@ export const INTENT_NAMES = [
   "summarize",
   "help_capabilities",
   "google_sheets_query",
+  "google_calendar_query",
   "unknown_custom_request",
 ] as const;
 

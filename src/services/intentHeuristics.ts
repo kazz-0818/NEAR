@@ -117,9 +117,33 @@ const INTEGRATION_OR_AUTOMATION = /スプレッドシート(に|へ)(書|記|追
 const STRUCTURED_FEATURE_HINT =
   /\b(TODO|ToDo)\b|タスク(を|に|の)?(作|追加|登録|記録|お願い|ください|頼)|メモ(に|を)(残|保存|書|取|記録)|メモして|スプレッドシート(に|へ)(書|記|追|保存|貼|出力)|カレンダー(に|へ)|会議のメモ|会議を記録|Notion|Slack(に)?(投稿|通知|送って)|Webhook|決済|請求書|パスワード管理|リマインド/i;
 
+function matchGoogleCalendarHeuristic(userText: string): ParsedIntent | null {
+  const n = normalizeForIntent(userText);
+  if (n.length < 4 || n.length > 400) return null;
+  if (
+    /(Google\s*)?カレンダー|gcal|\bGCal\b/i.test(n) &&
+    /(予定|スケジュール|同期|連携|見せ|教え|一覧|追加|空いて|入れて|よめる|できる)/i.test(n)
+  ) {
+    return {
+      intent: "google_calendar_query",
+      confidence: 1,
+      can_handle: true,
+      required_params: {},
+      needs_followup: false,
+      followup_question: null,
+      reason: "heuristic_google_calendar",
+      suggested_category: null,
+    };
+  }
+  return null;
+}
+
 export function matchIntentHeuristic(userText: string): ParsedIntent | null {
   const sheets = matchGoogleSheetsUrlHeuristic(userText);
   if (sheets) return sheets;
+
+  const cal = matchGoogleCalendarHeuristic(userText);
+  if (cal) return cal;
 
   const n = normalizeForIntent(userText);
   if (roughSheetsBusinessRequest(n) || indirectSheetReadOrReviewRequest(n)) {

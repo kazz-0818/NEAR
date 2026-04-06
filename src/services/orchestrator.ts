@@ -15,7 +15,11 @@ import {
   markUnsupportedGrowthSkipped,
   type GrowthGateResult,
 } from "./growth_suggestion_gate.js";
-import { maybeRecordAgentPathGrowthSignals, maybeRecordLegacyModuleErrorSignal } from "./growth_candidate_signal_service.js";
+import {
+  maybeRecordAgentPathGrowthSignals,
+  maybeRecordFaqDeflectionGrowthSignal,
+  maybeRecordLegacyModuleErrorSignal,
+} from "./growth_candidate_signal_service.js";
 import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
 import {
   promoteGoogleSheetsFollowUp,
@@ -458,6 +462,18 @@ export async function handleLineTextMessage(input: {
         inboundMessageId,
         parsed,
         situation,
+      });
+    }
+
+    if (modResult.success && situation === "success" && parsed.intent === "simple_question") {
+      await maybeRecordFaqDeflectionGrowthSignal({
+        db,
+        channel,
+        channelUserId,
+        inboundMessageId,
+        userText: text,
+        parsed,
+        draft: modResult.draft,
       });
     }
 

@@ -12,7 +12,7 @@
 |----------|------|
 | `unsupported_requests` | `growth_gate_allow` / `growth_gate_reason` / `growth_gate_evaluated_at` を追加（ゲート結果のスナップショット） |
 | `growth_funnel_events` | 段階イベント（`unsupported_recorded` → `growth_gate` → `suggestion_scheduled` → …） |
-| `growth_candidate_signals` | unsupported 以外のシグナル（エージェントの compose error・ソフト失敗文・ツール未使用、レガシー `situation=error`） |
+| `growth_candidate_signals` | unsupported 以外のシグナル（エージェント・レガシー error、**FAQ が「準備中／未対応」系で断った文案** など） |
 
 ## 管理 API（Bearer `ADMIN_API_KEY`）
 
@@ -30,6 +30,7 @@
 |------|------|------|
 | `NEAR_GROWTH_USER_ACK_ENABLED` | オフ | gate 通過時にユーザーへ「改善候補として記録」一文を追加 |
 | `NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED` | オン | `growth_candidate_signals` への記録 |
+| `NEAR_GROWTH_FAQ_DEFLECTION_SIGNAL_ENABLED` | オン | FAQ 返答が能力否定・準備中止めのときシグナル化（`source=faq_answerer`） |
 | `NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION` | オン | 提案作成後に `notifyGrowthFirstApproval`（管理者 LINE またはグループ） |
 
 ## Phase2 との整合

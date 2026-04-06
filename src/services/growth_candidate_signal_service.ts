@@ -56,6 +56,59 @@ export async function maybeRecordAgentPathGrowthSignals(input: {
   }
 }
 
+/** FAQ 返答が「準備中／未対応で断る」系か（成長シグナル用） */
+export function looksLikeFaqCapabilityDeflectionDraft(draft: string): boolean {
+  const t = draft.normalize("NFKC");
+  return /準備中|まだお届け|直接お届け|お届けできません|いまのところ[^。]{0,40}できません|未対応です|機能はまだ|実装されていません|準備ができていません|この機能は|サポートしておりません|対応しておりません/i.test(
+    t
+  );
+}
+
+/**
+ * simple_question（FAQ）が成功扱いでも、文案が能力否定・準備中止めなら成長候補シグナルに残す。
+ * unsupported には載らない経路の観測・拡張用。
+ */
+export async function maybeRecordFaqDeflectionGrowthSignal(input: {
+  db: Db;
+  channel: string;
+  channelUserId: string;
+  inboundMessageId: number;
+  userText: string;
+  parsed: ParsedIntent;
+  draft: string;
+}): Promise<void> {
+  const env = getEnv();
+  if (!env.NEAR_GROWTH_FAQ_DEFLECTION_SIGNAL_ENABLED) return;
+  if (input.parsed.intent !== "simple_question") return;
+  if (!looksLikeFaqCapabilityDeflectionDraft(input.draft)) return;
+
+  const log = getLogger();
+  try {
+    await insertGrowthCandidateSignal(input.db, {
+      inboundMessageId: input.inboundMessageId,
+      channel: input.channel,
+      channelUserId: input.channelUserId,
+      source: "faq_answerer",
+      reasonCode: "draft_looks_like_capability_deflection",
+      detail: {
+        draft_preview: input.draft.slice(0, 400),
+        user_preview: input.userText.slice(0, 200),
+      },
+      parsedIntentSnapshot: input.parsed,
+    });
+    await recordFunnelStep(input.db, {
+      step: "faq_deflection_signal",
+      inboundMessageId: input.inboundMessageId,
+      channel: input.channel,
+      channelUserId: input.channelUserId,
+      reasonCode: "capability_deflection_in_faq_draft",
+      detail: { intent: input.parsed.intent },
+    });
+  } catch (e) {
+    log.warn({ err: e }, "maybeRecordFaqDeflectionGrowthSignal failed");
+  }
+}
+
 /** レガシーモジュールが error を返したが unsupported 分岐に入らなかった場合 */
 export async function maybeRecordLegacyModuleErrorSignal(input: {
   db: Db;

@@ -172,6 +172,14 @@ const envSchema = z.object({
     .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /**
    * false / 0 でオフ。未設定はオン。
+   * simple_question（FAQ）返答が「準備中／未対応で断る」系の文案に見えるとき growth_candidate_signals に記録する。
+   */
+  NEAR_GROWTH_FAQ_DEFLECTION_SIGNAL_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /**
+   * false / 0 でオフ。未設定はオン。
    * 提案レコード作成後に notifyGrowthFirstApproval で管理者へ第一段階案内を送る（宛先は GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）。
    */
   NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION: z

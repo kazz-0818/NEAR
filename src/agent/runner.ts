@@ -7,6 +7,7 @@ import type {
 } from "openai/resources/responses/responses";
 import { getEnv } from "../config/env.js";
 import { insertAgentSearchRun } from "../db/agent_search_runs_repo.js";
+import { nearAgentSoftFailureMessage } from "../lib/agentReplyHeuristics.js";
 import { getLogger } from "../lib/logger.js";
 import { mergeModuleSituations, type AgentComposeSituation } from "./composeSituation.js";
 import { evaluateWebSearchPolicy } from "./policies/webSearchPolicy.js";
@@ -84,10 +85,6 @@ function turnLogBase(
     webSearchReasonCode: ws.reasonCode,
     webSearchPolicyEnabled: env.NEAR_WEB_SEARCH_POLICY_ENABLED,
   };
-}
-
-function softFailureMessage(): string {
-  return "申し訳ないです、外部の情報を取りに行く処理で一時的にうまくいきませんでした。言い換えて聞いてもらえると助かります。";
 }
 
 function done(
@@ -168,7 +165,7 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
 
     if (resp.error) {
       log.warn({ error: resp.error, step }, "near agent response error object");
-      return done(softFailureMessage(), {
+      return done(nearAgentSoftFailureMessage(), {
         steps: step,
         toolsInvoked,
         model: env.OPENAI_AGENT_MODEL,

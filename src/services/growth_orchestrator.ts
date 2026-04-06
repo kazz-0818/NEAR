@@ -6,10 +6,12 @@ import {
   notifyCodingReady,
   notifyFinalApproval,
   notifyGrowthComplete,
+  notifyGrowthFirstApproval,
   notifyGrowthRejected,
   notifyProgress,
   notifyUserGrowthConsent,
 } from "./admin_notification_service.js";
+import { recordFunnelStep } from "./growth_funnel_service.js";
 import {
   markImplementedComplete,
   setFinalApprovalAndStartCoding,
@@ -64,7 +66,7 @@ async function clearUserGrowthSessionForSuggestion(db: Db, suggestionId: number)
 
 export async function loadSuggestionBundle(db: Db, suggestionId: number) {
   const r = await db.query(
-    `SELECT s.*, u.original_message, u.channel_user_id, u.id AS unsupported_request_id
+    `SELECT s.*, u.original_message, u.channel_user_id, u.channel AS user_channel, u.id AS unsupported_request_id
      FROM implementation_suggestions s
      JOIN unsupported_requests u ON u.id = s.unsupported_request_id
      WHERE s.id = $1`,
@@ -139,11 +141,18 @@ export async function startUserHearingBatchFlow(db: Db, suggestionId: number): P
  * ADMIN_LINE_USER_ID が無くてもユーザー通知は行う。
  */
 export async function onSuggestionCreated(db: Db, suggestionId: number): Promise<void> {
+  const env = getEnv();
   const row = await loadSuggestionBundle(db, suggestionId);
   if (!row) return;
 
   const unsupportedRequestId = Number(row.unsupported_request_id);
   const channelUserId = String(row.channel_user_id ?? "").trim();
+  const inboundRow = await db.query<{ inbound_message_id: string | null }>(
+    `SELECT inbound_message_id::text AS inbound_message_id FROM unsupported_requests WHERE id = $1`,
+    [unsupportedRequestId]
+  );
+  const rawIm = inboundRow.rows[0]?.inbound_message_id;
+  const inboundMessageId = rawIm ? Number(rawIm) : null;
 
   await db.query(
     `UPDATE unsupported_requests
@@ -156,15 +165,90 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
 
   if (channelUserId) {
     await upsertUserGrowthSession(db, channelUserId, suggestionId);
-    await notifyUserGrowthConsent({
-      lineUserId: channelUserId,
-      suggestionId,
-      userOriginalSnippet: String(row.original_message ?? ""),
-      userSummary: String(row.summary ?? ""),
-      growthDifficultyTier: row.difficulty != null ? String(row.difficulty) : null,
-    });
+    try {
+      await notifyUserGrowthConsent({
+        lineUserId: channelUserId,
+        suggestionId,
+        userOriginalSnippet: String(row.original_message ?? ""),
+        userSummary: String(row.summary ?? ""),
+        growthDifficultyTier: row.difficulty != null ? String(row.difficulty) : null,
+      });
+      await recordFunnelStep(db, {
+        step: "user_consent_push_ok",
+        unsupportedRequestId,
+        inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+        channel: String(row.user_channel ?? "line"),
+        channelUserId,
+        reasonCode: "ok",
+        detail: { suggestion_id: suggestionId },
+      });
+    } catch (e) {
+      log.warn({ err: e, suggestionId }, "notifyUserGrowthConsent failed");
+      await recordFunnelStep(db, {
+        step: "user_consent_push_failed",
+        unsupportedRequestId,
+        inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+        channel: String(row.user_channel ?? "line"),
+        channelUserId,
+        reasonCode: "push_exception",
+        detail: { suggestion_id: suggestionId },
+      });
+    }
   } else {
     log.warn({ suggestionId }, "onSuggestionCreated: no channel_user_id; user consent notify skipped");
+    await recordFunnelStep(db, {
+      step: "user_consent_push_failed",
+      unsupportedRequestId,
+      inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+      channel: "line",
+      channelUserId: "",
+      reasonCode: "no_channel_user_id",
+      detail: { suggestion_id: suggestionId },
+    });
+  }
+
+  const adminDest =
+    env.GROWTH_APPROVAL_GROUP_ID?.trim() || env.ADMIN_LINE_USER_ID?.trim() || "";
+  if (env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION && adminDest) {
+    try {
+      await notifyGrowthFirstApproval({
+        db,
+        adminUserId: env.ADMIN_LINE_USER_ID?.trim() ?? "",
+        suggestionId,
+        userSummary: String(row.summary ?? ""),
+        userOriginalSnippet: String(row.original_message ?? ""),
+      });
+      await recordFunnelStep(db, {
+        step: "admin_first_approval_push_ok",
+        unsupportedRequestId,
+        inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+        channel: String(row.user_channel ?? "line"),
+        channelUserId,
+        reasonCode: "ok",
+        detail: { suggestion_id: suggestionId, has_admin_destination: true },
+      });
+    } catch (e) {
+      log.warn({ err: e, suggestionId }, "notifyGrowthFirstApproval failed");
+      await recordFunnelStep(db, {
+        step: "admin_first_approval_push_failed",
+        unsupportedRequestId,
+        inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+        channel: String(row.user_channel ?? "line"),
+        channelUserId,
+        reasonCode: "push_exception",
+        detail: { suggestion_id: suggestionId },
+      });
+    }
+  } else {
+    await recordFunnelStep(db, {
+      step: "admin_first_approval_skipped_no_destination",
+      unsupportedRequestId,
+      inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+      channel: String(row.user_channel ?? "line"),
+      channelUserId,
+      reasonCode: env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION ? "no_admin_line_or_group" : "notify_disabled",
+      detail: { suggestion_id: suggestionId },
+    });
   }
 }
 

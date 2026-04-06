@@ -23,6 +23,8 @@ const MIGRATION_FILES = [
   "015_pending_tool_confirmations.sql",
   "016_agent_search_runs.sql",
   "017_agent_search_runs_tool_names.sql",
+  "018_growth_funnel.sql",
+  "019_growth_candidate_signals.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

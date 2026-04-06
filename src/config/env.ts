@@ -157,6 +157,27 @@ const envSchema = z.object({
       const n = Number(s);
       return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.35;
     }),
+  /** true / 1 で、成長 gate 通過時にユーザー返信へ「改善候補として記録」旨を一文追加。既定オフ。 */
+  NEAR_GROWTH_USER_ACK_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /**
+   * false / 0 でオフ。未設定はオン。
+   * エージェント経路のエラー系・ツール未使用などを growth_candidate_signals に残す（unsupported 以外の観測用）。
+   */
+  NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /**
+   * false / 0 でオフ。未設定はオン。
+   * 提案レコード作成後に notifyGrowthFirstApproval で管理者へ第一段階案内を送る（宛先は GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）。
+   */
+  NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /** Google Sheets API 用サービスアカウント鍵（JSON 文字列。改行を含む場合は B64 推奨） */
   GOOGLE_SERVICE_ACCOUNT_JSON: z
     .string()

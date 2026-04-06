@@ -8,10 +8,14 @@ import { classifyIntent } from "./intent_classifier.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
 import { getLogger } from "../lib/logger.js";
+import { insertGrowthFunnelEvent } from "../db/growth_funnel_repo.js";
+import { recordGrowthGateEvaluated, recordFunnelStep } from "./growth_funnel_service.js";
 import {
   evaluateGrowthSuggestionEligibility,
   markUnsupportedGrowthSkipped,
+  type GrowthGateResult,
 } from "./growth_suggestion_gate.js";
+import { maybeRecordAgentPathGrowthSignals, maybeRecordLegacyModuleErrorSignal } from "./growth_candidate_signal_service.js";
 import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
 import {
   promoteGoogleSheetsFollowUp,
@@ -66,6 +70,79 @@ async function replyLineAndRememberOutbound(
   } catch (e) {
     log.warn({ err: e }, "saveOutboundAssistantText failed");
   }
+}
+
+/** unsupported 記録〜gate〜（通過時）提案スケジュールまで。gate 結果はユーザー向け一文に使う。 */
+async function runGrowthPipelineAfterUnsupported(
+  db: Db,
+  log: ReturnType<typeof getLogger>,
+  input: {
+    unsupportedId: number;
+    inboundMessageId: number;
+    channel: string;
+    channelUserId: string;
+    text: string;
+    parsed: ParsedIntent;
+  }
+): Promise<GrowthGateResult> {
+  try {
+    await insertGrowthFunnelEvent(db, {
+      step: "unsupported_recorded",
+      unsupportedRequestId: input.unsupportedId,
+      inboundMessageId: input.inboundMessageId,
+      channel: input.channel,
+      channelUserId: input.channelUserId,
+      reasonCode: input.parsed.intent,
+      detail: {
+        can_handle: input.parsed.can_handle,
+        needs_followup: input.parsed.needs_followup,
+      },
+    });
+  } catch (e) {
+    log.warn({ err: e }, "growth funnel unsupported_recorded failed");
+  }
+
+  const gate = await evaluateGrowthSuggestionEligibility({ db, text: input.text, parsed: input.parsed });
+  try {
+    await recordGrowthGateEvaluated(db, {
+      unsupportedRequestId: input.unsupportedId,
+      inboundMessageId: input.inboundMessageId,
+      channel: input.channel,
+      channelUserId: input.channelUserId,
+      gate,
+    });
+  } catch (e) {
+    log.warn({ err: e }, "recordGrowthGateEvaluated failed");
+  }
+
+  if (gate.allow) {
+    try {
+      await recordFunnelStep(db, {
+        step: "suggestion_scheduled",
+        unsupportedRequestId: input.unsupportedId,
+        inboundMessageId: input.inboundMessageId,
+        channel: input.channel,
+        channelUserId: input.channelUserId,
+        reasonCode: gate.reason,
+      });
+    } catch (e) {
+      log.warn({ err: e }, "growth funnel suggestion_scheduled failed");
+    }
+    scheduleFeatureSuggestion({
+      db,
+      unsupportedId: input.unsupportedId,
+      originalMessage: input.text,
+      intent: input.parsed,
+      inboundMessageId: input.inboundMessageId,
+      channel: input.channel,
+      channelUserId: input.channelUserId,
+    });
+  } else {
+    await markUnsupportedGrowthSkipped(db, input.unsupportedId, gate.reason);
+    log.info({ unsupportedId: input.unsupportedId, reason: gate.reason }, "growth suggestion skipped by gate");
+  }
+
+  return gate;
 }
 
 export async function handleLineTextMessage(input: {
@@ -230,7 +307,7 @@ export async function handleLineTextMessage(input: {
   const routable =
     parsed.can_handle === true && parsed.intent !== "unknown_custom_request" && handler !== undefined;
 
-  if (shouldInvokeNearAgent(env, parsed.intent, routable)) {
+  if (shouldInvokeNearAgent(env, parsed.intent, routable, text)) {
     try {
       const agentResult = await runNearAgentTurn({
         db,
@@ -267,6 +344,18 @@ export async function handleLineTextMessage(input: {
           }
         }
         await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        await maybeRecordAgentPathGrowthSignals({
+          db,
+          channel,
+          channelUserId,
+          inboundMessageId,
+          userText: text,
+          parsed,
+          finalText,
+          composeSituation: agentResult.composeSituation,
+          toolsInvoked: agentResult.log.toolsInvoked,
+          agentSteps: agentResult.log.steps,
+        });
         return;
       }
     } catch (e) {
@@ -291,21 +380,21 @@ export async function handleLineTextMessage(input: {
               : "ハンドラ未登録",
       });
 
-      const gate = await evaluateGrowthSuggestionEligibility({ db, text, parsed });
-      if (gate.allow) {
-        scheduleFeatureSuggestion({
-          db,
-          unsupportedId,
-          originalMessage: text,
-          intent: parsed,
-        });
-      } else {
-        await markUnsupportedGrowthSkipped(db, unsupportedId, gate.reason);
-        log.info({ unsupportedId, reason: gate.reason }, "growth suggestion skipped by gate");
-      }
+      const gate = await runGrowthPipelineAfterUnsupported(db, log, {
+        unsupportedId,
+        inboundMessageId,
+        channel,
+        channelUserId,
+        text,
+        parsed,
+      });
 
-      const draft =
+      const draftBase =
         "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
+      let draft = draftBase;
+      if (env.NEAR_GROWTH_USER_ACK_ENABLED && gate.allow) {
+        draft = `${draftBase}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+      }
       let finalText = draft;
       try {
         finalText = await composeNearReplyUnified({
@@ -342,6 +431,7 @@ export async function handleLineTextMessage(input: {
             ? "followup"
             : "success";
 
+    let growthGateForAck: GrowthGateResult | null = null;
     if (!modResult.success && situation === "unsupported") {
       const unsupportedId = await logUnsupportedRequest({
         db,
@@ -352,21 +442,29 @@ export async function handleLineTextMessage(input: {
         inboundMessageId,
         whyOverride: "モジュールが未対応と判断",
       });
-      const gate = await evaluateGrowthSuggestionEligibility({ db, text, parsed });
-      if (gate.allow) {
-        scheduleFeatureSuggestion({
-          db,
-          unsupportedId,
-          originalMessage: text,
-          intent: parsed,
-        });
-      } else {
-        await markUnsupportedGrowthSkipped(db, unsupportedId, gate.reason);
-        log.info({ unsupportedId, reason: gate.reason }, "growth suggestion skipped by gate");
-      }
+      growthGateForAck = await runGrowthPipelineAfterUnsupported(db, log, {
+        unsupportedId,
+        inboundMessageId,
+        channel,
+        channelUserId,
+        text,
+        parsed,
+      });
+    } else if (situation === "error") {
+      await maybeRecordLegacyModuleErrorSignal({
+        db,
+        channel,
+        channelUserId,
+        inboundMessageId,
+        parsed,
+        situation,
+      });
     }
 
     let finalText = modResult.draft;
+    if (env.NEAR_GROWTH_USER_ACK_ENABLED && growthGateForAck?.allow) {
+      finalText = `${modResult.draft}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+    }
     try {
       finalText = await composeNearReplyUnified({
         draft: modResult.draft,

@@ -111,6 +111,69 @@ export function createAdminApp(): Hono {
     return c.json({ items: r.rows });
   });
 
+  /** 成長パイプライン各段階のイベント（gate / 提案生成 / 通知 等） */
+  app.get("/growth-funnel-events", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 100), 500);
+    const unsupportedIdRaw = c.req.query("unsupported_id");
+    const usNum =
+      unsupportedIdRaw != null && unsupportedIdRaw !== "" && Number.isFinite(Number(unsupportedIdRaw))
+        ? Number(unsupportedIdRaw)
+        : null;
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, created_at, inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail
+       FROM growth_funnel_events
+       WHERE ($1::bigint IS NULL OR unsupported_request_id = $1)
+       ORDER BY id DESC LIMIT $2`,
+      [usNum, limit]
+    );
+    return c.json({ items: r.rows });
+  });
+
+  /** unsupported 以外の「実質未解決」シグナル（エージェント・レガシー error 等） */
+  app.get("/growth-candidate-signals", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 80), 400);
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, created_at, inbound_message_id, channel, channel_user_id, source, reason_code, detail, parsed_intent_snapshot
+       FROM growth_candidate_signals ORDER BY id DESC LIMIT $1`,
+      [limit]
+    );
+    return c.json({ items: r.rows });
+  });
+
+  /** 直近30日の funnel 集計 + unsupported ステータス件数 */
+  app.get("/growth-pipeline/summary", async (c) => {
+    const pool = getPool();
+    const funnel = await pool.query(
+      `SELECT step, reason_code, COUNT(*)::int AS count
+       FROM growth_funnel_events
+       WHERE created_at > now() - interval '30 days'
+       GROUP BY step, reason_code
+       ORDER BY count DESC`
+    );
+    const unsupportedByStatus = await pool.query(
+      `SELECT status, COUNT(*)::int AS count
+       FROM unsupported_requests
+       WHERE created_at > now() - interval '30 days'
+       GROUP BY status
+       ORDER BY count DESC`
+    );
+    const suggestionsByApproval = await pool.query(
+      `SELECT approval_status, COUNT(*)::int AS count
+       FROM implementation_suggestions
+       WHERE created_at > now() - interval '30 days'
+       GROUP BY approval_status
+       ORDER BY count DESC`
+    );
+    return c.json({
+      period_days: 30,
+      funnel_by_step_and_reason: funnel.rows,
+      unsupported_by_status: unsupportedByStatus.rows,
+      suggestions_by_approval_status: suggestionsByApproval.rows,
+    });
+  });
+
   app.get("/suggestions", async (c) => {
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
     const status = c.req.query("status");

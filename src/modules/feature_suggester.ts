@@ -3,6 +3,7 @@ import { getEnv } from "../config/env.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
 import { onSuggestionCreated } from "../services/growth_orchestrator.js";
+import { recordFunnelStep } from "../services/growth_funnel_service.js";
 import { markUnsupportedGrowthSkipped } from "../services/growth_suggestion_gate.js";
 import {
   FEATURE_SUGGESTION_JSON_SCHEMA,
@@ -26,6 +27,9 @@ export async function generateAndSaveSuggestion(input: {
   unsupportedId: number;
   originalMessage: string;
   intent: ParsedIntent;
+  inboundMessageId?: number;
+  channel?: string;
+  channelUserId?: string;
 }): Promise<void> {
   const env = getEnv();
   const log = getLogger();
@@ -37,6 +41,19 @@ export async function generateAndSaveSuggestion(input: {
   );
   if (dup.rows.length > 0) {
     log.info({ unsupportedId: input.unsupportedId }, "feature_suggester skip: suggestion already exists");
+    try {
+      await recordFunnelStep(input.db, {
+        step: "suggestion_skipped_duplicate",
+        unsupportedRequestId: input.unsupportedId,
+        inboundMessageId: input.inboundMessageId ?? null,
+        channel: input.channel,
+        channelUserId: input.channelUserId,
+        reasonCode: "duplicate_suggestion_for_unsupported",
+        detail: { existing_suggestion_id: Number(dup.rows[0]?.id) },
+      });
+    } catch (e) {
+      log.warn({ err: e }, "growth funnel duplicate event failed");
+    }
     return;
   }
 
@@ -78,6 +95,20 @@ export async function generateAndSaveSuggestion(input: {
         input.unsupportedId,
         `trivially_infeasible tier=${parsed.growth_difficulty_tier}${note ? `: ${note}` : ""}`
       );
+      try {
+        await recordFunnelStep(input.db, {
+          step: "suggestion_rejected_trivial",
+          unsupportedRequestId: input.unsupportedId,
+          inboundMessageId: input.inboundMessageId ?? null,
+          channel: input.channel,
+          channelUserId: input.channelUserId,
+          allowed: false,
+          reasonCode: "trivially_infeasible",
+          detail: { tier: parsed.growth_difficulty_tier, note },
+        });
+      } catch (e) {
+        log.warn({ err: e }, "growth funnel trivial event failed");
+      }
       log.info(
         { unsupportedId: input.unsupportedId, tier: parsed.growth_difficulty_tier },
         "feature_suggester: skipped trivially infeasible growth"
@@ -118,9 +149,39 @@ export async function generateAndSaveSuggestion(input: {
       [input.unsupportedId]
     );
 
+    try {
+      await recordFunnelStep(input.db, {
+        step: "suggestion_created",
+        unsupportedRequestId: input.unsupportedId,
+        inboundMessageId: input.inboundMessageId ?? null,
+        channel: input.channel,
+        channelUserId: input.channelUserId,
+        allowed: true,
+        reasonCode: "ok",
+        detail: { suggestion_id: suggestionId },
+      });
+    } catch (evErr) {
+      log.warn({ err: evErr }, "growth funnel suggestion_created event failed");
+    }
+
     await onSuggestionCreated(input.db, suggestionId);
   } catch (e) {
     log.warn({ err: e, unsupportedId: input.unsupportedId }, "feature_suggester failed");
+    try {
+      await recordFunnelStep(input.db, {
+        step: "suggestion_generation_failed",
+        unsupportedRequestId: input.unsupportedId,
+        inboundMessageId: input.inboundMessageId ?? null,
+        channel: input.channel,
+        channelUserId: input.channelUserId,
+        reasonCode: "exception",
+        detail: {
+          message: e && typeof e === "object" && "message" in e ? String((e as Error).message).slice(0, 400) : "unknown",
+        },
+      });
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -129,6 +190,9 @@ export function scheduleFeatureSuggestion(input: {
   unsupportedId: number;
   originalMessage: string;
   intent: ParsedIntent;
+  inboundMessageId?: number;
+  channel?: string;
+  channelUserId?: string;
 }): void {
   setImmediate(() => {
     void generateAndSaveSuggestion(input).catch(() => undefined);

@@ -179,6 +179,18 @@ const envSchema = z.object({
     .optional()
     .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /**
+   * 同一 bucket_key の raw 行を何時間以内に重ねないか。0＝無効（メッセージごとに常に 1 行。既定）。
+   * 抑制時も `growth_signal_buckets.hit_count` は増える（集約の材料は失わない）。
+   */
+  NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 0;
+      const n = parseFloat(s);
+      return Number.isFinite(n) && n >= 0 && n <= 168 ? n : 0;
+    }),
+  /**
    * false / 0 でオフ。未設定はオン。
    * 提案レコード作成後に notifyGrowthFirstApproval で管理者へ第一段階案内を送る（宛先は GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）。
    */

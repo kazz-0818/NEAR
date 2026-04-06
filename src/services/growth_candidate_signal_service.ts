@@ -1,11 +1,90 @@
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import { looksLikeAgentSoftFailureReply } from "../lib/agentReplyHeuristics.js";
+import { messageFingerprint } from "../lib/messageFingerprint.js";
 import type { Db } from "../db/client.js";
-import { insertGrowthCandidateSignal } from "../db/growth_candidate_signal_repo.js";
+import { insertGrowthCandidateSignalRow } from "../db/growth_candidate_signal_repo.js";
+import { hasSignalSinceBucketKey, upsertGrowthSignalBucket } from "../db/growth_signal_bucket_repo.js";
 import { recordFunnelStep } from "./growth_funnel_service.js";
+import {
+  computeSignalBucketKey,
+  computeSignalPriorityScore,
+} from "./growth_signal_model.js";
 import type { ParsedIntent } from "../models/intent.js";
 import type { AgentComposeSituation } from "../agent/composeSituation.js";
+
+type RecordSignalResult = { insertedRaw: boolean; bucketId: number };
+
+/**
+ * バケット集約 + 任意の raw 行抑制。`user_message_fingerprint` はゲートと同じ `messageFingerprint(userText)`。
+ */
+async function recordGrowthCandidateSignalEntry(input: {
+  db: Db;
+  channel: string;
+  channelUserId: string;
+  inboundMessageId?: number | null;
+  userText: string;
+  source: string;
+  reasonCode: string;
+  detail?: Record<string, unknown>;
+  parsedIntentSnapshot?: unknown;
+  log: ReturnType<typeof getLogger>;
+}): Promise<RecordSignalResult> {
+  const env = getEnv();
+  const channel = input.channel ?? "line";
+  const bucketKey = computeSignalBucketKey(channel, input.userText, input.source, input.reasonCode);
+  const userMessageFingerprint = messageFingerprint(input.userText);
+  const priorityScore = computeSignalPriorityScore(input.source, input.reasonCode);
+
+  const bucketId = await upsertGrowthSignalBucket(input.db, {
+    bucketKey,
+    userMessageFingerprint,
+    channel,
+    priorityScore,
+    primarySource: input.source,
+  });
+
+  const hours = env.NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS;
+  if (hours > 0) {
+    const since = new Date(Date.now() - hours * 3600 * 1000);
+    const recent = await hasSignalSinceBucketKey(input.db, bucketKey, since);
+    if (recent) {
+      try {
+        await recordFunnelStep(input.db, {
+          step: "growth_signal_raw_suppressed",
+          inboundMessageId: input.inboundMessageId ?? null,
+          channel,
+          channelUserId: input.channelUserId,
+          reasonCode: "raw_dedupe_within_window",
+          detail: {
+            bucket_id: bucketId,
+            bucket_key: bucketKey,
+            dedupe_hours: hours,
+            source: input.source,
+          },
+        });
+      } catch (e) {
+        input.log.warn({ err: e }, "growth_signal_raw_suppressed funnel failed");
+      }
+      return { insertedRaw: false, bucketId };
+    }
+  }
+
+  await insertGrowthCandidateSignalRow(input.db, {
+    inboundMessageId: input.inboundMessageId,
+    channel,
+    channelUserId: input.channelUserId,
+    source: input.source,
+    reasonCode: input.reasonCode,
+    detail: input.detail,
+    parsedIntentSnapshot: input.parsedIntentSnapshot,
+    bucketId,
+    userMessageFingerprint,
+    bucketKey,
+    priorityScore,
+  });
+  return { insertedRaw: true, bucketId };
+}
 
 /**
  * エージェント経路で返したが、エラー系・ソフト失敗・ツール未使用などのシグナルを残す。
@@ -37,10 +116,12 @@ export async function maybeRecordAgentPathGrowthSignals(input: {
   if (reasons.length === 0) return;
 
   try {
-    await insertGrowthCandidateSignal(input.db, {
-      inboundMessageId: input.inboundMessageId,
+    await recordGrowthCandidateSignalEntry({
+      db: input.db,
       channel: input.channel,
       channelUserId: input.channelUserId,
+      inboundMessageId: input.inboundMessageId,
+      userText: input.userText,
       source: "agent_path",
       reasonCode: reasons.join(","),
       detail: {
@@ -50,6 +131,7 @@ export async function maybeRecordAgentPathGrowthSignals(input: {
         textLen: input.finalText.length,
       },
       parsedIntentSnapshot: input.parsed,
+      log,
     });
   } catch (e) {
     log.warn({ err: e }, "insertGrowthCandidateSignal (agent) failed");
@@ -84,10 +166,12 @@ export async function maybeRecordFaqDeflectionGrowthSignal(input: {
 
   const log = getLogger();
   try {
-    await insertGrowthCandidateSignal(input.db, {
-      inboundMessageId: input.inboundMessageId,
+    const { insertedRaw } = await recordGrowthCandidateSignalEntry({
+      db: input.db,
       channel: input.channel,
       channelUserId: input.channelUserId,
+      inboundMessageId: input.inboundMessageId,
+      userText: input.userText,
       source: "faq_answerer",
       reasonCode: "draft_looks_like_capability_deflection",
       detail: {
@@ -95,6 +179,7 @@ export async function maybeRecordFaqDeflectionGrowthSignal(input: {
         user_preview: input.userText.slice(0, 200),
       },
       parsedIntentSnapshot: input.parsed,
+      log,
     });
     await recordFunnelStep(input.db, {
       step: "faq_deflection_signal",
@@ -102,7 +187,7 @@ export async function maybeRecordFaqDeflectionGrowthSignal(input: {
       channel: input.channel,
       channelUserId: input.channelUserId,
       reasonCode: "capability_deflection_in_faq_draft",
-      detail: { intent: input.parsed.intent },
+      detail: { intent: input.parsed.intent, raw_row_inserted: insertedRaw },
     });
   } catch (e) {
     log.warn({ err: e }, "maybeRecordFaqDeflectionGrowthSignal failed");
@@ -115,6 +200,7 @@ export async function maybeRecordLegacyModuleErrorSignal(input: {
   channel: string;
   channelUserId: string;
   inboundMessageId: number;
+  userText: string;
   parsed: ParsedIntent;
   situation: string;
 }): Promise<void> {
@@ -124,14 +210,17 @@ export async function maybeRecordLegacyModuleErrorSignal(input: {
 
   const log = getLogger();
   try {
-    await insertGrowthCandidateSignal(input.db, {
-      inboundMessageId: input.inboundMessageId,
+    const { insertedRaw } = await recordGrowthCandidateSignalEntry({
+      db: input.db,
       channel: input.channel,
       channelUserId: input.channelUserId,
+      inboundMessageId: input.inboundMessageId,
+      userText: input.userText,
       source: "legacy_module",
       reasonCode: "module_situation_error",
       detail: { intent: input.parsed.intent },
       parsedIntentSnapshot: input.parsed,
+      log,
     });
     await recordFunnelStep(input.db, {
       step: "legacy_module_unresolved_signal",
@@ -139,7 +228,7 @@ export async function maybeRecordLegacyModuleErrorSignal(input: {
       channel: input.channel,
       channelUserId: input.channelUserId,
       reasonCode: "module_situation_error",
-      detail: { intent: input.parsed.intent },
+      detail: { intent: input.parsed.intent, raw_row_inserted: insertedRaw },
     });
   } catch (e) {
     log.warn({ err: e }, "insertGrowthCandidateSignal (legacy) failed");

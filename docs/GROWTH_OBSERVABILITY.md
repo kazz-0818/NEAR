@@ -13,14 +13,23 @@
 | `unsupported_requests` | `growth_gate_allow` / `growth_gate_reason` / `growth_gate_evaluated_at` を追加（ゲート結果のスナップショット） |
 | `growth_funnel_events` | 段階イベント（`unsupported_recorded` → `growth_gate` → `suggestion_scheduled` → …） |
 | `growth_candidate_signals` | unsupported 以外のシグナル（エージェント・レガシー error、**FAQ が「準備中／未対応」系で断った文案** など） |
+| `growth_signal_buckets` | 同一種別のシグナルを **bucket_key** で集約（`hit_count`・`priority_score`）。raw 行の「重複排除ビュー」 |
+
+### 重複排除・優先度・gate との関係（設計）
+
+- **raw 行**（`growth_candidate_signals`）: メッセージ単位の監査ログ。任意で `NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS` により同一 `bucket_key` では raw を抑制できる（抑制時もバケットの `hit_count` は増える）。
+- **バケット**（`growth_signal_buckets`）: `bucket_key = hash(channel, messageFingerprint(userText), source, reason_family)`。**ゲート**（`growth_suggestion_gate`）が使う `messageFingerprint(text)` とユーザー発話部分で整合。
+- **優先度**（`priority_score` 1〜100）: source・reason の粗いスコア。一覧の並びと、将来の閾値・自動昇格の材料（現状は観測のみ）。
+- **gate**（`evaluateGrowthSuggestionEligibility`）: **未対応行（`unsupported_requests`）が既にある前提**で、suggestion 化するかを判定。`GROWTH_MIN_FINGERPRINT_COUNT` は **unsupported の fingerprint 件数**のみカウント（現状）。候補シグナルから **いつでも** suggestion に載せるには、別途「疑似 unsupported」作成または gate の入力にバケット `hit_count` を取り込む拡張が必要（本リリースでは材料蓄積まで）。
 
 ## 管理 API（Bearer `ADMIN_API_KEY`）
 
 | エンドポイント | 内容 |
 |----------------|------|
 | `GET /admin/growth-funnel-events?unsupported_id=&limit=` | パイプラインイベント一覧 |
-| `GET /admin/growth-candidate-signals` | 実質未解決シグナル |
-| `GET /admin/growth-pipeline/summary` | 直近30日の集計（funnel / unsupported ステータス / suggestion 承認状態） |
+| `GET /admin/growth-candidate-signals` | 実質未解決シグナル（`bucket_id` / `priority_score` 付き） |
+| `GET /admin/growth-signal-buckets` | 集約バケット（優先度・`hit_count`） |
+| `GET /admin/growth-pipeline/summary` | 直近30日の集計（funnel / unsupported / suggestion / **バケット件数**） |
 
 既存の `GET /admin/unsupported` / `GET /admin/suggestions` と併用する。
 
@@ -31,6 +40,7 @@
 | `NEAR_GROWTH_USER_ACK_ENABLED` | オフ | gate 通過時にユーザーへ「改善候補として記録」一文を追加 |
 | `NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED` | オン | `growth_candidate_signals` への記録 |
 | `NEAR_GROWTH_FAQ_DEFLECTION_SIGNAL_ENABLED` | オン | FAQ 返答が能力否定・準備中止めのときシグナル化（`source=faq_answerer`） |
+| `NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS` | 0 | 同一 bucket の raw 行を何時間以内に重ねないか。0＝毎回 raw 行も残す |
 | `NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION` | オン | 提案作成後に `notifyGrowthFirstApproval`（管理者 LINE またはグループ） |
 
 ## Phase2 との整合

@@ -135,8 +135,23 @@ export function createAdminApp(): Hono {
     const limit = Math.min(Number(c.req.query("limit") ?? 80), 400);
     const pool = getPool();
     const r = await pool.query(
-      `SELECT id, created_at, inbound_message_id, channel, channel_user_id, source, reason_code, detail, parsed_intent_snapshot
+      `SELECT id, created_at, inbound_message_id, channel, channel_user_id, source, reason_code, detail, parsed_intent_snapshot,
+              bucket_id, user_message_fingerprint, bucket_key, priority_score
        FROM growth_candidate_signals ORDER BY id DESC LIMIT $1`,
+      [limit]
+    );
+    return c.json({ items: r.rows });
+  });
+
+  /** シグナル集約バケット（重複排除・優先度の要約。raw 行は /growth-candidate-signals） */
+  app.get("/growth-signal-buckets", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 80), 400);
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT id, bucket_key, user_message_fingerprint, channel, first_seen, last_seen, hit_count, priority_score, primary_source
+       FROM growth_signal_buckets
+       ORDER BY priority_score DESC, last_seen DESC
+       LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -166,11 +181,15 @@ export function createAdminApp(): Hono {
        GROUP BY approval_status
        ORDER BY count DESC`
     );
+    const signalBuckets = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM growth_signal_buckets WHERE last_seen > now() - interval '30 days'`
+    );
     return c.json({
       period_days: 30,
       funnel_by_step_and_reason: funnel.rows,
       unsupported_by_status: unsupportedByStatus.rows,
       suggestions_by_approval_status: suggestionsByApproval.rows,
+      growth_signal_buckets_last_30d: Number(signalBuckets.rows[0]?.count ?? 0),
     });
   });
 

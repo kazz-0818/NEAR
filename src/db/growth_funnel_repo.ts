@@ -15,7 +15,8 @@ export type GrowthFunnelStep =
   | "admin_first_approval_skipped_no_destination"
   | "agent_path_completed"
   | "legacy_module_unresolved_signal"
-  | "faq_deflection_signal";
+  | "faq_deflection_signal"
+  | "growth_signal_raw_suppressed";
 
 export async function insertGrowthFunnelEvent(
   db: Db,

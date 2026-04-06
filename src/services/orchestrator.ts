@@ -460,6 +460,7 @@ export async function handleLineTextMessage(input: {
         channel,
         channelUserId,
         inboundMessageId,
+        userText: text,
         parsed,
         situation,
       });

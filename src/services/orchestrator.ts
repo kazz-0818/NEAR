@@ -21,7 +21,10 @@ import {
 } from "./growth_suggestion_gate.js";
 import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
 import { promoteGoogleSheetsFollowUp, promoteSheetsPendingAffirmative } from "./sheetsIntentFollowUp.js";
-import { tryHandleGoogleOAuthUserLine } from "./google_oauth_user_line.js";
+import {
+  tryHandleGoogleAccountListOrSwitch,
+  tryHandleGoogleOAuthUserLine,
+} from "./google_oauth_user_line.js";
 import { saveOutboundAssistantText } from "./outbound_store.js";
 import { interpretSecretaryRequest } from "./request_interpreter.js";
 import { resolveLatestAssistantTextForEdit } from "./conversation_target_resolver.js";
@@ -93,6 +96,12 @@ export async function handleLineTextMessage(input: {
   const googleOauth = await tryHandleGoogleOAuthUserLine({ db, channelUserId, text });
   if (googleOauth.handled && googleOauth.reply) {
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, googleOauth.reply, log);
+    return;
+  }
+
+  const googleAcct = await tryHandleGoogleAccountListOrSwitch({ db, channelUserId, text });
+  if (googleAcct.handled && googleAcct.reply) {
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, googleAcct.reply, log);
     return;
   }
 

@@ -15,14 +15,25 @@ import {
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
 import { buildSheetReadSuccessHeader } from "../lib/sheetReplyMarker.js";
 import { clipTsv, escapeSheetTitleForA1, resolveSheetTitle, valuesToTsv } from "../lib/sheetFormat.js";
+import { setActiveGoogleAccount } from "../db/user_google_oauth_accounts_repo.js";
 import { searchSpreadsheetByUserHint } from "../lib/googleDriveSpreadsheetSearch.js";
-import { getSheetsAndDriveForLineUser, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
+import { listSheetsAndDriveClientsOrdered, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { getLogger } from "../lib/logger.js";
+import type { sheets_v4 } from "googleapis";
 import type { ModuleContext, ModuleResult } from "./types.js";
 import { answerSheetQuestionWithLlm, pickSheetWithLlm } from "./sheets_query_llm.js";
 
 const SET_DEFAULT_RE =
   /(常用|既定|デフォルト|いつも|デフォ).{0,20}(スプレッド|シート)|(スプレッド|シート).{0,12}(常用|既定|デフォルト|いつも)/i;
+
+function isSwitchToNextGoogleAccountError(e: unknown): boolean {
+  const msg = e && typeof e === "object" && "message" in e ? String((e as Error).message) : String(e);
+  return (
+    /PERMISSION_DENIED|403/i.test(msg) ||
+    /The caller does not have permission/i.test(msg) ||
+    /not found|NOT_FOUND|404/i.test(msg)
+  );
+}
 
 export { loadUserSpreadsheetDefault } from "../db/user_sheet_defaults_repo.js";
 
@@ -77,45 +88,59 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     }
   }
 
-  let clients: Awaited<ReturnType<typeof getSheetsAndDriveForLineUser>> = null;
+  let clientEntries: Awaited<ReturnType<typeof listSheetsAndDriveClientsOrdered>> = [];
   try {
-    clients = await getSheetsAndDriveForLineUser(ctx.db, ctx.channelUserId);
+    clientEntries = await listSheetsAndDriveClientsOrdered(ctx.db, ctx.channelUserId);
   } catch (e) {
-    log.warn({ err: e }, "getSheetsAndDriveForLineUser failed");
-    clients = null;
+    log.warn({ err: e }, "listSheetsAndDriveClientsOrdered failed");
+    clientEntries = [];
   }
 
   let driveSearchInsufficientScope = false;
 
-  if (!spreadsheetId && clients) {
+  if (!spreadsheetId && clientEntries.length > 0) {
     try {
-      const outcome = await searchSpreadsheetByUserHint(clients.drive, ctx.originalText);
-      if (outcome.kind === "one") {
-        spreadsheetId = outcome.id;
-        log.info({ bookName: outcome.name }, "sheets drive search resolved spreadsheet");
-      } else if (outcome.kind === "confirm") {
-        const { suggested, alternatives } = outcome;
-        let draft =
-          "あなたの言い方はざっくりでも大丈夫です。Drive 上で似た名前のシートが複数あったので、まずは次を**第一候補**にしています。\n\n" +
-          `**「${suggested.name}」**\n\n` +
-          "**これでよろしかったですか？**\n" +
-          "・**合っていれば**「はい」「それで」「OK」など一言送ってください（この候補で読みにいきます）。\n" +
-          "・**違う場合**は、正しい**ファイル名をそのまま**送るか、**共有リンク**を送ってください。\n";
-        if (alternatives.length > 0) {
-          draft += "\n**他の候補（参考）**\n" + alternatives.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+      for (const entry of clientEntries) {
+        const outcome = await searchSpreadsheetByUserHint(entry.clients.drive, ctx.originalText);
+        if (outcome.kind === "one") {
+          spreadsheetId = outcome.id;
+          if (!entry.isServiceAccount) {
+            await setActiveGoogleAccount(ctx.db, ctx.channelUserId, entry.googleSub);
+          }
+          log.info(
+            { bookName: outcome.name, googleSub: entry.googleSub.slice(0, 12) },
+            "sheets drive search resolved spreadsheet"
+          );
+          break;
         }
-        try {
-          await savePendingSpreadsheetConfirm(ctx.db, ctx.channelUserId, suggested.id, suggested.name);
-        } catch (e) {
-          log.warn({ err: e }, "savePendingSpreadsheetConfirm failed");
+        if (outcome.kind === "confirm") {
+          const { suggested, alternatives } = outcome;
+          if (!entry.isServiceAccount) {
+            await setActiveGoogleAccount(ctx.db, ctx.channelUserId, entry.googleSub);
+          }
+          let draft =
+            "あなたの言い方はざっくりでも大丈夫です。Drive 上で似た名前のシートが複数あったので、まずは次を**第一候補**にしています。\n\n" +
+            `**「${suggested.name}」**\n\n` +
+            "**これでよろしかったですか？**\n" +
+            "・**合っていれば**「はい」「それで」「OK」など一言送ってください（この候補で読みにいきます）。\n" +
+            "・**違う場合**は、正しい**ファイル名をそのまま**送るか、**共有リンク**を送ってください。\n";
+          if (alternatives.length > 0) {
+            draft += "\n**他の候補（参考）**\n" + alternatives.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+          }
+          try {
+            await savePendingSpreadsheetConfirm(ctx.db, ctx.channelUserId, suggested.id, suggested.name);
+          } catch (e) {
+            log.warn({ err: e }, "savePendingSpreadsheetConfirm failed");
+          }
+          return {
+            success: true,
+            draft,
+            situation: "followup",
+          };
         }
-        return {
-          success: true,
-          draft,
-          situation: "followup",
-        };
-      } else if (outcome.kind === "insufficient_scope") {
-        driveSearchInsufficientScope = true;
+        if (outcome.kind === "insufficient_scope") {
+          driveSearchInsufficientScope = true;
+        }
       }
     } catch (e) {
       log.warn({ err: e }, "searchSpreadsheetByUserHint failed");
@@ -143,7 +168,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const maxRows = env.GOOGLE_SHEETS_MAX_ROWS;
 
   try {
-    if (!clients) {
+    if (clientEntries.length === 0) {
       return {
         success: true,
         draft:
@@ -153,8 +178,34 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
         situation: "followup",
       };
     }
-    const sheets = clients.sheets;
-    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+
+    let sheets: sheets_v4.Sheets | null = null;
+    let meta: { data: sheets_v4.Schema$Spreadsheet } | null = null;
+    let lastTryErr: unknown = null;
+
+    for (const entry of clientEntries) {
+      try {
+        const m = await entry.clients.sheets.spreadsheets.get({ spreadsheetId });
+        meta = m;
+        sheets = entry.clients.sheets;
+        if (!entry.isServiceAccount) {
+          await setActiveGoogleAccount(ctx.db, ctx.channelUserId, entry.googleSub);
+        }
+        log.info({ googleSub: entry.googleSub.slice(0, 12) }, "sheets read using google account");
+        break;
+      } catch (e) {
+        lastTryErr = e;
+        if (isSwitchToNextGoogleAccountError(e)) {
+          log.info({ err: e, googleSub: entry.googleSub.slice(0, 12) }, "sheets get: try next linked account");
+          continue;
+        }
+        throw e;
+      }
+    }
+
+    if (!meta || !sheets) {
+      throw lastTryErr ?? new Error("no sheets client could open spreadsheet");
+    }
 
     const titles =
       meta.data.sheets?.map((s) => s.properties?.title).filter((t): t is string => !!t && t.length > 0) ?? [];

@@ -10,9 +10,4 @@ CREATE TABLE IF NOT EXISTS google_oauth_link_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_google_oauth_link_expires ON google_oauth_link_tokens (expires_at);
 
-CREATE TABLE IF NOT EXISTS user_google_oauth (
-  line_user_id TEXT PRIMARY KEY,
-  refresh_token_ciphertext TEXT NOT NULL,
-  scope TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- ユーザーごとのトークンは 012_user_google_oauth_multi.sql の user_google_oauth_accounts へ移行済み

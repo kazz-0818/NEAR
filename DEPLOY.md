@@ -42,7 +42,7 @@
 | `GOOGLE_OAUTH_REDIRECT_URI` | 任意。**完全一致**で Google Cloud に登録。例: `https://<本番ホスト>/oauth/google/callback` |
 | `GOOGLE_OAUTH_TOKEN_SECRET` | 任意。refresh_token 暗号化用（**16文字以上**、漏洩厳禁） |
 
-初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001`〜`008_user_google_oauth.sql` など）。
+初回起動時に `ensureSchema()` が DB マイグレーション相当を流します（`001` 〜 `012_user_google_oauth_multi.sql` など）。
 
 ## Google スプレッドシート（読み取り）
 
@@ -65,11 +65,11 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 1. 同じ（または別）GCP プロジェクトで **OAuth クライアント ID（ウェブアプリケーション）** を作成する。
 2. **承認済みのリダイレクト URI** に `https://<本番>/oauth/google/callback` を**完全一致**で追加する。
 3. **Google Sheets API** と **Google Drive API** を有効にする。
-4. （外部ユーザーに使わせる場合）**OAuth 同意画面**でスコープ `.../auth/spreadsheets.readonly` と `.../auth/drive.metadata.readonly`（Drive のメタデータ・ファイル名検索のみ）を追加し、テストユーザーまたは本番公開を設定する。
+4. （外部ユーザーに使わせる場合）**OAuth 同意画面**で次を追加し、テストユーザーまたは本番公開を設定する: `openid` / `email` / `userinfo.profile`（アカウント識別・表示用）、`.../auth/spreadsheets.readonly`、`.../auth/drive.metadata.readonly`（Drive のファイル名検索）。
 5. 環境変数に `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REDIRECT_URI` / `GOOGLE_OAUTH_TOKEN_SECRET` を設定する。
 6. `PUBLIC_BASE_URL`（または Render の `RENDER_EXTERNAL_URL`）が連携 URL の生成に使われる。
 
-**利用者の操作:** LINE で **「Google連携」** と送る → 返信の URL をブラウザで開く → Google で許可。refresh_token は DB に暗号化保存されます。
+**利用者の操作:** LINE で **「Google連携」** と送る → 返信の URL をブラウザで開く → Google で許可。refresh_token は DB に暗号化保存されます。**2つ目の Google** も同じ「Google連携」で追加できます（ブラウザで別アカウントを選択）。**「Googleアカウント一覧」**で確認、**「Google 2」「2番のGoogle」**で利用中アカウントを切り替えます。
 
 エンドポイント: `GET /oauth/google/start?link=…` → Google へリダイレクト → `GET /oauth/google/callback`。
 

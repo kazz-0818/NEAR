@@ -3,9 +3,15 @@ import { OAuth2Client } from "google-auth-library";
 import { getPool } from "../db/client.js";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
+import {
+  extractSubFromIdToken,
+  setActiveGoogleAccount,
+  upsertGoogleOAuthAccount,
+} from "../db/user_google_oauth_accounts_repo.js";
 import { encryptRefreshToken } from "../lib/googleOAuthTokenCrypto.js";
 import { GOOGLE_USER_SHEET_SCOPES } from "../lib/googleOAuthScopes.js";
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
+import { google } from "googleapis";
 
 function esc(s: string): string {
   return s
@@ -96,15 +102,30 @@ export function createGoogleOAuthApp(): Hono {
       }
       const env = getEnv();
       const cipher = encryptRefreshToken(refresh, env.GOOGLE_OAUTH_TOKEN_SECRET!);
-      await db.query(
-        `INSERT INTO user_google_oauth (line_user_id, refresh_token_ciphertext, scope, updated_at)
-         VALUES ($1, $2, $3, now())
-         ON CONFLICT (line_user_id) DO UPDATE SET
-           refresh_token_ciphertext = EXCLUDED.refresh_token_ciphertext,
-           scope = EXCLUDED.scope,
-           updated_at = now()`,
-        [lineUserId, cipher, tokens.scope ?? GOOGLE_USER_SHEET_SCOPES.join(" ")]
-      );
+      const scopeStr = tokens.scope ?? GOOGLE_USER_SHEET_SCOPES.join(" ");
+
+      let sub: string | null = null;
+      let email: string | null = null;
+      const fromId = extractSubFromIdToken(tokens);
+      if (fromId) {
+        sub = fromId.sub;
+        email = fromId.email;
+      } else {
+        client.setCredentials(tokens);
+        const oauth2 = google.oauth2({ version: "v2", auth: client });
+        const { data } = await oauth2.userinfo.get();
+        if (data.id) sub = String(data.id);
+        email = data.email ?? null;
+      }
+      if (!sub) {
+        return c.html(
+          `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"></head><body><p>Google アカウントを識別できませんでした（sub 未取得）。同意画面に <code>openid</code> / <code>email</code> / <code>profile</code> が含まれているか、GCP の OAuth スコープを確認してください。</p></body></html>`,
+          400
+        );
+      }
+
+      await upsertGoogleOAuthAccount(db, lineUserId, sub, email, cipher, scopeStr);
+      await setActiveGoogleAccount(db, lineUserId, sub);
       await db.query(`DELETE FROM google_oauth_link_tokens WHERE token = $1`, [state]);
     } catch (e) {
       log.warn({ err: e }, "google oauth callback failed");

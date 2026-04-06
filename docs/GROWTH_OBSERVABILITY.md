@@ -17,7 +17,32 @@
 
 ### agent 時代の昇格（2026-04 追記）
 
-- **`NEAR_GROWTH_BUCKET_PROMOTION_ENABLED=true`** のとき、`growth_signal_buckets` が閾値を満たすと **合成 `unsupported_requests`**（`entry_source=growth_signal_bucket`）を 1 行作り、**既存と同じ gate → `feature_suggester`** へ進む（`growth_pipeline.ts`）。
+- **`NEAR_GROWTH_BUCKET_PROMOTION_ENABLED`** — **未設定時はオン**（明示的に `false` / `0` でオフ）。以前は既定オフだったため、「シグナルは溜まるのに suggestion に一切進まない」原因になりやすかった。
+- **`NEAR_GROWTH_PROMOTE_MIN_BUCKET_HITS`** — 既定 **1**（同一バケットで 1 回目から昇格判定）。以前は 2 のため、**2 通目まで昇格しない**ことがあった。
+- オン時、`growth_signal_buckets` が閾値を満たすと **合成 `unsupported_requests`**（`entry_source=growth_signal_bucket`）を 1 行作り、**既存と同じ gate → `feature_suggester`** へ進む（`growth_pipeline.ts`）。
+
+### 成長に全然進まないとき（原因追究チェックリスト）
+
+1. **エージェントが先に返している**  
+   `NEAR_AGENT_ENABLED` かつ非空テキストで return すると、**従来の unsupported 行は作られない**。対策: シグナル＋バケット昇格（上記）、または `NEAR_AGENT_SHADOW=true` で影モードに戻す、など。
+
+2. **バケット昇格がオフ**  
+   Render の env で `NEAR_GROWTH_BUCKET_PROMOTION_ENABLED=false` になっていないか確認（本番で明示的にオフにしているケース）。
+
+3. **ゲートで落ちている**  
+   `GET /admin/growth-funnel-events` で `growth_gate` / `growth_promotion_evaluated` の `reason_code`（`message_too_short`, `needs_followup`, `fingerprint_count_*` 等）。`GROWTH_MIN_MESSAGE_CHARS=0` で短文許可、`GROWTH_MIN_FINGERPRINT_COUNT=1` を確認。
+
+4. **DB マイグレーション**  
+   `growth_funnel_events` の新カラムや `021` 未適用だと INSERT が失敗し、ログに DB エラーが出る。起動時 `ensureSchema` が走る前提を確認。
+
+5. **OpenAI**  
+   `feature_suggester` は `OPENAI_API_KEY` 必須。失敗時は `suggestion_generation_failed`。
+
+6. **エージェント応答に「シグナル理由」がない**  
+   ツールも使い、長文で成功っぽい返答だけだと `maybeRecordAgentPathGrowthSignals` は **何も記録しない**。観測用にシグナルを増やすか、意図的に未解決っぽいパターンを試す。
+
+7. **デバッグログ**  
+   昇格スキップ理由は `growth_promotion_service` で `log.debug`（ログレベル `debug` 時に表示）。
 - ゲートの **fingerprint 件数**は、既定で **`unsupported_requests` + `growth_signal_buckets` の hit（重み付き）**（`GROWTH_FINGERPRINT_INCLUDE_BUCKETS` 等）。
 - ファネル: `candidate_signal_recorded` →（昇格時）`growth_bucket_synthetic_unsupported` → `growth_gate` → `suggestion_scheduled` → …。事前ゲート不通過は `growth_promotion_evaluated`（`allowed=false`）。
 

@@ -216,19 +216,23 @@ const envSchema = z.object({
       return Number.isFinite(n) && n >= 0 && n <= 168 ? n : 0;
     }),
   /**
-   * true / 1: growth_signal_buckets から合成 unsupported を経由して suggestion 生成まで進める（段階導入。既定オフ）。
+   * growth_signal_buckets から合成 unsupported を経由して suggestion 生成まで進める。
+   * 未設定はオン（agent 主体構成では off のままだと suggestion にほぼ届かないため）。false / 0 で無効。
    */
   NEAR_GROWTH_BUCKET_PROMOTION_ENABLED: z
     .string()
     .optional()
-    .transform((s) => s === "true" || s === "1"),
+    .transform((s) => {
+      if (s === undefined || s.trim() === "") return true;
+      return !(s === "false" || s === "0");
+    }),
   NEAR_GROWTH_PROMOTE_MIN_BUCKET_HITS: z
     .string()
     .optional()
     .transform((s) => {
-      if (s == null || s.trim() === "") return 2;
+      if (s == null || s.trim() === "") return 1;
       const n = parseInt(s, 10);
-      return Number.isFinite(n) && n >= 1 && n <= 1000 ? n : 2;
+      return Number.isFinite(n) && n >= 1 && n <= 1000 ? n : 1;
     }),
   NEAR_GROWTH_PROMOTE_MIN_PRIORITY: z
     .string()

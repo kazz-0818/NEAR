@@ -27,15 +27,39 @@ export async function maybePromoteGrowthBucketAfterSignal(
 ): Promise<void> {
   const env = getEnv();
   const log = getLogger();
-  if (!env.NEAR_GROWTH_BUCKET_PROMOTION_ENABLED) return;
+  if (!env.NEAR_GROWTH_BUCKET_PROMOTION_ENABLED) {
+    log.debug({ bucketId: input.bucketId }, "growth promotion skipped: NEAR_GROWTH_BUCKET_PROMOTION_ENABLED=off");
+    return;
+  }
 
   const bucket = await getGrowthSignalBucketById(db, input.bucketId);
-  if (!bucket || bucket.implementation_suggestion_id != null) return;
-  if (bucket.hit_count < env.NEAR_GROWTH_PROMOTE_MIN_BUCKET_HITS) return;
-  if (bucket.priority_score < env.NEAR_GROWTH_PROMOTE_MIN_PRIORITY) return;
+  if (!bucket || bucket.implementation_suggestion_id != null) {
+    log.debug({ bucketId: input.bucketId, hasBucket: !!bucket }, "growth promotion skipped: no bucket or already has suggestion");
+    return;
+  }
+  if (bucket.hit_count < env.NEAR_GROWTH_PROMOTE_MIN_BUCKET_HITS) {
+    log.debug(
+      { bucketId: input.bucketId, hit_count: bucket.hit_count, min: env.NEAR_GROWTH_PROMOTE_MIN_BUCKET_HITS },
+      "growth promotion skipped: hit_count below min"
+    );
+    return;
+  }
+  if (bucket.priority_score < env.NEAR_GROWTH_PROMOTE_MIN_PRIORITY) {
+    log.debug(
+      { bucketId: input.bucketId, priority_score: bucket.priority_score, min: env.NEAR_GROWTH_PROMOTE_MIN_PRIORITY },
+      "growth promotion skipped: priority below min"
+    );
+    return;
+  }
 
   const allowSources = env.NEAR_GROWTH_PROMOTE_SOURCES;
-  if (allowSources && allowSources.length > 0 && !allowSources.includes(input.primarySource)) return;
+  if (allowSources && allowSources.length > 0 && !allowSources.includes(input.primarySource)) {
+    log.debug(
+      { bucketId: input.bucketId, primarySource: input.primarySource, allowSources },
+      "growth promotion skipped: source not in NEAR_GROWTH_PROMOTE_SOURCES"
+    );
+    return;
+  }
 
   const textForGate = (bucket.last_user_text ?? input.userText).trim();
   if (textForGate.length < 1) return;

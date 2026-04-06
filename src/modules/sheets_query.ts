@@ -115,8 +115,26 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   }
 
   let driveSearchInsufficientScope = false;
+  let driveSearchAttempted = false;
+
+  /** spreadsheetId が無く、Google クライアントも無い → Drive 検索も呼べない（先に返す） */
+  if (!spreadsheetId && clientEntries.length === 0) {
+    log.info(
+      { channelUserId: ctx.channelUserId.slice(0, 12) },
+      "sheets_query: no spreadsheet id and no sheets/drive clients (OAuth or service account)"
+    );
+    return {
+      success: true,
+      draft:
+        "スプレッドシート用の認証がありません。\n" +
+        "・トークで「**Google連携**」と送ると、ブラウザで許可する URL を出します（あなたの Google で見えるシートを読みます）。\n" +
+        "・または管理者にサービスアカウント連携とシート共有を依頼してください（DEPLOY.md）。",
+      situation: "followup",
+    };
+  }
 
   if (!spreadsheetId && clientEntries.length > 0) {
+    driveSearchAttempted = true;
     const driveLlmKeywords = await inferDriveSheetSearchKeywordsFromLlm(ctx.originalText);
     try {
       for (const entry of clientEntries) {
@@ -173,7 +191,12 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   }
 
   if (!spreadsheetId) {
-    let draft =
+    const searchedButNotFound =
+      driveSearchAttempted && !driveSearchInsufficientScope && clientEntries.length > 0;
+    let draft = searchedButNotFound
+      ? "Google ドライブでファイル名を検索しましたが、該当するスプレッドシートが見つかりませんでした。\n\n"
+      : "";
+    draft +=
       "どのスプレッドシートを見るか決められませんでした。\n" +
       "・あなたの Google ドライブ上の**ファイル名**に、会話に近い語が入っていれば、**リンク無しでも自動で探す**ことがあります。\n" +
       "・見つからないときは共有リンク（`https://docs.google.com/spreadsheets/d/...`）を送るか、\n" +
@@ -194,6 +217,10 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
 
   try {
     if (clientEntries.length === 0) {
+      log.warn(
+        { channelUserId: ctx.channelUserId.slice(0, 12), spreadsheetId: spreadsheetId.slice(0, 8) },
+        "sheets_query: have spreadsheetId but no clients (unexpected)"
+      );
       return {
         success: true,
         draft:

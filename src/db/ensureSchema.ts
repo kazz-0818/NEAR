@@ -18,6 +18,7 @@ const MIGRATION_FILES = [
   "010_self_growth_audit.sql",
   "011_user_sheet_pending_confirm.sql",
   "012_user_google_oauth_multi.sql",
+  "013_user_sheet_pending_pick.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

@@ -2,9 +2,13 @@ import { loadUserSpreadsheetDefault, saveUserSpreadsheetDefault } from "../db/us
 import {
   clearPendingSpreadsheetConfirm,
   isSpreadsheetConfirmNegative,
-  savePendingSpreadsheetConfirm,
   tryConsumePendingSpreadsheetConfirm,
 } from "../db/user_sheet_pending_confirm_repo.js";
+import {
+  clearPendingSheetPick,
+  savePendingSheetPick,
+  tryConsumePendingSheetPick,
+} from "../db/user_sheet_pending_pick_repo.js";
 import { getEnv } from "../config/env.js";
 import {
   extractSpreadsheetIdFromText,
@@ -21,7 +25,11 @@ import { listSheetsAndDriveClientsOrdered, sheetsReadIntegrationEnabled } from "
 import { getLogger } from "../lib/logger.js";
 import type { sheets_v4 } from "googleapis";
 import type { ModuleContext, ModuleResult } from "./types.js";
-import { answerSheetQuestionWithLlm, pickSheetWithLlm } from "./sheets_query_llm.js";
+import {
+  answerSheetQuestionWithLlm,
+  inferDriveSheetSearchKeywordsFromLlm,
+  pickSheetWithLlm,
+} from "./sheets_query_llm.js";
 
 const SET_DEFAULT_RE =
   /(常用|既定|デフォルト|いつも|デフォ).{0,20}(スプレッド|シート)|(スプレッド|シート).{0,12}(常用|既定|デフォルト|いつも)/i;
@@ -53,8 +61,9 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   if (isSpreadsheetConfirmNegative(ctx.originalText)) {
     try {
       await clearPendingSpreadsheetConfirm(ctx.db, ctx.channelUserId);
+      await clearPendingSheetPick(ctx.db, ctx.channelUserId);
     } catch (e) {
-      log.warn({ err: e }, "clearPendingSpreadsheetConfirm failed");
+      log.warn({ err: e }, "clear pending sheet state failed");
     }
   }
 
@@ -81,6 +90,15 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
 
   if (!spreadsheetId) {
     try {
+      const pickedId = await tryConsumePendingSheetPick(ctx.db, ctx.channelUserId, ctx.originalText);
+      if (pickedId && isValidSpreadsheetId(pickedId)) spreadsheetId = pickedId;
+    } catch (e) {
+      log.warn({ err: e }, "tryConsumePendingSheetPick failed");
+    }
+  }
+
+  if (!spreadsheetId) {
+    try {
       const affirmed = await tryConsumePendingSpreadsheetConfirm(ctx.db, ctx.channelUserId, ctx.originalText);
       if (affirmed && isValidSpreadsheetId(affirmed)) spreadsheetId = affirmed;
     } catch (e) {
@@ -99,9 +117,14 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   let driveSearchInsufficientScope = false;
 
   if (!spreadsheetId && clientEntries.length > 0) {
+    const driveLlmKeywords = await inferDriveSheetSearchKeywordsFromLlm(ctx.originalText);
     try {
       for (const entry of clientEntries) {
-        const outcome = await searchSpreadsheetByUserHint(entry.clients.drive, ctx.originalText);
+        const outcome = await searchSpreadsheetByUserHint(
+          entry.clients.drive,
+          ctx.originalText,
+          driveLlmKeywords
+        );
         if (outcome.kind === "one") {
           spreadsheetId = outcome.id;
           if (!entry.isServiceAccount) {
@@ -113,25 +136,27 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
           );
           break;
         }
-        if (outcome.kind === "confirm") {
-          const { suggested, alternatives } = outcome;
+        if (outcome.kind === "pick_list") {
+          const { candidates } = outcome;
+          if (candidates.length === 0) continue;
           if (!entry.isServiceAccount) {
             await setActiveGoogleAccount(ctx.db, ctx.channelUserId, entry.googleSub);
           }
-          let draft =
-            "あなたの言い方はざっくりでも大丈夫です。Drive 上で似た名前のシートが複数あったので、まずは次を**第一候補**にしています。\n\n" +
-            `**「${suggested.name}」**\n\n` +
-            "**これでよろしかったですか？**\n" +
-            "・**合っていれば**「はい」「それで」「OK」など一言送ってください（この候補で読みにいきます）。\n" +
-            "・**違う場合**は、正しい**ファイル名をそのまま**送るか、**共有リンク**を送ってください。\n";
-          if (alternatives.length > 0) {
-            draft += "\n**他の候補（参考）**\n" + alternatives.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
-          }
           try {
-            await savePendingSpreadsheetConfirm(ctx.db, ctx.channelUserId, suggested.id, suggested.name);
+            await clearPendingSpreadsheetConfirm(ctx.db, ctx.channelUserId);
+            await savePendingSheetPick(
+              ctx.db,
+              ctx.channelUserId,
+              candidates.map((c) => ({ id: c.id, name: c.name }))
+            );
           } catch (e) {
-            log.warn({ err: e }, "savePendingSpreadsheetConfirm failed");
+            log.warn({ err: e }, "savePendingSheetPick failed");
           }
+          const lines = candidates.map((c, i) => `・${i + 1}. ${c.name}`);
+          const draft =
+            "ざっくりした言い方でも検索しました。次の**候補**から選んでください。\n\n" +
+            lines.join("\n") +
+            "\n\n**番号だけ**送れば開いて読みます（例: `1` または `2番`）。**ファイル名をそのまま**送ってもOKです。";
           return {
             success: true,
             draft,
@@ -150,7 +175,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   if (!spreadsheetId) {
     let draft =
       "どのスプレッドシートを見るか決められませんでした。\n" +
-      "・あなたの Google ドライブ上の**ファイル名**にキーワード（例:【購入代行】）が入っていれば、**リンク無しでも自動で探す**ことがあります。\n" +
+      "・あなたの Google ドライブ上の**ファイル名**に、会話に近い語が入っていれば、**リンク無しでも自動で探す**ことがあります。\n" +
       "・見つからないときは共有リンク（`https://docs.google.com/spreadsheets/d/...`）を送るか、\n" +
       "・管理者が `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` を設定しているか、\n" +
       "・一度「このシートを既定にして」とリンク付きで言って保存してください。";

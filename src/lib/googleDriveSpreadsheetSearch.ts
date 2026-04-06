@@ -125,6 +125,7 @@ export function expandTermsForRoughSheetName(terms: string[], rawUser: string): 
       if (p.length >= 2 && !STOPWORDS.has(p)) out.push(p);
     }
   }
+
   const seen = new Set<string>();
   const uniq: string[] = [];
   for (const t of out) {
@@ -178,6 +179,27 @@ async function listSpreadsheetFiles(drive: drive_v3.Drive, q: string, pageSize: 
     .map((f) => ({ id: f.id, name: f.name }));
 }
 
+/**
+ * LLM が返した検索語を先に、続けてヒューリスティック展開をマージする（重複は先勝ち）。
+ */
+export function mergeDriveSearchTerms(userMessage: string, llmKeywords: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (s: string) => {
+    const t = s.normalize("NFKC").trim();
+    if (t.length < 2 || t.length > 80) return;
+    const k = t.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(t);
+  };
+  for (const k of llmKeywords) push(k);
+  const baseTerms = extractSpreadsheetSearchTerms(userMessage);
+  const expanded = expandTermsForRoughSheetName(baseTerms, userMessage);
+  for (const t of expanded) push(t);
+  return out;
+}
+
 function dedupeHits(hits: DriveSpreadsheetHit[]): DriveSpreadsheetHit[] {
   const byId = new Map<string, DriveSpreadsheetHit>();
   for (const h of hits) {
@@ -188,7 +210,7 @@ function dedupeHits(hits: DriveSpreadsheetHit[]): DriveSpreadsheetHit[] {
 
 export type DriveSpreadsheetSearchOutcome =
   | { kind: "one"; id: string; name: string }
-  | { kind: "confirm"; suggested: DriveSpreadsheetHit; alternatives: DriveSpreadsheetHit[] }
+  | { kind: "pick_list"; candidates: DriveSpreadsheetHit[] }
   | { kind: "none" }
   | { kind: "insufficient_scope" };
 
@@ -199,37 +221,39 @@ function isInsufficientScopeError(err: unknown): boolean {
   return code === 403 || /Insufficient Permission|insufficient authentication scopes/i.test(msg);
 }
 
+/** 自動で1件に決めるのはスコア差がはっきりしたときだけ。それ以外は候補リストで選ばせる */
 function decideOutcome(ranked: ScoredHit[]): DriveSpreadsheetSearchOutcome {
   if (ranked.length === 0) return { kind: "none" };
   const top = ranked[0];
-  if (ranked.length === 1) return { kind: "one", id: top.id, name: top.name };
-  const second = ranked[1];
-  const gap = top.score - second.score;
-  const strong = top.score >= 18 && gap >= 2;
-  const veryClear = gap >= 5;
-  const loneHigh = top.score >= 22 && gap >= 3;
-  if (veryClear || loneHigh || strong) {
+  if (ranked.length === 1) {
     return { kind: "one", id: top.id, name: top.name };
   }
-  const alts = ranked.slice(1, 6).map(({ id, name }) => ({ id, name }));
+  const second = ranked[1];
+  const gap = top.score - second.score;
+  if (top.score >= 18 && gap >= 6) {
+    return { kind: "one", id: top.id, name: top.name };
+  }
+  if (top.score >= 22 && gap >= 4) {
+    return { kind: "one", id: top.id, name: top.name };
+  }
+  const cap = Math.min(8, ranked.length);
   return {
-    kind: "confirm",
-    suggested: { id: top.id, name: top.name },
-    alternatives: alts,
+    kind: "pick_list",
+    candidates: ranked.slice(0, cap).map(({ id, name }) => ({ id, name })),
   };
 }
 
 /**
  * ユーザーの発言から Drive 上のスプレッドシートを名前検索する。
- * ざっくりしたキーワードでも寄せるため広めに拾い、スコアで順位付けする。
+ * ざっくりしたキーワードでも寄せるため広めに拾い、多くの場合は候補リストで選んでもらう。
  */
 export async function searchSpreadsheetByUserHint(
   drive: drive_v3.Drive,
-  userMessage: string
+  userMessage: string,
+  llmDriveKeywords: string[] = []
 ): Promise<DriveSpreadsheetSearchOutcome> {
   const raw = userMessage.trim();
-  const baseTerms = extractSpreadsheetSearchTerms(raw);
-  const terms = expandTermsForRoughSheetName(baseTerms, raw);
+  const terms = mergeDriveSearchTerms(raw, llmDriveKeywords);
   if (terms.length === 0) return { kind: "none" };
 
   const base = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false";
@@ -246,19 +270,16 @@ export async function searchSpreadsheetByUserHint(
 
   try {
     const collected: DriveSpreadsheetHit[] = [];
-    const topForOr = terms.slice(0, 8);
-    collected.push(...(await listSpreadsheetFiles(drive, orClause(topForOr), 50)));
+    const topForOr = terms.slice(0, 10);
+    collected.push(...(await listSpreadsheetFiles(drive, orClause(topForOr), 60)));
 
-    if (collected.length < 3 && terms.length > 0) {
-      for (const t of terms.slice(0, 5)) {
-        collected.push(...(await listSpreadsheetFiles(drive, `${base} and name contains '${escapeDriveQueryLiteral(t)}'`, 25)));
-      }
+    for (const t of terms.slice(0, 8)) {
+      collected.push(...(await listSpreadsheetFiles(drive, `${base} and name contains '${escapeDriveQueryLiteral(t)}'`, 30)));
     }
 
     if (terms.length >= 2) {
       const tight = terms.slice(0, Math.min(3, terms.length));
-      const tightHits = await listSpreadsheetFiles(drive, andClause(tight), 30);
-      collected.push(...tightHits);
+      collected.push(...(await listSpreadsheetFiles(drive, andClause(tight), 35)));
     }
 
     const unique = dedupeHits(collected);
@@ -269,12 +290,11 @@ export async function searchSpreadsheetByUserHint(
         ...h,
         score: scoreSpreadsheetNameMatch(h.name, terms, raw),
       }))
-      .filter((h) => h.score > 0)
       .sort((a, b) => b.score - a.score);
 
-    if (scored.length === 0) return { kind: "none" };
+    const floorRanked = scored.some((h) => h.score >= 1) ? scored.filter((h) => h.score >= 1) : scored.slice(0, 15);
 
-    return decideOutcome(scored);
+    return decideOutcome(floorRanked);
   } catch (e) {
     if (isInsufficientScopeError(e)) return { kind: "insufficient_scope" };
     throw e;

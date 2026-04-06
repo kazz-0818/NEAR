@@ -5,6 +5,7 @@ import {
   getPendingSpreadsheetConfirm,
   isSpreadsheetConfirmAffirmative,
 } from "../db/user_sheet_pending_confirm_repo.js";
+import { hasPendingSheetPick, isPendingSheetPickIndexMessage } from "../db/user_sheet_pending_pick_repo.js";
 import { isValidSpreadsheetId } from "../lib/googleSheetsAuth.js";
 import { findSpreadsheetIdInUserThread, spreadsheetUrlInUserThread } from "../lib/spreadsheetThread.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
@@ -14,6 +15,30 @@ import {
   explicitUnanchoredSheetReadIntent,
   looksLikeSheetsThreadFollowUp,
 } from "./sheetsIntentPatterns.js";
+
+/**
+ * 候補リスト表示後の「1」「2番」だけ `google_sheets_query` へ載せる。
+ */
+export async function promoteSheetsPendingPick(
+  text: string,
+  parsed: ParsedIntent,
+  db: Db,
+  channelUserId: string
+): Promise<ParsedIntent> {
+  if (!sheetsReadIntegrationEnabled()) return parsed;
+  if (!isPendingSheetPickIndexMessage(text)) return parsed;
+  if (!(await hasPendingSheetPick(db, channelUserId))) return parsed;
+  return {
+    ...parsed,
+    intent: "google_sheets_query",
+    can_handle: true,
+    required_params: { ...parsed.required_params },
+    needs_followup: false,
+    followup_question: null,
+    reason: "orchestrator_sheets_pending_pick_index",
+    suggested_category: parsed.suggested_category,
+  };
+}
 
 /**
  * Drive 検索の「第一候補でよいか」に対し、短い肯定だけ `google_sheets_query` へ載せる（`sheets_query` 側で pending を消費して ID 確定）。

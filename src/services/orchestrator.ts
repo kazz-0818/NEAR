@@ -21,7 +21,11 @@ import {
   markUnsupportedGrowthSkipped,
 } from "./growth_suggestion_gate.js";
 import { loadRecentAssistantMessages, loadRecentUserMessages } from "./conversation_context.js";
-import { promoteGoogleSheetsFollowUp, promoteSheetsPendingAffirmative } from "./sheetsIntentFollowUp.js";
+import {
+  promoteGoogleSheetsFollowUp,
+  promoteSheetsPendingAffirmative,
+  promoteSheetsPendingPick,
+} from "./sheetsIntentFollowUp.js";
 import {
   explicitUnanchoredSheetReadIntent,
   looksLikeSheetsThreadFollowUp,
@@ -247,6 +251,7 @@ export async function handleLineTextMessage(input: {
   }
 
   try {
+    parsed = await promoteSheetsPendingPick(text, parsed, db, channelUserId);
     parsed = await promoteSheetsPendingAffirmative(text, parsed, db, channelUserId);
     parsed = await promoteGoogleSheetsFollowUp(text, parsed, recentUserMessages, db, channelUserId);
   } catch (promoErr) {

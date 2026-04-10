@@ -28,6 +28,7 @@ const MIGRATION_FILES = [
   "020_growth_signal_buckets.sql",
   "021_growth_unified_promotion.sql",
   "022_enable_rls_public.sql",
+  "023_drop_unused_audit_tables.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

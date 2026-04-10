@@ -14,11 +14,3 @@ ALTER TABLE implementation_suggestions
   ADD COLUMN IF NOT EXISTS estimated_effort TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_unsupported_fingerprint ON unsupported_requests(message_fingerprint);
-
-CREATE TABLE IF NOT EXISTS admin_notify_log (
-  id BIGSERIAL PRIMARY KEY,
-  message_fingerprint TEXT NOT NULL,
-  notified_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_admin_notify_fp_time ON admin_notify_log(message_fingerprint, notified_at DESC);

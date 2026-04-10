@@ -20,15 +20,3 @@ ALTER TABLE capability_registry
 
 COMMENT ON COLUMN capability_registry.request_mode IS '任意: intent と別軸の request_mode 表示用';
 COMMENT ON COLUMN capability_registry.version IS '能力の版（成長完了時にインクリメント等）';
-
-CREATE TABLE IF NOT EXISTS growth_execution_log (
-  id BIGSERIAL PRIMARY KEY,
-  suggestion_id BIGINT NOT NULL REFERENCES implementation_suggestions (id) ON DELETE CASCADE,
-  phase TEXT NOT NULL,
-  status TEXT NOT NULL,
-  detail JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_growth_execution_suggestion
-  ON growth_execution_log (suggestion_id, created_at DESC);

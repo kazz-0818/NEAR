@@ -1,0 +1,41 @@
+-- Supabase アドバイザー対策: public のテーブルで RLS を有効化する。
+-- anon / authenticated（PostgREST・Data API）にはポリシーが無いため行にアクセスできない。
+-- NEAR サーバーは DATABASE_URL の postgres ロールで接続しており、RLS をバイパスする想定。
+
+ALTER TABLE inbound_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE intent_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE unsupported_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE implementation_suggestions ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE admin_notify_log ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE growth_user_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE growth_admin_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE growth_hearing_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE capability_registry ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE near_line_groups ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE outbound_messages ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE user_sheet_defaults ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE google_oauth_link_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_google_oauth_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_google_active_oauth ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE user_sheet_pending_confirm ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_sheet_pending_pick ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE agent_tool_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pending_tool_confirmations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agent_search_runs ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE growth_execution_log ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE growth_funnel_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE growth_candidate_signals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE growth_signal_buckets ENABLE ROW LEVEL SECURITY;

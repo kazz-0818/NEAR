@@ -207,8 +207,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
     });
   }
 
-  const adminDest =
-    env.GROWTH_APPROVAL_GROUP_ID?.trim() || env.ADMIN_LINE_USER_ID?.trim() || "";
+  const adminDest = env.GROWTH_APPROVAL_GROUP_ID?.trim() || env.ADMIN_LINE_USER_ID?.trim() || "";
   if (env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION && adminDest) {
     try {
       await notifyGrowthFirstApproval({
@@ -240,13 +239,16 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
       });
     }
   } else {
+    const reasonCode = env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION
+      ? "no_admin_line_or_group"
+      : "wait_user_hearing_done";
     await recordFunnelStep(db, {
       step: "admin_first_approval_skipped_no_destination",
       unsupportedRequestId,
       inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
       channel: String(row.user_channel ?? "line"),
       channelUserId,
-      reasonCode: env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION ? "no_admin_line_or_group" : "notify_disabled",
+      reasonCode,
       detail: { suggestion_id: suggestionId },
     });
   }

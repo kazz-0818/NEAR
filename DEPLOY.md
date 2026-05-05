@@ -15,7 +15,7 @@
 | `ADMIN_API_KEY` | 長いランダム文字列（管理 API 用） |
 | `PORT` | 未設定なら `3000`。Render 等が自動で付与する場合はそのまま |
 | `CRON_SECRET` | 任意（`/internal/reminders/dispatch` を保護する場合） |
-| `ADMIN_LINE_USER_ID` | 任意。**成長フロー**で管理者へ第一段階承認・ヒアリング・最終承認・実装指示・進捗を LINE プッシュ（あなたの userId を設定） |
+| `ADMIN_LINE_USER_ID` | 任意。**成長フロー**で管理者へ「ユーザー個人LINEヒアリング完了後」の要約共有・最終承認・実装指示・進捗を LINE プッシュ（あなたの userId を設定） |
 | `GROWTH_AUTO_CODING_ENABLED` | 任意 `true`/`1`。自動コーディング runner を有効化。**下記 GitHub／エージェントが未設定ならスタブ**（手動運用推奨） |
 | `GITHUB_TOKEN` | 任意。`GROWTH_GITHUB_REPO` と組み合わせて第二承認後に **GitHub Issue を自動作成**（classic PAT または fine-grained で `issues: write`） |
 | `GROWTH_GITHUB_REPO` | 任意。`owner/repo` 形式（例: `kazz-0818/NEAR`）。`GITHUB_TOKEN` とセットで有効 |
@@ -29,6 +29,7 @@
 | `GROWTH_MIN_MESSAGE_CHARS` | 既定 `12`。未満はログのみ（`growth_skipped`）。`0` で無効 |
 | `GROWTH_MIN_FINGERPRINT_COUNT` | 既定 `1`（初回から成長候補化）。スパム抑制で `2` 以上にすると同一要約が溜まるまで保留 |
 | `GROWTH_MIN_CONFIDENCE_UNKNOWN` | 既定 `0.35`。`unknown_custom_request` かつ低 confidence はスキップ。`0` で無効 |
+| `NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION` | 任意 `true`/`1` で有効。**旧フロー互換**で提案作成直後に成長カプセルへ第一段階通知。未設定（既定）はオフ＝ユーザー個人LINEヒアリング完了後に初回共有 |
 | `PUBLIC_BASE_URL` | 任意。通知に `…/admin/suggestions/:id` のリンクを載せるとき（例: `https://near-xxx.onrender.com`、末尾スラッシュなし）。**Render では未設定でも `RENDER_EXTERNAL_URL` に自動フォールバック** |
 | `LINE_BOT_USER_ID` | 任意。グループ／トークルームでは **@ボットのメンション** か **本文に「NEAR」「ニア」** がないと返信しない（1:1 は従来どおり）。メンション判定に使う。`curl -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" https://api.line.me/v2/bot/info` の `userId` |
 | `NEAR_WHATS_NEW` | 任意。改行可。「最近できるようになったこと」を NEAR が短く話すときの本文（デプロイごとに手更新） |
@@ -90,10 +91,11 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
 
 ## NEAR 成長システム（運用の流れ）
 
-1. ユーザーが未対応依頼をすると `unsupported_requests` に保存されます。条件を満たすときだけ非同期で `implementation_suggestions` が作られ管理者へ通知されます。弾かれた行は `status=growth_skipped` と `notes` に理由が残ります（[`growth_suggestion_gate.ts`](src/services/growth_suggestion_gate.ts)）。
-2. `ADMIN_LINE_USER_ID` があると、管理者の LINE に**第一段階承認**（この成長候補で進めてよいか）が届きます。`growth_admin_sessions` でアクティブな提案が紐づきます。
-3. 管理者は LINE で「はい／いいえ」→**ヒアリング**（1問ずつ）→**第二承認**→**Cursor 向け指示の再生成＋プッシュ**、の順で進めます。メッセージ例: 進行中は `テスト完了`→`デプロイ準備OK`→実装後 `成長完了`（または管理 API の `complete`）。
-4. 管理 API（`Authorization: Bearer <ADMIN_API_KEY>`）の例:
+1. ユーザーが未対応依頼をすると `unsupported_requests` に保存され、条件を満たすと `implementation_suggestions` が作成されます。ユーザーにはまず「この場で進化ヒアリングを始めるか」を個人LINEで確認します。弾かれた行は `status=growth_skipped` と `notes` に理由が残ります（[`growth_suggestion_gate.ts`](src/services/growth_suggestion_gate.ts)）。
+2. ユーザーが同意すると、個人LINEでヒアリングを実施し、回答を `growth_hearing_items` / `required_information` に集約します。
+3. ヒアリング完了後に、`ADMIN_LINE_USER_ID` または `GROWTH_APPROVAL_GROUP_ID` へ要約共有＋**最終承認**依頼が届きます。`growth_admin_sessions` でアクティブ提案が紐づきます。
+4. 管理者は LINE で「はい／いいえ」→（はいの場合）**Cursor 向け指示の再生成＋プッシュ**、の順で進めます。メッセージ例: 進行中は `テスト完了`→`デプロイ準備OK`→実装後 `成長完了`（または管理 API の `complete`）。
+5. 管理 API（`Authorization: Bearer <ADMIN_API_KEY>`）の例:
    - `GET /admin/suggestions?status=pending` … 第一段階 `approval_status` フィルタ
    - `GET /admin/suggestions/:id` … 1件（JSON。`cursor_prompt` に全文）
    - `GET /admin/suggestions/:id/cursor-prompt` … **`cursor_prompt` 本文のみ**（`text/plain`。CLI でファイル化しやすい）
@@ -101,7 +103,7 @@ LINE 上で「POPUPシートの7月の売上は？」のように聞くと、NEA
    - `PATCH /admin/suggestions/:id` … `approval_status`（`pending`→`approved`|`rejected`）、`implementation_state`、`deploy_safety_confirmed`（`deploying` へ進むとき必須）、`failure_reason` / `review_notes`
    - `POST /admin/suggestions/:id/growth/second-approve` … 第二承認相当（LINE と同じ処理）
    - `POST /admin/suggestions/:id/growth/complete` … 成長完了（`capability_registry` 追記・通知）
-5. **自動コーディング／自動デプロイ**は `coding_runner` / `deploy_runner` のアダプタ差し替えで拡張します。`GROWTH_AUTO_CODING_ENABLED` がオンのとき、`GITHUB_TOKEN`+`GROWTH_GITHUB_REPO` があれば **Issue 作成**、なければ `GROWTH_CODING_AGENT_URL` があれば **エージェント POST**、どちらもなければ **スタブ**です。
+6. **自動コーディング／自動デプロイ**は `coding_runner` / `deploy_runner` のアダプタ差し替えで拡張します。`GROWTH_AUTO_CODING_ENABLED` がオンのとき、`GITHUB_TOKEN`+`GROWTH_GITHUB_REPO` があれば **Issue 作成**、なければ `GROWTH_CODING_AGENT_URL` があれば **エージェント POST**、どちらもなければ **スタブ**です。
 
 設計メモはリポジトリ内 `GROWTH.md` を参照してください。
 

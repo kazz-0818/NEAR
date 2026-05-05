@@ -67,15 +67,15 @@ export async function notifyUserGrowthConsent(input: {
   const log = getLogger();
   const tierLines = formatGrowthDifficultyLines(input.growthDifficultyTier ?? null);
   const body = [
-    "NEAR です。あなたからいただいた次のご依頼は、いまの私ではまだお手伝いできませんでした。",
+    "NEAR です。あなたからの次のご依頼は、いまの私ではまだお手伝いできませんでした。",
     `「${clip(input.userOriginalSnippet, 420)}」`,
     "",
     ...tierLines,
     "内容の要約:",
     clip(input.userSummary, 480),
     "",
-    "この機能を「成長候補」として開発側に検討してもよいでしょうか？",
-    "よろしければ「はい」、見送る場合は「いいえ」と返信してください。",
+    "できなかった内容をこの場で進化させるため、個人LINEでヒアリングを始めてもよいですか？",
+    "よければ「はい」、今回は見送る場合は「いいえ」と返信してください。",
     "",
     `（候補 #${input.suggestionId}）`,
   ].join("\n");
@@ -212,7 +212,8 @@ export async function notifyFinalApproval(input: {
   }
 
   const body = [
-    "依頼ユーザーからのヒアリングが完了しました。実装に進む前の**最終確認**です。",
+    "依頼ユーザーとの個人LINEヒアリングが完了しました。要点をまとめて共有します。",
+    "この内容で実装に進めるか、最終確認をお願いします。",
     "",
     ...requesterLines,
     "【ユーザー当初の依頼】",

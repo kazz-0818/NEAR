@@ -72,7 +72,7 @@
 | `NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED` | オン | `growth_candidate_signals` への記録 |
 | `NEAR_GROWTH_FAQ_DEFLECTION_SIGNAL_ENABLED` | オン | FAQ 返答が能力否定・準備中止めのときシグナル化（`source=faq_answerer`） |
 | `NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS` | 0 | 同一 bucket の raw 行を何時間以内に重ねないか。0＝毎回 raw 行も残す |
-| `NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION` | オン | 提案作成後に `notifyGrowthFirstApproval`（管理者 LINE またはグループ） |
+| `NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION` | オフ | 旧フロー互換。オン時のみ提案作成直後に `notifyGrowthFirstApproval`（管理者 LINE またはグループ） |
 
 ## Phase2 との整合
 
@@ -84,5 +84,5 @@
 1. `GET /admin/growth-pipeline/summary` で `funnel_by_step_and_reason` を見る。  
 2. `growth_gate` の `reason_code` が `needs_followup` / `message_too_short` / `fingerprint_count_*` なら **gate 設定**（`GROWTH_*`）を疑う。  
 3. `suggestion_rejected_trivial` が多いなら **feature_suggester の LLM 判定**（trivially_infeasible）を疑う。  
-4. `admin_first_approval_skipped_no_destination` なら **`ADMIN_LINE_USER_ID` または `GROWTH_APPROVAL_GROUP_ID`** が未設定。  
+4. `admin_first_approval_skipped_no_destination` の `reason_code` が `no_admin_line_or_group` なら **`ADMIN_LINE_USER_ID` または `GROWTH_APPROVAL_GROUP_ID`** 未設定、`wait_user_hearing_done` なら仕様どおり「個人LINEヒアリング完了待ち」。  
 5. `growth_candidate_signals` でエージェント経路の未解決感を追う。

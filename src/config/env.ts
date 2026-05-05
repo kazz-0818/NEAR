@@ -265,13 +265,15 @@ const envSchema = z.object({
       return Number.isFinite(n) && n >= 0 && n <= 1440 ? n : 15;
     }),
   /**
-   * false / 0 でオフ。未設定はオン。
-   * 提案レコード作成後に notifyGrowthFirstApproval で管理者へ第一段階案内を送る（宛先は GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）。
+   * true / 1 でオン。未設定はオフ。
+   * 旧フロー互換: 提案レコード作成直後に notifyGrowthFirstApproval で管理者へ第一段階案内を送る
+   * （宛先は GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）。
+   * 既定では、ユーザー個人LINEヒアリング完了後にのみ管理者へ共有する。
    */
   NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION: z
     .string()
     .optional()
-    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+    .transform((s) => s === "true" || s === "1"),
   /** Google Sheets API 用サービスアカウント鍵（JSON 文字列。改行を含む場合は B64 推奨） */
   GOOGLE_SERVICE_ACCOUNT_JSON: z
     .string()

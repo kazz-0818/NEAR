@@ -59,6 +59,11 @@ function isTriviallyShortForHearing(text: string): boolean {
   return !/^[はいいえなしOKok👍]+$/i.test(t);
 }
 
+function isGrowthResetCommand(text: string): boolean {
+  const t = norm(text);
+  return /リセット/.test(t) && /(進化|成長)/.test(t);
+}
+
 /**
  * 同意待ち/ヒアリング待ちの最中でも、明らかに別件の新規依頼は通常ルートへ通す。
  * （成長フローが会話全体を占有してしまうのを防ぐ）
@@ -83,10 +88,37 @@ export async function tryHandleGrowthRequestingUserLine(input: {
   db: Db;
   channelUserId: string;
   text: string;
+  lineSourceType?: string;
 }): Promise<{ handled: boolean; reply: string }> {
   const raw = input.text;
   const text = norm(raw);
   if (!text) return { handled: false, reply: "" };
+
+  if (isGrowthResetCommand(text)) {
+    const r = await input.db.query(
+      `UPDATE growth_user_sessions
+       SET active_suggestion_id = NULL, updated_at = now()
+       WHERE requesting_line_user_id = $1 AND active_suggestion_id IS NOT NULL`,
+      [input.channelUserId]
+    );
+    if (r.rowCount && r.rowCount > 0) {
+      return {
+        handled: true,
+        reply:
+          "進化フローの待機状態をリセットしました。\n" +
+          "このあとはグループでも通常どおり相談できます。必要なら個人LINEであらためて進化確認を進めましょう。",
+      };
+    }
+    return {
+      handled: true,
+      reply: "進化フローの待機は見つかりませんでした。通常どおり使って大丈夫です。",
+    };
+  }
+
+  // グループ/ルームでは進化同意待ちを横取りしない（個人LINEで進める）
+  if (input.lineSourceType === "group" || input.lineSourceType === "room") {
+    return { handled: false, reply: "" };
+  }
 
   const explicitId = parseExplicitSuggestionId(text);
   const suggestionId = await resolveSuggestionIdForRequestingUser(

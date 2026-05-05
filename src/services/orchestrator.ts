@@ -81,14 +81,15 @@ export async function handleLineTextMessage(input: {
   channelUserId: string;
   text: string;
   inboundMessageId: number;
+  lineSourceType?: string;
 }): Promise<void> {
   const log = getLogger();
-  const { db, replyToken, channelUserId, text, inboundMessageId } = input;
+  const { db, replyToken, channelUserId, text, inboundMessageId, lineSourceType } = input;
   const channel = "line";
   const env = getEnv();
   const outboundCtx = { channel, channelUserId, inboundMessageId };
 
-  const thin = await runThinRouterPhase({ db, env, channelUserId, text });
+  const thin = await runThinRouterPhase({ db, env, channelUserId, text, lineSourceType });
   if (thin.handled) {
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
     return;

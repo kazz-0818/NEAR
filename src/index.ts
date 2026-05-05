@@ -208,6 +208,7 @@ async function lineMessagingWebhook(c: Context) {
       channelUserId: userId,
       text,
       inboundMessageId: inboundId,
+      lineSourceType: typeof source?.type === "string" ? source.type : undefined,
     });
   }
 

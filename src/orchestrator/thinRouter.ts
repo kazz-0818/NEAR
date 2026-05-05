@@ -26,9 +26,10 @@ export async function runThinRouterPhase(input: {
   env: Env;
   channelUserId: string;
   text: string;
+  lineSourceType?: string;
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, text } = input;
+  const { db, env, channelUserId, text, lineSourceType } = input;
 
   if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
     const growth = await tryHandleAdminGrowthLine({ db, adminUserId: channelUserId, text });
@@ -37,7 +38,7 @@ export async function runThinRouterPhase(input: {
     }
   }
 
-  const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text });
+  const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text, lineSourceType });
   if (userGrowth.handled) {
     return { handled: true, finalText: userGrowth.reply };
   }

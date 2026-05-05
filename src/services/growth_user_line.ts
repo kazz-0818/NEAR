@@ -60,6 +60,23 @@ function isTriviallyShortForHearing(text: string): boolean {
 }
 
 /**
+ * 同意待ち/ヒアリング待ちの最中でも、明らかに別件の新規依頼は通常ルートへ通す。
+ * （成長フローが会話全体を占有してしまうのを防ぐ）
+ */
+function looksLikeIndependentNewRequest(text: string): boolean {
+  const t = norm(text);
+  if (!t) return false;
+  if (isAffirmative(t) || isNegative(t)) return false;
+  if (looksLikeConsentDeferred(t) || looksLikeHearingDeferred(t)) return false;
+
+  const chars = [...t].length;
+  const hasQuestionCue = /[?？]|教えて|どう|なぜ|何|いつ|どこ|できますか|して|作って|確認|調べて|お願い|頼む/.test(t);
+  const hasConversationCue = /です|ます|ください|かな|たい|について|を/.test(t);
+
+  return chars >= 12 && (hasQuestionCue || hasConversationCue);
+}
+
+/**
  * 依頼ユーザー（管理者以外）の LINE を成長フローが処理すべきか判定する。
  */
 export async function tryHandleGrowthRequestingUserLine(input: {
@@ -98,6 +115,9 @@ export async function tryHandleGrowthRequestingUserLine(input: {
       const reply = await handleUserConsentAffirmative(input.db, suggestionId);
       return { handled: true, reply };
     }
+    if (looksLikeIndependentNewRequest(text)) {
+      return { handled: false, reply: "" };
+    }
     const kind = looksLikeConsentDeferred(text) ? "consent_deferred" : "consent_unclear";
     await appendGrowthStallMemo(input.db, suggestionId, kind, raw);
     return {
@@ -113,6 +133,9 @@ export async function tryHandleGrowthRequestingUserLine(input: {
     if (norm(text) === "ヒアリングキャンセル") {
       const reply = await handleUserHearingCancel(input.db, suggestionId);
       return { handled: true, reply };
+    }
+    if (looksLikeIndependentNewRequest(text)) {
+      return { handled: false, reply: "" };
     }
     if (looksLikeHearingDeferred(text) || isTriviallyShortForHearing(text)) {
       const kind = isTriviallyShortForHearing(text) && !looksLikeHearingDeferred(text)

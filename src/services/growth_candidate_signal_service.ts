@@ -218,7 +218,7 @@ export async function maybeRecordAgentPathGrowthSignals(input: {
 /** FAQ 返答が「準備中／未対応で断る」系か（成長シグナル用） */
 export function looksLikeFaqCapabilityDeflectionDraft(draft: string): boolean {
   const t = draft.normalize("NFKC");
-  return /準備中|まだお届け|直接お届け|お届けできません|いまのところ[^。]{0,40}できません|未対応です|機能はまだ|実装されていません|準備ができていません|この機能は|サポートしておりません|対応しておりません/i.test(
+  return /準備中|まだお届け|直接お届け|お届けできません|いまのところ[^。]{0,40}できません|未対応です|機能はまだ|実装されていません|準備ができていません|この機能は|サポートしておりません|対応しておりません|情報は20\d{2}年\d{1,2}月[^。]{0,40}止まって|学習データ[^。]{0,40}最新[^。]{0,40}わから/i.test(
     t
   );
 }

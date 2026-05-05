@@ -5,7 +5,7 @@
 - **オフ（既定）**: `NEAR_AGENT_WEB_SEARCH` のみで付与可否を決める（従来どおり）。
 - **オン**: 次の優先順で **1 つだけ**採用し、`web_search_preview` を付けるか決める。
 
-1. **明示キーワード**（天気・為替・ニュース・株・「検索して」等）→ **付与**（`explicit_keyword`）
+1. **明示キーワード**（「検索して」「最新」「出典」「公式情報」等）→ **付与**（`explicit_keyword`）
 2. ユーザー本文が **`NEAR_WEB_SEARCH_MIN_CHARS` 未満** → 不付与（`text_too_short`）
 3. 発話が **スプレッドシート／表・カレンダー文脈**に強い → 不付与（`sheet_or_calendar_context`）
 4. 上記以外 → 不付与（`default_no_search`）

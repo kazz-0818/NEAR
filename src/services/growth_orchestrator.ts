@@ -154,6 +154,52 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
   const rawIm = inboundRow.rows[0]?.inbound_message_id;
   const inboundMessageId = rawIm ? Number(rawIm) : null;
 
+  // 同一依頼で候補が重複した場合、2件目の個人LINE同意通知は止める。
+  if (channelUserId && Number.isFinite(inboundMessageId)) {
+    const dup = await db.query<{ id: string }>(
+      `SELECT s.id::text AS id
+       FROM implementation_suggestions s
+       JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+       WHERE u.channel_user_id = $1
+         AND u.inbound_message_id = $2
+         AND s.id <> $3
+         AND s.implementation_state IN ('awaiting_user_consent', 'hearing_required')
+       ORDER BY s.id ASC
+       LIMIT 1`,
+      [channelUserId, inboundMessageId, suggestionId]
+    );
+    const priorId = dup.rows[0]?.id ? Number(dup.rows[0].id) : null;
+    if (priorId != null && Number.isFinite(priorId)) {
+      await db.query(
+        `UPDATE implementation_suggestions
+         SET approval_status = 'rejected',
+             implementation_state = 'failed',
+             failure_reason = COALESCE(failure_reason, $2),
+             review_notes = COALESCE(review_notes, $3),
+             updated_at = now()
+         WHERE id = $1`,
+        [suggestionId, `duplicate suggestion for inbound_message_id=${inboundMessageId}`, `prior_suggestion_id=${priorId}`]
+      );
+      await db.query(
+        `UPDATE unsupported_requests
+         SET status = 'growth_skipped', notes = COALESCE(notes, $2), updated_at = now()
+         WHERE id = $1`,
+        [unsupportedRequestId, `duplicate_suggestion_suppressed prior_suggestion_id=${priorId}`]
+      );
+      await recordFunnelStep(db, {
+        step: "user_consent_push_failed",
+        unsupportedRequestId,
+        inboundMessageId: Number.isFinite(inboundMessageId) ? inboundMessageId : null,
+        channel: String(row.user_channel ?? "line"),
+        channelUserId,
+        reasonCode: "duplicate_suggestion_suppressed",
+        detail: { suggestion_id: suggestionId, prior_suggestion_id: priorId },
+      });
+      log.info({ suggestionId, priorId, inboundMessageId }, "duplicate suggestion suppressed before user consent push");
+      return;
+    }
+  }
+
   await db.query(
     `UPDATE unsupported_requests
      SET status = 'user_consent_requested', updated_at = now()

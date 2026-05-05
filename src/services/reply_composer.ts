@@ -29,14 +29,31 @@ function temperatureForSituation(s: ComposeInput["situation"]): number {
   switch (s) {
     case "success":
     case "followup":
-      return 0.78;
+      return 0.84;
     case "unsupported":
-      return 0.64;
+      return 0.72;
     case "error":
-      return 0.55;
+      return 0.62;
     default:
-      return 0.7;
+      return 0.76;
   }
+}
+
+function recentOpeningGuards(messages?: string[]): string[] {
+  if (!messages?.length) return [];
+  const out: string[] = [];
+  for (let i = messages.length - 1; i >= 0 && out.length < 3; i--) {
+    const line = messages[i]
+      .split("\n")
+      .map((s) => s.trim())
+      .find((s) => s.length > 0);
+    if (!line) continue;
+    const normalized = line.replace(/[「」『』。、！!？?\s]/g, "");
+    if (!normalized) continue;
+    const head = normalized.slice(0, 14);
+    if (head.length >= 5 && !out.includes(head)) out.push(head);
+  }
+  return out;
 }
 
 export async function composeNearReply(input: ComposeInput): Promise<string> {
@@ -79,6 +96,14 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
         "ユーザーが直前の返答の見せ方だけを変えているときは、ドラフトの数値・事実を変えず体裁だけ整える。"
       );
     }
+    const openingGuards = recentOpeningGuards(input.recentAssistantMessages);
+    if (openingGuards.length > 0) {
+      userBits.push(
+        "",
+        "直近と同じテンプレ感を避けるため、次の書き出し（先頭付近）は繰り返さない:",
+        ...openingGuards.map((s, i) => `${i + 1}. ${s}...`)
+      );
+    }
     if (input.recentUserMessages?.length) {
       userBits.push(
         "",
@@ -110,6 +135,8 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
       ],
       max_tokens: 520,
       temperature: temperatureForSituation(input.situation),
+      frequency_penalty: 0.45,
+      presence_penalty: 0.25,
     });
     const text = completion.choices[0]?.message?.content?.trim();
     if (text) return text;
@@ -153,6 +180,8 @@ export async function composeNearReplyLight(input: ComposeInput): Promise<string
       ],
       max_tokens: 380,
       temperature: 0.28,
+      frequency_penalty: 0.2,
+      presence_penalty: 0.1,
     });
     const text = completion.choices[0]?.message?.content?.trim();
     if (text) return text;

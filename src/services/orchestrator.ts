@@ -10,6 +10,7 @@ import { getLogger } from "../lib/logger.js";
 import type { GrowthGateResult } from "./growth_suggestion_gate.js";
 import { runGrowthPipelineAfterUnsupported } from "./growth_pipeline.js";
 import {
+  looksLikeFaqCapabilityDeflectionDraft,
   maybeRecordAgentPathGrowthSignals,
   maybeRecordFaqDeflectionGrowthSignal,
   maybeRecordLegacyModuleErrorSignal,
@@ -416,6 +417,25 @@ export async function handleLineTextMessage(input: {
     }
 
     if (modResult.success && situation === "success" && parsed.intent === "simple_question") {
+      if (looksLikeFaqCapabilityDeflectionDraft(modResult.draft)) {
+        const unsupportedId = await logUnsupportedRequest({
+          db,
+          channel,
+          channelUserId,
+          originalMessage: text,
+          intent: parsed,
+          inboundMessageId,
+          whyOverride: "FAQ capability deflection detected",
+        });
+        growthGateForAck = await runGrowthPipelineAfterUnsupported(db, log, {
+          unsupportedId,
+          inboundMessageId,
+          channel,
+          channelUserId,
+          text,
+          parsed,
+        });
+      }
       await maybeRecordFaqDeflectionGrowthSignal({
         db,
         channel,

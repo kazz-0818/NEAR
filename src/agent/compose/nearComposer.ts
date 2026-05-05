@@ -8,6 +8,29 @@ import {
 
 export type ComposeMode = "skip" | "light" | "full";
 
+function normalizeDeflectionReply(text: string): string {
+  let out = text;
+  // 特定年月を断定する言い回しを汎用表現に丸める。
+  out = out.replace(
+    /私の情報は20\d{2}年\d{1,2}月止まり(?:でして)?、?/g,
+    "最新情報をこの場で断定するのが難しく、"
+  );
+  out = out.replace(
+    /私の情報は20\d{2}年\d{1,2}月で止まって(?:いる|いて)(?:ため)?、?/g,
+    "最新情報をこの場で断定するのが難しく、"
+  );
+
+  const looksLikeDeflection =
+    /最新[^。\n]{0,30}(?:提供|お伝え|案内)[^。\n]{0,20}できません|情報は20\d{2}年\d{1,2}月[^。\n]{0,40}止まって|気象庁|公式アプリ|公式サイト/.test(
+      out
+    );
+  const hasPersonalHearingLine = /個人\s*LINE|個人ライン/.test(out);
+  if (looksLikeDeflection && !hasPersonalHearingLine) {
+    out += "\n\n必要なら個人LINEでヒアリングして、改善候補として進めます。";
+  }
+  return out;
+}
+
 /** 候補番号リスト（・1. 形式）など、整形で事実が壊れやすい followup */
 function looksLikeNumberedChoiceListDraft(draft: string): boolean {
   return /・\s*\d+\./.test(draft);
@@ -49,10 +72,10 @@ export function classifyComposeMode(draft: string, situation: ComposeInput["situ
 export async function composeNearReplyUnified(input: ComposeInput): Promise<string> {
   const mode = classifyComposeMode(input.draft, input.situation);
   if (mode === "skip") {
-    return input.draft;
+    return normalizeDeflectionReply(input.draft);
   }
   if (mode === "light") {
-    return composeNearReplyLight(input);
+    return normalizeDeflectionReply(await composeNearReplyLight(input));
   }
-  return composeNearReply(input);
+  return normalizeDeflectionReply(await composeNearReply(input));
 }

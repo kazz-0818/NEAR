@@ -74,8 +74,9 @@ export async function notifyUserGrowthConsent(input: {
     "内容の要約:",
     clip(input.userSummary, 480),
     "",
+    "グループでの会話中でも、進化確認は個人LINEで進めます。",
     "できなかった内容をこの場で進化させるため、個人LINEでヒアリングを始めてもよいですか？",
-    "よければ「はい」、今回は見送る場合は「いいえ」と返信してください。",
+    "個人LINEのこのメッセージに、よければ「はい」、今回は見送る場合は「いいえ」と返信してください。",
     "",
     `（候補 #${input.suggestionId}）`,
   ].join("\n");

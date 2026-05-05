@@ -124,7 +124,7 @@ export async function tryHandleGrowthRequestingUserLine(input: {
       handled: true,
       reply:
         "いま、**成長候補として進めてよいか**の確認待ちです。この件はここで**ステイ**のままにしておきますね。\n" +
-        "進めてよければ **「はい」**、見送るなら **「いいえ」** とだけ送ってください。\n" +
+        "確認は個人LINEに送っているので、そちらに **「はい」** か **「いいえ」** とだけ返してください。\n" +
         "別の用件は、そのあとでも大丈夫です。",
     };
   }
@@ -146,6 +146,7 @@ export async function tryHandleGrowthRequestingUserLine(input: {
         handled: true,
         reply:
           "ヒアリングへのご回答は、**この段階で待機**しています（まだ先には進めません）。\n" +
+          "回答は個人LINEで進める前提です。\n" +
           "まとまったら、前にお送りした質問に**1通で**答えてください。「ヒアリングキャンセル」で中断もできます。",
       };
     }

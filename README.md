@@ -1,6 +1,6 @@
 # NEAR（LINE × AI秘書）MVP
 
-公式LINEを窓口に、OpenAI で意図判定し、モジュール実行または未対応ログ＋丁寧な返答を行います。設計思想・秘書レイヤー（request_mode）・ロードマップは [`docs/NEAR_SECRETARY_ARCHITECTURE.md`](docs/NEAR_SECRETARY_ARCHITECTURE.md) を参照してください。未対応から能力拡張までの自己成長ループは [`docs/NEAR_SELF_GROWTH_ARCHITECTURE.md`](docs/NEAR_SELF_GROWTH_ARCHITECTURE.md) を参照してください。
+公式LINEを窓口に、OpenAI で意図判定し、モジュール実行または未対応ログ＋丁寧な返答を行います。設計思想・秘書レイヤー（request_mode）・ロードマップは [`docs/NEAR_SECRETARY_ARCHITECTURE.md`](docs/NEAR_SECRETARY_ARCHITECTURE.md) を参照してください。未対応から能力拡張までの自己成長ループは [`docs/NEAR_SELF_GROWTH_ARCHITECTURE.md`](docs/NEAR_SELF_GROWTH_ARCHITECTURE.md) を参照してください。AI活用時の責務分界（GPT寄り運用と開発要件の境界）は [`docs/AI_SCOPE_BOUNDARY.md`](docs/AI_SCOPE_BOUNDARY.md) を参照してください。
 
 ## 必要な環境変数
 

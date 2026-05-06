@@ -1,6 +1,7 @@
 # NEAR 成長フロー（設計メモ）
 
 **自己成長型の全体像・DB 拡張・フェーズ計画:** [`docs/NEAR_SELF_GROWTH_ARCHITECTURE.md`](docs/NEAR_SELF_GROWTH_ARCHITECTURE.md)
+**GPT寄り運用と開発要件の境界:** [`docs/AI_SCOPE_BOUNDARY.md`](docs/AI_SCOPE_BOUNDARY.md)
 
 ## 成果物インデックス
 

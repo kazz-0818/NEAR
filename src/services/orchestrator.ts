@@ -87,9 +87,15 @@ function looksLikeWeakFaqDraft(draft: string): boolean {
 function looksLikeBroadConsultation(text: string): boolean {
   const t = text.normalize("NFKC").trim();
   if (t.length < 4) return false;
-  return /(考えて|提案|アイデア|戦略|施策|マーケ|マーケティング|改善|壁打ち|整理|比較|どうすれば|方針|企画|プラン|ロードマップ|優先順位)/i.test(
+  return /(考えて|提案|アイデア|戦略|施策|マーケ|マーケティング|改善|壁打ち|整理|比較|どうすれば|方針|企画|プラン|ロードマップ|優先順位|調べて|しらべて|リサーチ)/i.test(
     t
   );
+}
+
+function looksLikeBroadConsultationFollowup(text: string, recentUserMessages: string[]): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (!/(調べて|しらべて|もっと詳しく|深掘り|続けて|つづき)/i.test(t)) return false;
+  return recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m));
 }
 
 export async function handleLineTextMessage(input: {
@@ -177,6 +183,11 @@ export async function handleLineTextMessage(input: {
       }
 
       if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.52) {
+        const shouldSkipClarifyForConsultation =
+          looksLikeBroadConsultation(text) || looksLikeBroadConsultationFollowup(text, recentUserMessages);
+        if (shouldSkipClarifyForConsultation) {
+          log.info({ mode: interpretation.mode }, "secretary clarify skipped: prefer direct broad consultation answer");
+        } else
         if (
           sheetsReadIntegrationEnabled() &&
           (looksLikeSheetsThreadFollowUp(text, recentUserMessages) ||

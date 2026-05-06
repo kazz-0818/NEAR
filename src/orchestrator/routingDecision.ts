@@ -21,6 +21,15 @@ function looksLikeWebResearchIntent(userText: string): boolean {
   );
 }
 
+/** GPT寄りに、一般相談・比較・作成依頼も Agent 側で巻き取りやすくする。 */
+function looksLikeBroadAssistantIntent(userText: string): boolean {
+  const t = userText.trim();
+  if (t.length < 4) return false;
+  return /(比較|違い|メリット|デメリット|提案|アイデア|案を出|壁打ち|整理|要点|手順|進め方|どうすれば|なぜ|理由|改善|添削|言い換え|文章|返信文|メール|下書き|テンプレ|計画|ロードマップ|優先順位)/i.test(
+    t
+  );
+}
+
 /**
  * エージェント（Responses + ツール）を起動すべきか。
  * - シートは routable なら常にレガシー優先（状態機械・既存 sheets_query）。
@@ -43,6 +52,17 @@ export function shouldInvokeNearAgent(
     legacyRoutable &&
     intent === "simple_question" &&
     looksLikeWebResearchIntent(userText)
+  ) {
+    return true;
+  }
+
+  if (
+    userText &&
+    env.NEAR_AGENT_SHADOW &&
+    env.NEAR_AGENT_SIMPLE_QUESTION_PRIMARY &&
+    legacyRoutable &&
+    intent === "simple_question" &&
+    looksLikeBroadAssistantIntent(userText)
   ) {
     return true;
   }

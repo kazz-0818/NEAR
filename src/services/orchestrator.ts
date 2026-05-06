@@ -76,6 +76,14 @@ async function replyLineAndRememberOutbound(
   }
 }
 
+function looksLikeWeakFaqDraft(draft: string): boolean {
+  const t = draft.normalize("NFKC").trim();
+  if (!t) return true;
+  if (looksLikeFaqCapabilityDeflectionDraft(t)) return true;
+  if (t.length <= 32 && /(うまく|難しい|できません|わかりません|もう一度|短く)/i.test(t)) return true;
+  return /(もう一度(短く)?送って|もう少し(具体的|詳しく)|お試しください|準備中|未対応|うまく言語化できませんでした)/i.test(t);
+}
+
 export async function handleLineTextMessage(input: {
   db: Db;
   replyToken: string;
@@ -416,8 +424,70 @@ export async function handleLineTextMessage(input: {
       });
     }
 
+    const faqDeflectionDetected =
+      modResult.success &&
+      situation === "success" &&
+      parsed.intent === "simple_question" &&
+      looksLikeFaqCapabilityDeflectionDraft(modResult.draft);
+    const faqWeakDetected =
+      modResult.success &&
+      situation === "success" &&
+      parsed.intent === "simple_question" &&
+      looksLikeWeakFaqDraft(modResult.draft);
+    const shouldRetryFaqViaAgent =
+      env.NEAR_AGENT_ENABLED &&
+      ((faqDeflectionDetected && env.NEAR_AGENT_RETRY_ON_FAQ_DEFLECTION) ||
+        (faqWeakDetected && env.NEAR_AGENT_RETRY_ON_WEAK_FAQ));
+
+    if (shouldRetryFaqViaAgent) {
+      try {
+        const agentRetry = await runNearAgentTurn({
+          db,
+          channel,
+          channelUserId,
+          inboundMessageId,
+          userText: text,
+          recentUserMessages,
+          recentAssistantMessages,
+        });
+        const retried = agentRetry.text.trim();
+        if (retried) {
+          let finalText = retried;
+          if (!env.NEAR_AGENT_SKIP_COMPOSE) {
+            try {
+              finalText = await composeNearReplyUnified({
+                draft: retried,
+                situation: agentRetry.composeSituation,
+                userMessage: text,
+                recentUserMessages,
+                recentAssistantMessages,
+              });
+            } catch (ce) {
+              log.warn({ err: ce }, "composeNearReplyUnified failed (faq deflection retry path)");
+            }
+          }
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+          await maybeRecordAgentPathGrowthSignals({
+            db,
+            channel,
+            channelUserId,
+            inboundMessageId,
+            userText: text,
+            parsed,
+            finalText,
+            composeSituation: agentRetry.composeSituation,
+            toolsInvoked: agentRetry.log.toolsInvoked,
+            agentSteps: agentRetry.log.steps,
+          });
+          return;
+        }
+      } catch (e) {
+        log.warn({ err: e }, "faq weak/deflection retry via near agent failed; keep legacy response");
+      }
+    }
+
     if (modResult.success && situation === "success" && parsed.intent === "simple_question") {
-      if (looksLikeFaqCapabilityDeflectionDraft(modResult.draft)) {
+      if (faqDeflectionDetected) {
         const unsupportedId = await logUnsupportedRequest({
           db,
           channel,

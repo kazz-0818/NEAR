@@ -357,6 +357,30 @@ const envSchema = z.object({
       if (s === undefined || s.trim() === "") return true;
       return !(s === "false" || s === "0");
     }),
+  /**
+   * 影モードでも simple_question を積極的に Agent 優先へ寄せる（既定オン）。
+   * false / 0 で、従来どおり「調査系など一部のみ」Agent 優先。
+   */
+  NEAR_AGENT_SIMPLE_QUESTION_PRIMARY: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /**
+   * FAQ が能力否定寄りの返答になったとき、同ターンで Agent に再試行させる。
+   * 未設定は true（巻き取り優先）。false / 0 で無効。
+   */
+  NEAR_AGENT_RETRY_ON_FAQ_DEFLECTION: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /**
+   * FAQ が行き止まり寄りの弱い返答（短い再入力依頼など）になったとき、同ターンで Agent 再試行。
+   * 未設定は true（巻き取り優先）。false / 0 で無効。
+   */
+  NEAR_AGENT_RETRY_ON_WEAK_FAQ: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /** エージェント用モデル（Web 検索ツール対応のものを推奨。例: gpt-4o） */
   OPENAI_AGENT_MODEL: z.string().default("gpt-4o"),
   /** ツール呼び出しループの最大回数（1〜24） */

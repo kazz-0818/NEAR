@@ -439,6 +439,7 @@ export async function handleLineTextMessage(input: {
       ((faqDeflectionDetected && env.NEAR_AGENT_RETRY_ON_FAQ_DEFLECTION) ||
         (faqWeakDetected && env.NEAR_AGENT_RETRY_ON_WEAK_FAQ));
 
+    let faqRetryFallbackDraft: string | null = null;
     if (shouldRetryFaqViaAgent) {
       try {
         const agentRetry = await runNearAgentTurn({
@@ -481,31 +482,20 @@ export async function handleLineTextMessage(input: {
           });
           return;
         }
+        // Agent 再試行が空振りのときは、行き止まり文面をそのまま返さず最小限の巻き取り回答へ寄せる。
+        faqRetryFallbackDraft =
+          "もちろんお手伝いできます。まずは実務で使える形で整理します。\n" +
+          "物販マーケなら、①誰に売るか（顧客像）②何で選ばれるか（差別化）③どこで獲得するか（集客チャネル）の順で決めると進めやすいです。";
       } catch (e) {
         log.warn({ err: e }, "faq weak/deflection retry via near agent failed; keep legacy response");
+        faqRetryFallbackDraft =
+          "もちろんお手伝いできます。まずは実務で使える形で整理します。\n" +
+          "物販マーケなら、①誰に売るか（顧客像）②何で選ばれるか（差別化）③どこで獲得するか（集客チャネル）の順で決めると進めやすいです。";
       }
     }
 
     if (modResult.success && situation === "success" && parsed.intent === "simple_question") {
-      if (faqDeflectionDetected) {
-        const unsupportedId = await logUnsupportedRequest({
-          db,
-          channel,
-          channelUserId,
-          originalMessage: text,
-          intent: parsed,
-          inboundMessageId,
-          whyOverride: "FAQ capability deflection detected",
-        });
-        growthGateForAck = await runGrowthPipelineAfterUnsupported(db, log, {
-          unsupportedId,
-          inboundMessageId,
-          channel,
-          channelUserId,
-          text,
-          parsed,
-        });
-      }
+      // GPT寄り運用では、一般相談の deflection を即 unsupported 候補化せず、まず会話内で巻き取る。
       await maybeRecordFaqDeflectionGrowthSignal({
         db,
         channel,
@@ -517,13 +507,13 @@ export async function handleLineTextMessage(input: {
       });
     }
 
-    let finalText = modResult.draft;
+    let finalText = faqRetryFallbackDraft ?? modResult.draft;
     if (env.NEAR_GROWTH_USER_ACK_ENABLED && growthGateForAck?.allow) {
-      finalText = `${modResult.draft}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+      finalText = `${finalText}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
     }
     try {
       finalText = await composeNearReplyUnified({
-        draft: modResult.draft,
+        draft: finalText,
         situation,
         userMessage: text,
         recentUserMessages,

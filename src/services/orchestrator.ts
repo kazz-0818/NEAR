@@ -84,6 +84,14 @@ function looksLikeWeakFaqDraft(draft: string): boolean {
   return /(もう一度(短く)?送って|もう少し(具体的|詳しく)|お試しください|準備中|未対応|うまく言語化できませんでした)/i.test(t);
 }
 
+function looksLikeBroadConsultation(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (t.length < 4) return false;
+  return /(考えて|提案|アイデア|戦略|施策|マーケ|マーケティング|改善|壁打ち|整理|比較|どうすれば|方針|企画|プラン|ロードマップ|優先順位)/i.test(
+    t
+  );
+}
+
 export async function handleLineTextMessage(input: {
   db: Db;
   replyToken: string;
@@ -236,6 +244,19 @@ export async function handleLineTextMessage(input: {
     parsed = await promoteGoogleSheetsFollowUp(text, parsed, recentUserMessages, db, channelUserId);
   } catch (promoErr) {
     log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");
+  }
+
+  // GPT寄り運用: 一般相談が unknown に落ちたら simple_question へ救済して会話で巻き取る。
+  if (parsed.intent === "unknown_custom_request" && looksLikeBroadConsultation(text)) {
+    parsed = {
+      ...parsed,
+      intent: "simple_question",
+      can_handle: true,
+      needs_followup: false,
+      followup_question: null,
+      reason: "orchestrator_broad_consultation_rescue",
+      suggested_category: null,
+    };
   }
 
   await saveIntentRun(db, inboundMessageId, parsed, {

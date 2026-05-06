@@ -197,14 +197,15 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
       ? "Google ドライブでファイル名を検索しましたが、該当するスプレッドシートが見つかりませんでした。\n\n"
       : "";
     draft +=
-      "どのスプレッドシートを見るか決められませんでした。\n" +
-      "・あなたの Google ドライブ上の**ファイル名**に、会話に近い語が入っていれば、**リンク無しでも自動で探す**ことがあります。\n" +
-      "・見つからないときは共有リンク（`https://docs.google.com/spreadsheets/d/...`）を送るか、\n" +
-      "・管理者が `GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID` を設定しているか、\n" +
-      "・一度「このシートを既定にして」とリンク付きで言って保存してください。";
+      "どのスプレッドシートを見るか、まだ特定できませんでした。\n\n" +
+      "こちらで次の順に巻き取ります。\n" +
+      "1. まず、あなたの Google ドライブで会話に近い**ファイル名**を自動検索します。\n" +
+      "2. 候補が複数ある場合は、こちらから**番号付き候補**を出します（番号だけ返信でOK）。\n" +
+      "3. 見つからない場合だけ、共有リンク（`https://docs.google.com/spreadsheets/d/...`）を1本ください。\n\n" +
+      "リンクを送ってくれたら、以後は「このシートを既定にして」で保存して次回から省略できます。";
     if (driveSearchInsufficientScope && googleUserOAuthEnvConfigured()) {
       draft +=
-        "\n\n※ **名前からの自動検索**には、Google 連携に **Drive（ファイル名の参照）** の許可が必要です。LINE で「**Google連携**」から、もう一度ブラウザで許可し直してください。";
+        "\n\nいまは Drive の参照権限が不足しているため、名前検索が使えません。LINE で「**Google連携**」と送って再許可すると、次回からリンクなしでも候補提示まで進められます。";
     }
     return {
       success: true,

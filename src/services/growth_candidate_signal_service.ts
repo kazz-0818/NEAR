@@ -174,20 +174,6 @@ export async function maybeRecordAgentPathGrowthSignals(input: {
   if (ft.includes(AGENT_EMPTY_REPLY_HINT)) reasons.push("agent_empty_or_fallback_reply");
   if (ft.includes(AGENT_STEP_BUDGET_HINT)) reasons.push("agent_step_budget_exhausted");
   if (ft.includes(AGENT_LOOP_END_HINT)) reasons.push("agent_max_steps_soft_stop");
-  if (input.toolsInvoked.length === 0 && [...input.userText.normalize("NFKC")].length >= 15) {
-    reasons.push("no_tools_invoked_long_user_message");
-  }
-  const uLen = [...input.userText.normalize("NFKC")].length;
-  const fLen = ft.length;
-  if (
-    input.toolsInvoked.length === 0 &&
-    uLen >= 20 &&
-    fLen > 0 &&
-    fLen < 120 &&
-    !looksLikeAgentSoftFailureReply(ft)
-  ) {
-    reasons.push("ambiguous_short_reply_no_tools");
-  }
 
   if (reasons.length === 0) return;
 

@@ -76,6 +76,21 @@ async function replyLineAndRememberOutbound(
   }
 }
 
+async function runNearAgentTurnWithTimeout(
+  input: Parameters<typeof runNearAgentTurn>[0],
+  timeoutMs: number
+): Promise<Awaited<ReturnType<typeof runNearAgentTurn>>> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`near agent timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+    runNearAgentTurn(input)
+      .then((r) => resolve(r))
+      .catch((e) => reject(e))
+      .finally(() => clearTimeout(timer));
+  });
+}
+
 function looksLikeWeakFaqDraft(draft: string): boolean {
   const t = draft.normalize("NFKC").trim();
   if (!t) return true;
@@ -333,7 +348,8 @@ export async function handleLineTextMessage(input: {
 
   if (shouldInvokeNearAgent(env, parsed.intent, routable, text)) {
     try {
-      const agentResult = await runNearAgentTurn({
+      const agentResult = await runNearAgentTurnWithTimeout(
+        {
         db,
         channel,
         channelUserId,
@@ -341,7 +357,9 @@ export async function handleLineTextMessage(input: {
         userText: text,
         recentUserMessages,
         recentAssistantMessages,
-      });
+      },
+        env.NEAR_AGENT_TIMEOUT_MS
+      );
       const trimmed = agentResult.text.trim();
       if (trimmed) {
         log.info(
@@ -504,7 +522,8 @@ export async function handleLineTextMessage(input: {
     let faqRetryFallbackDraft: string | null = null;
     if (shouldRetryFaqViaAgent) {
       try {
-        const agentRetry = await runNearAgentTurn({
+        const agentRetry = await runNearAgentTurnWithTimeout(
+          {
           db,
           channel,
           channelUserId,
@@ -512,7 +531,9 @@ export async function handleLineTextMessage(input: {
           userText: text,
           recentUserMessages,
           recentAssistantMessages,
-        });
+        },
+          env.NEAR_AGENT_TIMEOUT_MS
+        );
         const retried = agentRetry.text.trim();
         if (retried) {
           let finalText = retried;

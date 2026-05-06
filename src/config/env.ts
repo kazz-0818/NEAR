@@ -392,6 +392,15 @@ const envSchema = z.object({
       const n = parseInt(s, 10);
       return Number.isFinite(n) && n >= 1 && n <= 24 ? n : 8;
     }),
+  /** Agent 1ターンの待機上限ミリ秒（2000〜120000、既定 15000）。超過時はレガシーへフォールバック。 */
+  NEAR_AGENT_TIMEOUT_MS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 15000;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 2000 && n <= 120000 ? n : 15000;
+    }),
   /** false / 0 で Web 検索ツールを渡さない（コスト抑止・オフライン寄りテスト用） */
   NEAR_AGENT_WEB_SEARCH: z
     .string()

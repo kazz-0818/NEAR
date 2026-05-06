@@ -57,12 +57,10 @@ export function shouldInvokeNearAgent(
   }
 
   if (
-    userText &&
-    env.NEAR_AGENT_SHADOW &&
     env.NEAR_AGENT_SIMPLE_QUESTION_PRIMARY &&
     legacyRoutable &&
     intent === "simple_question" &&
-    looksLikeBroadAssistantIntent(userText)
+    (!userText || looksLikeBroadAssistantIntent(userText) || userText.trim().length >= 2)
   ) {
     return true;
   }

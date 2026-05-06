@@ -98,6 +98,19 @@ function looksLikeBroadConsultationFollowup(text: string, recentUserMessages: st
   return recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m));
 }
 
+function looksLikeShortEntityReply(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (t.length === 0 || t.length > 48) return false;
+  return /(です|だよ|です。|だよ。|です！|だよ！)$/.test(t) || /^[A-Za-z0-9][A-Za-z0-9 _-]{1,24}$/.test(t);
+}
+
+function buildBroadConsultationFallbackDraft(): string {
+  return (
+    "もちろんお手伝いできます。まずは実務で使える形で整理します。\n" +
+    "進め方は、①目的（売上・利益・認知のどれを優先するか）②対象（誰に売るか）③打ち手（集客・訴求・オファー）の3点を先に決めるのが最短です。"
+  );
+}
+
 export async function handleLineTextMessage(input: {
   db: Db;
   replyToken: string;
@@ -184,7 +197,9 @@ export async function handleLineTextMessage(input: {
 
       if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.52) {
         const shouldSkipClarifyForConsultation =
-          looksLikeBroadConsultation(text) || looksLikeBroadConsultationFollowup(text, recentUserMessages);
+          looksLikeBroadConsultation(text) ||
+          looksLikeBroadConsultationFollowup(text, recentUserMessages) ||
+          (looksLikeShortEntityReply(text) && recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m)));
         if (shouldSkipClarifyForConsultation) {
           log.info({ mode: interpretation.mode }, "secretary clarify skipped: prefer direct broad consultation answer");
         } else
@@ -266,6 +281,21 @@ export async function handleLineTextMessage(input: {
       needs_followup: false,
       followup_question: null,
       reason: "orchestrator_broad_consultation_rescue",
+      suggested_category: null,
+    };
+  }
+  if (
+    parsed.intent === "unknown_custom_request" &&
+    looksLikeShortEntityReply(text) &&
+    recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m))
+  ) {
+    parsed = {
+      ...parsed,
+      intent: "simple_question",
+      can_handle: true,
+      needs_followup: false,
+      followup_question: null,
+      reason: "orchestrator_broad_consultation_entity_followup_rescue",
       suggested_category: null,
     };
   }
@@ -515,14 +545,10 @@ export async function handleLineTextMessage(input: {
           return;
         }
         // Agent 再試行が空振りのときは、行き止まり文面をそのまま返さず最小限の巻き取り回答へ寄せる。
-        faqRetryFallbackDraft =
-          "もちろんお手伝いできます。まずは実務で使える形で整理します。\n" +
-          "物販マーケなら、①誰に売るか（顧客像）②何で選ばれるか（差別化）③どこで獲得するか（集客チャネル）の順で決めると進めやすいです。";
+        faqRetryFallbackDraft = buildBroadConsultationFallbackDraft();
       } catch (e) {
         log.warn({ err: e }, "faq weak/deflection retry via near agent failed; keep legacy response");
-        faqRetryFallbackDraft =
-          "もちろんお手伝いできます。まずは実務で使える形で整理します。\n" +
-          "物販マーケなら、①誰に売るか（顧客像）②何で選ばれるか（差別化）③どこで獲得するか（集客チャネル）の順で決めると進めやすいです。";
+        faqRetryFallbackDraft = buildBroadConsultationFallbackDraft();
       }
     }
 

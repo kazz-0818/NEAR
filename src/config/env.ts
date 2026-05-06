@@ -340,21 +340,21 @@ const envSchema = z.object({
     }),
   /**
    * true / 1 で有効。Responses API ベースのエージェント経路（Web 検索・カスタムツール）。
-   * 既定オフ。有効時も NEAR_AGENT_SHADOW でレガシー優先範囲を切り替え。
+   * 既定オン。NEAR_AGENT_SHADOW でレガシー優先範囲を切り替え。
    */
   NEAR_AGENT_ENABLED: z
     .string()
     .optional()
-    .transform((s) => s === "true" || s === "1"),
+    .transform((s) => (s === undefined || s.trim() === "" ? true : s === "true" || s === "1")),
   /**
-   * 既定 true（影モード）。true のとき、従来ルートで処理できる発話はレガシーのまま。
+   * 既定 false（GPT寄り）。true のとき、従来ルートで処理できる発話はレガシーのまま。
    * false のときは「エージェント担当 intent」（simple_question / unknown 等）をエージェントが主担当。
    */
   NEAR_AGENT_SHADOW: z
     .string()
     .optional()
     .transform((s) => {
-      if (s === undefined || s.trim() === "") return true;
+      if (s === undefined || s.trim() === "") return false;
       return !(s === "false" || s === "0");
     }),
   /**

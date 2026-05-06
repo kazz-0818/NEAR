@@ -9,8 +9,15 @@ const SHEETS_TOPIC_EXPLICIT =
 const ANALYZE_OR_CONTINUE_SHEETS =
   /(これ|それ|上|さっき|先|直前|このデータ|この表|この一覧|一覧).{0,30}(見て|読んで|分析|解析|どう思|教えて|解説|コメント|判断|説明)|分析(して|できますか|できる)|見て.{0,12}(判断|どう|分析)|^ニア[,、\s]*(これ|それ|上).{0,25}(見て|分析)/i;
 
-const SHEETS_NUMERIC_OR_OPINION_FOLLOWUP =
-  /\d{1,2}月(だけ|のみ|分)?\s*(の|で)?\s*(算出|集計|データ|結果|教えて|見て|出して|抽出|一覧|リスト|件|売上|売り上げ|売上高|売行|粗利|利益|実績|件数|個数|人数|台数|数量|注文|受注)|\d{1,2}月(について|の件|の分|の状況|の数字)|(?:^|[\s、。])(算出|集計|合計|平均(値)?|件数|内訳)(\s|を)?(して|してほしい|ください|お願い|できる)|どう思(う|います|いる)|所感|印象|読み取って|傾向|比較して|前年|先月|昨年|今月|四半期|\bQ[1-4]\b|増えた|減った|落ちた|上がった/i;
+const SHEETS_NUMERIC_FOLLOWUP =
+  /\d{1,2}月(だけ|のみ|分)?\s*(の|で)?\s*(算出|集計|データ|結果|教えて|見て|出して|抽出|一覧|リスト|件|売上|売り上げ|売上高|売行|粗利|利益|実績|件数|個数|人数|台数|数量|注文|受注)|\d{1,2}月(について|の件|の分|の状況|の数字)|(?:^|[\s、。])(算出|集計|合計|平均(値)?|件数|内訳)(\s|を)?(して|してほしい|ください|お願い|できる)|(?:^|[\s、。])(前年|先月|昨年|今月|四半期|\bQ[1-4]\b).{0,20}(比較|推移|増減|教えて|見て|分析)|(?:^|[\s、。])(増えた|減った|落ちた|上がった).{0,20}(理由|要因|傾向|内訳|比較)/i;
+
+/**
+ * 「比較して」「どう思う」など、一般質問にも出る曖昧語。
+ * 直近スレッドにシート文脈がある時だけ Sheets 追従とみなす。
+ */
+const AMBIGUOUS_SHEETS_OPINION_FOLLOWUP =
+  /(どう思(う|います|いる)|所感|印象|読み取って|傾向|比較して)/i;
 
 /** 第三者伝言調・レビュー依頼でもシート実読に回す（「〜とのことですね」「見てほしい」等） */
 export function indirectSheetReadOrReviewRequest(text: string): boolean {
@@ -81,10 +88,12 @@ function looksLikeShortSheetsContinuation(text: string, recentUserMessages: stri
 
 export function looksLikeSheetsThreadFollowUp(text: string, recentUserMessages: string[] = []): boolean {
   const t = text.trim();
+  const hadSheetsContext = recentUserThreadHadSheetsTopic(recentUserMessages);
   return (
     ANALYZE_OR_CONTINUE_SHEETS.test(t) ||
-    SHEETS_NUMERIC_OR_OPINION_FOLLOWUP.test(t) ||
+    SHEETS_NUMERIC_FOLLOWUP.test(t) ||
     roughSheetsBusinessRequest(t) ||
+    (AMBIGUOUS_SHEETS_OPINION_FOLLOWUP.test(t) && hadSheetsContext) ||
     looksLikeShortSheetsContinuation(t, recentUserMessages)
   );
 }
@@ -110,6 +119,6 @@ export function allowDefaultSheetPromotionWithoutUrl(text: string): boolean {
     ANALYZE_OR_CONTINUE_SHEETS.test(t) ||
     SHEETS_TOPIC_EXPLICIT.test(t) ||
     roughSheetsBusinessRequest(t) ||
-    SHEETS_NUMERIC_OR_OPINION_FOLLOWUP.test(t)
+    SHEETS_NUMERIC_FOLLOWUP.test(t)
   );
 }

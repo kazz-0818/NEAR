@@ -1,7 +1,19 @@
 import OpenAI from "openai";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
+import { loadLastQueriedSpreadsheet } from "../db/user_sheet_defaults_repo.js";
+import { SHEET_READ_SUCCESS_HEADER_REGEX } from "../lib/sheetReplyMarker.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
+
+const SHEET_URL_REQUEST_RE =
+  /URLリンク|url\s*リンク|スプレッド.{0,8}URL|URL.{0,8}スプレッド|シート.{0,8}URL|URL.{0,8}シート|リンク.{0,8}出|リンク.{0,8}教|リンク.{0,8}貼/iu;
+
+/** 前回のシート回答URLを要求しているかを判定 */
+function isAskingForSheetUrl(ctx: ModuleContext): boolean {
+  if (!SHEET_URL_REQUEST_RE.test(ctx.originalText)) return false;
+  const asst = ctx.recentAssistantMessages ?? [];
+  return asst.some((m) => SHEET_READ_SUCCESS_HEADER_REGEX.test(m));
+}
 
 function buildFaqUserContent(ctx: ModuleContext): string {
   const prev = ctx.recentUserMessages?.filter((s) => s.trim().length > 0) ?? [];
@@ -28,6 +40,24 @@ function buildFaqUserContent(ctx: ModuleContext): string {
 export async function faqAnswerer(ctx: ModuleContext): Promise<ModuleResult> {
   const env = getEnv();
   const log = getLogger();
+
+  // 直前のシート回答の URL を求めているケースを先に処理
+  if (isAskingForSheetUrl(ctx)) {
+    try {
+      const sheetId = await loadLastQueriedSpreadsheet(ctx.db, ctx.channelUserId);
+      if (sheetId) {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+        return {
+          success: true,
+          draft: `さっき参照したスプレッドシートのリンクです：\n${url}`,
+          situation: "success",
+        };
+      }
+    } catch (e) {
+      log.warn({ err: e }, "loadLastQueriedSpreadsheet failed in faqAnswerer");
+    }
+  }
+
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
   const hasAssistantContext = (ctx.recentAssistantMessages?.filter((s) => s.trim()).length ?? 0) > 0;

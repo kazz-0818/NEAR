@@ -2,11 +2,12 @@ import type { Db } from "./client.js";
 
 export type SheetPickOption = { id: string; name: string };
 
-/** 「1」「2番」など候補番号だけの短文 */
+/** 「1」「2番」「3版」など候補番号だけの短文 */
 export function isPendingSheetPickIndexMessage(text: string): boolean {
   const t = text.normalize("NFKC").trim();
   if (t.length > 14) return false;
-  return /^\s*([1-9]|1[0-5])\s*(番)?\s*$/u.test(t);
+  // 「番」「版」「個」などの助数詞、または数字のみを許容
+  return /^\s*([1-9]|1[0-5])\s*(番|版|個|番目|つ目)?\s*$/u.test(t);
 }
 
 export function parsePendingSheetPickIndex(text: string): number | null {

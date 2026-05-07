@@ -1,4 +1,8 @@
-import { loadUserSpreadsheetDefault, saveUserSpreadsheetDefault } from "../db/user_sheet_defaults_repo.js";
+import {
+  loadUserSpreadsheetDefault,
+  saveLastQueriedSpreadsheet,
+  saveUserSpreadsheetDefault,
+} from "../db/user_sheet_defaults_repo.js";
 import {
   clearPendingSpreadsheetConfirm,
   isSpreadsheetConfirmNegative,
@@ -327,6 +331,11 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
       effectiveQuery + (bookTitle ? `\n（ブック名の参考: ${bookTitle}）` : ""),
       sheetTitle,
       tsv
+    );
+
+    // 成功時に最後に使ったシートIDを記録（「URLリンク出して」に答えるため）
+    saveLastQueriedSpreadsheet(ctx.db, ctx.channelUserId, spreadsheetId).catch((e) =>
+      log.warn({ err: e }, "saveLastQueriedSpreadsheet failed")
     );
 
     const header = buildSheetReadSuccessHeader(sheetTitle, lastRow, spreadsheetId);

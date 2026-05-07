@@ -325,9 +325,79 @@ const REVOKE_RE = /^権限削除\s+(.+)$/u;
 const LIST_RE = /^権限一覧$/u;
 const CHECK_RE = /^権限確認\s+(.+)$/u;
 
+// 自然言語パターン
+// 「ゆうすけの権限を変えたい」「田中さんにメンバー権限」「権限変更」など
+const PERM_KEYWORD_RE = /権限(?:付与|削除|変更|確認|一覧|を変|に変|を付|を削|を教|を見|一覧)/u;
+const PERM_NATURAL_RE =
+  /(.{1,20}?)(?:さん|様|くん|ちゃん)?\s*の?\s*権限(?:を|に)?(?:変え|付け|付与|削除|変更|教え|確認|上げ|下げ|外し|はず)|権限(?:変更|付与|削除|確認)|(.{1,20}?)(?:さん|様)?\s*(?:に|の)\s*(?:メンバー|管理者|ゲスト|developer|admin|member|guest)\s*権限/ui;
+
 function isPermissionCommand(text: string): boolean {
   const t = text.normalize("NFKC").trim();
-  return GRANT_RE.test(t) || REVOKE_RE.test(t) || LIST_RE.test(t) || CHECK_RE.test(t);
+  return (
+    GRANT_RE.test(t) ||
+    REVOKE_RE.test(t) ||
+    LIST_RE.test(t) ||
+    CHECK_RE.test(t) ||
+    PERM_KEYWORD_RE.test(t) ||
+    PERM_NATURAL_RE.test(t)
+  );
+}
+
+const PERM_HELP = `権限管理コマンドの使い方:
+
+**付与:** \`権限付与 {名前または userId} {レベル}\`
+　例: \`権限付与 ゆうすけ member\`
+
+**削除:** \`権限削除 {名前または userId}\`
+　例: \`権限削除 田中\`
+
+**一覧:** \`権限一覧\`
+
+**確認:** \`権限確認 {名前または userId}\`
+
+レベル: \`guest\`（閲覧のみ）/ \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`（開発者）`;
+
+/**
+ * 自然言語から「誰の権限をどうしたいか」をざっくり解釈してコマンドに変換する。
+ * 完全な解釈ができない場合はヘルプと入力ガイドを返す。
+ */
+function tryParseNaturalPermCommand(t: string): {
+  op: "grant" | "revoke" | "list" | "check" | "help";
+  name?: string;
+  role?: UserRole | null;
+} {
+  // 一覧系
+  if (/権限一覧|権限.*一覧|一覧.*権限/u.test(t)) return { op: "list" };
+
+  // ロール名が含まれる → grant 判断
+  const roleInText = Object.keys(ROLE_ALIASES).find((k) =>
+    new RegExp(k, "iu").test(t)
+  );
+  const role: UserRole | null = roleInText ? (parseRole(roleInText) ?? null) : null;
+
+  // 名前の抽出: 「Xの権限」「Xさん」などの前の部分
+  const nameMatch =
+    t.match(/^(.{1,20}?)(?:さん|様|くん|ちゃん)?\s*の?\s*権限/u) ??
+    t.match(/^(.{1,20}?)(?:さん|様|くん|ちゃん)\s*(?:に|の)/u);
+  const name = nameMatch?.[1]?.trim();
+
+  // 削除系キーワード
+  if (/削除|外し|はず|取り消し|取消|remove|revoke/iu.test(t)) {
+    return { op: "revoke", name };
+  }
+
+  // 確認系
+  if (/確認|確かめ|調べ|見せ|教え/u.test(t) && !role) {
+    return { op: "check", name };
+  }
+
+  // 名前もロールも取れた → grant
+  if (name && role) return { op: "grant", name, role };
+
+  // 名前だけ取れた → 何にするか聞き返す
+  if (name) return { op: "help", name };
+
+  return { op: "help" };
 }
 
 /**
@@ -351,6 +421,7 @@ export async function tryHandlePermissionLine(input: {
     };
   }
 
+  // 厳密コマンドを先に処理
   const grantMatch = t.match(GRANT_RE);
   if (grantMatch) {
     const parts = grantMatch[1]!.trim().split(/\s+/);
@@ -373,5 +444,36 @@ export async function tryHandlePermissionLine(input: {
     return { handled: true, reply: await handleCheck(db, parts) };
   }
 
-  return { handled: false, reply: "" };
+  // 自然言語コマンドの解釈
+  const parsed = tryParseNaturalPermCommand(t);
+
+  if (parsed.op === "list") {
+    return { handled: true, reply: await handleList(db) };
+  }
+
+  if (parsed.op === "check" && parsed.name) {
+    return { handled: true, reply: await handleCheck(db, [parsed.name]) };
+  }
+
+  if (parsed.op === "grant" && parsed.name && parsed.role) {
+    return { handled: true, reply: await handleGrant(db, actorUserId, actorRole, [parsed.name, parsed.role]) };
+  }
+
+  if (parsed.op === "revoke" && parsed.name) {
+    return { handled: true, reply: await handleRevoke(db, actorUserId, actorRole, [parsed.name]) };
+  }
+
+  // 名前は取れたがロールが不明の場合 → 案内メッセージ
+  if (parsed.name) {
+    return {
+      handled: true,
+      reply:
+        `**${parsed.name}** さんの権限を変更しますね。どのレベルにしますか？\n\n` +
+        `例: \`権限付与 ${parsed.name} member\`\n\n` +
+        `レベル: \`guest\` / \`member\` / \`admin\` / \`developer\``,
+    };
+  }
+
+  // どれにも合わなかった → ヘルプ
+  return { handled: true, reply: PERM_HELP };
 }

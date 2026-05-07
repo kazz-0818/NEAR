@@ -223,8 +223,18 @@ async function handleCheck(db: Db, parts: string[]): Promise<string> {
 // ─── 保留フローの応答処理 ─────────────────────────────────────────────────────
 
 const YES_RE = /^(はい|yes|ok|確認|OK|よい|いいよ|よし)$/iu;
-const CANCEL_RE = /^(キャンセル|いいえ|no|やめ|やめて|やめる|cancel)$/iu;
+const CANCEL_RE = /^(キャンセル|いいえ|no|やめ|やめて|やめる|cancel|取り消し|取消|やっぱり(いい|なし|やめ))$/iu;
 const NUMBER_RE = /^\s*([1-9]\d?)\s*(?:番)?\s*$/u;
+
+/**
+ * 権限フローへの応答としては明らかに無関係な入力かを判定。
+ * - 15文字超 → 別の依頼の可能性が高い
+ * - 短くても「〜して」「〜出して」「〜教えて」などの依頼語尾があれば不関係
+ */
+function isLikelyUnrelated(t: string): boolean {
+  if (t.length > 15) return true;
+  return /(?:して|出して|教えて|見せて|調べて|探して|売り?上げ|シート|スプレ|確認して)/.test(t);
+}
 
 export async function tryConsumePendingPermOp(input: {
   db: Db;
@@ -249,21 +259,17 @@ export async function tryConsumePendingPermOp(input: {
   if (pending.stage === "await_role") {
     const roleParsed = parseRole(t);
     if (!roleParsed) {
-      // 短い発言でロールに一致しない場合だけエラーを返す
-      // 長い文・別の依頼っぽい内容ならキャンセルして通常処理に戻す
-      const isLikelyUnrelatedRequest = t.length > 20 || /出して|教えて|見て|売上|シート|確認|どう|何|ください/.test(t);
-      if (isLikelyUnrelatedRequest) {
+      if (isLikelyUnrelated(t)) {
         await deletePendingPermOp(db, actorUserId);
-        log.info({ actorUserId }, "await_role auto-cancelled: unrelated message detected");
+        log.info({ actorUserId, t }, "await_role auto-cancelled: unrelated message");
         return { handled: false, reply: "" };
       }
       return {
         handled: true,
-        reply: `「${t}」はレベルとして認識できませんでした。\n\`guest\` / \`member\` / \`admin\` / \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
+        reply: `「${t}」はレベルとして認識できませんでした。\n\`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
       };
     }
     const nameQuery = pending.notes ?? "";
-    // await_role を削除して名前検索フローを起動
     await deletePendingPermOp(db, actorUserId);
     const actorRole = await getUserRole(db, actorUserId);
     const reply = await startNameSearchFlow(db, actorUserId, actorRole, "grant", nameQuery, roleParsed, null, channelId);
@@ -274,8 +280,7 @@ export async function tryConsumePendingPermOp(input: {
   if (pending.stage === "pick") {
     const numMatch = t.match(NUMBER_RE);
     if (!numMatch) {
-      // 長い文・別の依頼なら自動キャンセル
-      if (t.length > 20 || /出して|教えて|見て|売上|シート|確認|どう|何|ください/.test(t)) {
+      if (isLikelyUnrelated(t)) {
         await deletePendingPermOp(db, actorUserId);
         return { handled: false, reply: "" };
       }
@@ -308,14 +313,16 @@ export async function tryConsumePendingPermOp(input: {
   // --- confirm ステージ: はい / キャンセル ---
   if (pending.stage === "confirm") {
     if (!YES_RE.test(t)) {
-      // 長い文・別の依頼なら自動キャンセル
-      if (t.length > 20 || /出して|教えて|見て|売上|シート|確認|どう|何|ください/.test(t)) {
+      if (isLikelyUnrelated(t)) {
         await deletePendingPermOp(db, actorUserId);
         return { handled: false, reply: "" };
       }
+      const opDesc = pending.opType === "grant"
+        ? `${ROLE_LABEL[pending.role ?? "member"]} 権限付与`
+        : "権限削除";
       return {
         handled: true,
-        reply: `「はい」か「キャンセル」で答えてください。\n（確認: **${pending.targetDisplayName ?? "?"}** 様への ${pending.opType === "grant" ? `${ROLE_LABEL[pending.role ?? "member"]} 権限付与` : "権限削除"}）`,
+        reply: `「はい」か「キャンセル」で答えてください。\n（**${pending.targetDisplayName ?? "?"}** 様への ${opDesc}）`,
       };
     }
 
@@ -415,11 +422,13 @@ function tryParseNaturalPermCommand(t: string): {
   );
   const role: UserRole | null = roleInText ? (parseRole(roleInText) ?? null) : null;
 
-  // 名前の抽出: 「Xの権限」「Xさん」などの前の部分
+  // 名前の抽出:「Xの権限」「Xに権限」「Xさん」等のパターン。
+  // [にへをのがは] は助詞であり名前に含めない（キャプチャ群の外に配置）。
   const nameMatch =
-    t.match(/^(.{1,20}?)(?:さん|様|くん|ちゃん)?\s*の?\s*権限/u) ??
+    t.match(/^(.{1,20}?)(?:さん|様|くん|ちゃん)?\s*[にへをのがは]?\s*権限/u) ??
     t.match(/^(.{1,20}?)(?:さん|様|くん|ちゃん)\s*(?:に|の)/u);
-  const name = nameMatch?.[1]?.trim();
+  // 末尾に助詞・敬称が残っていればトリム（lazy match の取り残し対策）
+  const name = nameMatch?.[1]?.replace(/[にへをのがは]\s*$/u, "").trim();
 
   // 削除系キーワード
   if (/削除|外し|はず|取り消し|取消|remove|revoke/iu.test(t)) {

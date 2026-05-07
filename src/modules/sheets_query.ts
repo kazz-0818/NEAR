@@ -119,7 +119,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   let driveSearchAttempted = false;
 
   /** spreadsheetId が無く、Google クライアントも無い → Drive 検索も呼べない（先に返す） */
-  if (!spreadsheetId && clientEntries.length === 0) {
+  if (!spreadsheetId && clientEntries.length === 0 && !env.GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID) {
     log.info(
       { channelUserId: ctx.channelUserId.slice(0, 12) },
       "sheets_query: no spreadsheet id and no sheets/drive clients (OAuth or service account)"
@@ -150,11 +150,14 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     };
   }
 
-  if (!spreadsheetId && clientEntries.length > 0) {
+  // Drive 名前検索は OAuth アカウントのみ（サービスアカウントは自分が共有されたファイルしか見えないため除外）
+  const driveSearchableEntries = clientEntries.filter((e) => !e.isServiceAccount);
+
+  if (!spreadsheetId && driveSearchableEntries.length > 0) {
     driveSearchAttempted = true;
     const driveLlmKeywords = await inferDriveSheetSearchKeywordsFromLlm(ctx.originalText);
     try {
-      for (const entry of clientEntries) {
+      for (const entry of driveSearchableEntries) {
         const outcome = await searchSpreadsheetByUserHint(
           entry.clients.drive,
           ctx.originalText,
@@ -199,7 +202,10 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
           };
         }
         if (outcome.kind === "insufficient_scope") {
-          driveSearchInsufficientScope = true;
+          // サービスアカウントのスコープ不足は OAuth 再連携では解決できないためフラグを立てない
+          if (!entry.isServiceAccount) {
+            driveSearchInsufficientScope = true;
+          }
         }
       }
     } catch (e) {

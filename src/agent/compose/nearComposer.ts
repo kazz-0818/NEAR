@@ -19,15 +19,6 @@ function normalizeDeflectionReply(text: string): string {
     /私の情報は20\d{2}年\d{1,2}月で止まって(?:いる|いて)(?:ため)?、?/g,
     "最新情報をこの場で断定するのが難しく、"
   );
-
-  const looksLikeDeflection =
-    /最新[^。\n]{0,30}(?:提供|お伝え|案内)[^。\n]{0,20}できません|情報は20\d{2}年\d{1,2}月[^。\n]{0,40}止まって|気象庁|公式アプリ|公式サイト/.test(
-      out
-    );
-  const hasPersonalHearingLine = /個人\s*LINE|個人ライン/.test(out);
-  if (looksLikeDeflection && !hasPersonalHearingLine) {
-    out += "\n\n必要なら個人LINEでヒアリングして、改善候補として進めます。";
-  }
   return out;
 }
 

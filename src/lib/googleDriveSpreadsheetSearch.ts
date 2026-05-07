@@ -221,7 +221,7 @@ function isInsufficientScopeError(err: unknown): boolean {
   return code === 403 || /Insufficient Permission|insufficient authentication scopes/i.test(msg);
 }
 
-/** 自動で1件に決めるのはスコア差がはっきりしたときだけ。それ以外は候補リストで選ばせる */
+/** ざっくりタイトルでも1件に絞れるよう、スコア差が十分なら自動選択する */
 function decideOutcome(ranked: ScoredHit[]): DriveSpreadsheetSearchOutcome {
   if (ranked.length === 0) return { kind: "none" };
   const top = ranked[0];
@@ -230,13 +230,13 @@ function decideOutcome(ranked: ScoredHit[]): DriveSpreadsheetSearchOutcome {
   }
   const second = ranked[1];
   const gap = top.score - second.score;
-  if (top.score >= 18 && gap >= 6) {
+  if (top.score >= 14 && gap >= 4) {
     return { kind: "one", id: top.id, name: top.name };
   }
-  if (top.score >= 22 && gap >= 4) {
+  if (top.score >= 18 && gap >= 3) {
     return { kind: "one", id: top.id, name: top.name };
   }
-  const cap = Math.min(8, ranked.length);
+  const cap = Math.min(5, ranked.length);
   return {
     kind: "pick_list",
     candidates: ranked.slice(0, cap).map(({ id, name }) => ({ id, name })),

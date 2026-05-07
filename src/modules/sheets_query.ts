@@ -170,11 +170,11 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
           } catch (e) {
             log.warn({ err: e }, "savePendingSheetPick failed");
           }
-          const lines = candidates.map((c, i) => `・${i + 1}. ${c.name}`);
+          const lines = candidates.map((c, i) => `${i + 1}. ${c.name}`);
           const draft =
-            "ざっくりした言い方でも検索しました。次の**候補**から選んでください。\n\n" +
+            "Drive でいくつか候補が見つかりました。どれですか？\n\n" +
             lines.join("\n") +
-            "\n\n**番号だけ**送れば開いて読みます（例: `1` または `2番`）。**ファイル名をそのまま**送ってもOKです。";
+            "\n\n番号だけ送ってください（例: `1`）。";
           return {
             success: true,
             draft,
@@ -191,21 +191,21 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   }
 
   if (!spreadsheetId) {
-    const searchedButNotFound =
-      driveSearchAttempted && !driveSearchInsufficientScope && clientEntries.length > 0;
-    let draft = searchedButNotFound
-      ? "Google ドライブでファイル名を検索しましたが、該当するスプレッドシートが見つかりませんでした。\n\n"
-      : "";
-    draft +=
-      "どのスプレッドシートを見るか、まだ特定できませんでした。\n\n" +
-      "こちらで次の順に巻き取ります。\n" +
-      "1. まず、あなたの Google ドライブで会話に近い**ファイル名**を自動検索します。\n" +
-      "2. 候補が複数ある場合は、こちらから**番号付き候補**を出します（番号だけ返信でOK）。\n" +
-      "3. 見つからない場合だけ、共有リンク（`https://docs.google.com/spreadsheets/d/...`）を1本ください。\n\n" +
-      "リンクを送ってくれたら、以後は「このシートを既定にして」で保存して次回から省略できます。";
+    let draft: string;
     if (driveSearchInsufficientScope && googleUserOAuthEnvConfigured()) {
-      draft +=
-        "\n\nいまは Drive の参照権限が不足しているため、名前検索が使えません。LINE で「**Google連携**」と送って再許可すると、次回からリンクなしでも候補提示まで進められます。";
+      draft =
+        "Drive の参照権限が不足しているため、ファイル名検索が使えない状態です。\n" +
+        "「**Google連携**」と送って再許可してもらえると、次回からリンクなしで探せます。\n\n" +
+        "今回はスプレッドシートのリンクを貼ってもらえますか？";
+    } else if (driveSearchAttempted) {
+      draft =
+        "Drive でファイル名を検索しましたが、ぴったりのスプレッドシートが見つかりませんでした。\n\n" +
+        "もう少し具体的なファイル名か、スプレッドシートのリンク（`https://docs.google.com/spreadsheets/d/...`）を送ってください。\n" +
+        "「このシートを既定にして」で保存しておくと、次回から省略できます。";
+    } else {
+      draft =
+        "スプレッドシートを特定できませんでした。\n\n" +
+        "ファイル名か、スプレッドシートのリンク（`https://docs.google.com/spreadsheets/d/...`）を送ってください。";
     }
     return {
       success: true,

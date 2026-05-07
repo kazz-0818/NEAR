@@ -1,4 +1,5 @@
 import {
+  loadLastQueriedSpreadsheet,
   loadUserSpreadsheetDefault,
   saveLastQueriedSpreadsheet,
   saveUserSpreadsheetDefault,
@@ -24,7 +25,7 @@ import {
   spreadsheetIdFromIntentParams,
 } from "../lib/googleSheetsAuth.js";
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
-import { buildSheetReadSuccessHeader } from "../lib/sheetReplyMarker.js";
+import { buildSheetReadSuccessHeader, SHEET_READ_SUCCESS_HEADER_REGEX } from "../lib/sheetReplyMarker.js";
 import { clipTsv, escapeSheetTitleForA1, resolveSheetTitle, valuesToTsv } from "../lib/sheetFormat.js";
 import { setActiveGoogleAccount } from "../db/user_google_oauth_accounts_repo.js";
 import { searchSpreadsheetByUserHint } from "../lib/googleDriveSpreadsheetSearch.js";
@@ -181,6 +182,24 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
 
   // Drive 名前検索は OAuth アカウントのみ（サービスアカウントは自分が共有されたファイルしか見えないため除外）
   const driveSearchableEntries = clientEntries.filter((e) => !e.isServiceAccount);
+
+  // シートIDがまだ無い場合、直近クエリのIDをフォールバックとして使う
+  // 「これ見てどう思う？」「さっきのデータ」など前回シートへの言及に対応
+  // 直前の NEAR 返答にシート回答（参照マーカー）があるかどうかも確認してから適用
+  if (!spreadsheetId) {
+    const FOLLOWUP_WORDS_RE =
+      /これ|それ|あれ|さっき|先ほど|前の|このデータ|そのデータ|あのデータ|さっきの|先ほどの|前のやつ|もう一度|再度|同じシート|同シート|どう思|所感|感想|コメント|分析|傾向/u;
+    const hadRecentSheetReply = (ctx.recentAssistantMessages ?? []).some((m) =>
+      SHEET_READ_SUCCESS_HEADER_REGEX.test(m)
+    );
+    if (FOLLOWUP_WORDS_RE.test(effectiveQuery) && hadRecentSheetReply) {
+      const lastId = await loadLastQueriedSpreadsheet(ctx.db, ctx.channelUserId).catch(() => null);
+      if (lastId && isValidSpreadsheetId(lastId)) {
+        spreadsheetId = lastId;
+        log.info({ spreadsheetId: lastId.slice(0, 8) }, "sheets_query: using last_queried_spreadsheet for followup");
+      }
+    }
+  }
 
   if (!spreadsheetId && driveSearchableEntries.length > 0) {
     driveSearchAttempted = true;

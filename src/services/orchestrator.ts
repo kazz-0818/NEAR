@@ -157,6 +157,9 @@ export async function handleLineTextMessage(input: {
     return;
   }
 
+  // thinRouter から強制 intent が返った場合は secretary 層・intent 分類をスキップして直接処理する
+  const thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
+
   let recentUserMessages: string[] = [];
   let recentAssistantMessages: string[] = [];
   try {
@@ -180,7 +183,7 @@ export async function handleLineTextMessage(input: {
     return;
   }
 
-  if (!env.NEAR_SECRETARY_LAYER_DISABLED) {
+  if (!env.NEAR_SECRETARY_LAYER_DISABLED && !thinForceIntent) {
     try {
       const interpretation = await interpretSecretaryRequest({
         userText: text,
@@ -274,20 +277,35 @@ export async function handleLineTextMessage(input: {
   }
 
   let parsed: ParsedIntent;
-  try {
-    parsed = await classifyIntent(text);
-  } catch (e) {
-    log.error({ err: e }, "classifyIntent threw");
+  if (thinForceIntent) {
+    // thinRouter が強制指定した intent（secretary 層・LLM 分類スキップ）
+    log.info({ forceIntent: thinForceIntent }, "using thinRouter forceIntent");
     parsed = {
-      intent: "unknown_custom_request",
-      confidence: 0,
-      can_handle: false,
+      intent: thinForceIntent as ParsedIntent["intent"],
+      confidence: 1,
+      can_handle: true,
       required_params: {},
       needs_followup: false,
       followup_question: null,
-      reason: "分類エラー",
-      suggested_category: "システム安定化",
+      reason: "thinRouter_force",
+      suggested_category: null,
     };
+  } else {
+    try {
+      parsed = await classifyIntent(text);
+    } catch (e) {
+      log.error({ err: e }, "classifyIntent threw");
+      parsed = {
+        intent: "unknown_custom_request",
+        confidence: 0,
+        can_handle: false,
+        required_params: {},
+        needs_followup: false,
+        followup_question: null,
+        reason: "分類エラー",
+        suggested_category: "システム安定化",
+      };
+    }
   }
 
   try {

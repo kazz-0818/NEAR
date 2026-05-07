@@ -89,14 +89,21 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     env.GOOGLE_SHEETS_DEFAULT_SPREADSHEET_ID?.trim() ??
     null;
 
+  let restoredOriginalQuery: string | null = null;
   if (!spreadsheetId) {
     try {
-      const pickedId = await tryConsumePendingSheetPick(ctx.db, ctx.channelUserId, ctx.originalText);
-      if (pickedId && isValidSpreadsheetId(pickedId)) spreadsheetId = pickedId;
+      const pickResult = await tryConsumePendingSheetPick(ctx.db, ctx.channelUserId, ctx.originalText);
+      if (pickResult && isValidSpreadsheetId(pickResult.spreadsheetId)) {
+        spreadsheetId = pickResult.spreadsheetId;
+        restoredOriginalQuery = pickResult.originalQuery;
+      }
     } catch (e) {
       log.warn({ err: e }, "tryConsumePendingSheetPick failed");
     }
   }
+
+  // 候補選択（番号送信）で元の質問文が復元された場合はそちらを優先して使う
+  const effectiveQuery = restoredOriginalQuery ?? ctx.originalText;
 
   if (!spreadsheetId) {
     try {
@@ -155,12 +162,12 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
 
   if (!spreadsheetId && driveSearchableEntries.length > 0) {
     driveSearchAttempted = true;
-    const driveLlmKeywords = await inferDriveSheetSearchKeywordsFromLlm(ctx.originalText);
+    const driveLlmKeywords = await inferDriveSheetSearchKeywordsFromLlm(effectiveQuery);
     try {
       for (const entry of driveSearchableEntries) {
         const outcome = await searchSpreadsheetByUserHint(
           entry.clients.drive,
-          ctx.originalText,
+          effectiveQuery,
           driveLlmKeywords
         );
         if (outcome.kind === "one") {
@@ -185,7 +192,8 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
             await savePendingSheetPick(
               ctx.db,
               ctx.channelUserId,
-              candidates.map((c) => ({ id: c.id, name: c.name }))
+              candidates.map((c) => ({ id: c.id, name: c.name })),
+              ctx.originalText  // 元の質問文を保存
             );
           } catch (e) {
             log.warn({ err: e }, "savePendingSheetPick failed");
@@ -298,7 +306,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
       };
     }
 
-    const pickedRaw = await pickSheetWithLlm(ctx.originalText, titles);
+    const pickedRaw = await pickSheetWithLlm(effectiveQuery, titles);
     const sheetTitle = resolveSheetTitle(pickedRaw, titles);
     const rowCount =
       meta.data.sheets?.find((s) => s.properties?.title === sheetTitle)?.properties?.gridProperties?.rowCount ??
@@ -316,7 +324,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     const tsv = clipTsv(valuesToTsv(valuesRes.data.values as unknown[][]));
     const bookTitle = meta.data.properties?.title ?? "";
     const answer = await answerSheetQuestionWithLlm(
-      ctx.originalText + (bookTitle ? `\n（ブック名の参考: ${bookTitle}）` : ""),
+      effectiveQuery + (bookTitle ? `\n（ブック名の参考: ${bookTitle}）` : ""),
       sheetTitle,
       tsv
     );

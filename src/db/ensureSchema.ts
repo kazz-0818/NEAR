@@ -34,6 +34,7 @@ const MIGRATION_FILES = [
   "025_tasks_group_support.sql",
   "026_user_roles.sql",
   "027_pending_perm_ops.sql",
+  "028_sheet_pending_pick_original_query.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

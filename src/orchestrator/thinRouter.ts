@@ -15,10 +15,14 @@ import {
 } from "../services/google_oauth_user_line.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
 import { tryHandlePermissionLine, tryConsumePendingPermOp } from "../services/permission_line.js";
+import {
+  hasPendingSheetPick,
+  isPendingSheetPickIndexMessage,
+} from "../db/user_sheet_pending_pick_repo.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
-  | { handled: false };
+  | { handled: false; forceIntent?: string };
 
 /**
  * LLM 意図分類より前の決定的ルート（成長・OAuth・テンプレ系）。
@@ -35,6 +39,16 @@ export async function runThinRouterPhase(input: {
   const { db, env, channelUserId, actorUserId, text, lineSourceType } = input;
 
   const effectiveActorId = actorUserId ?? channelUserId;
+
+  // スプレッドシート候補選択の保留がある場合、番号メッセージを google_sheets_query に強制ルーティング
+  // （intent 分類前にここで判断しないと「1」が別 intent に誤分類される）
+  if (isPendingSheetPickIndexMessage(text)) {
+    const hasPick = await hasPendingSheetPick(db, channelUserId).catch(() => false);
+    if (hasPick) {
+      log.info({ channelUserId }, "pending sheet pick detected — forcing google_sheets_query");
+      return { handled: false, forceIntent: "google_sheets_query" };
+    }
+  }
 
   // 権限操作の保留応答（はい / 番号 / キャンセル）を最優先で処理
   const pendingPerm = await tryConsumePendingPermOp({ db, actorUserId: effectiveActorId, text });

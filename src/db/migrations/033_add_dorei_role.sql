@@ -1,7 +1,7 @@
--- 奴隷ロールの追加
--- レベル: dorei(0) < guest(1) < member(2) < admin(3) < developer(4)
+-- 奴隷ロール(slave)の追加
+-- レベル: slave(0) < guest(1) < member(2) < admin(3) < developer(4)
 -- 未登録ユーザーのデフォルトは引き続き guest。
--- dorei は明示的に付与しないと付かない（最低限の挨拶のみ可）。
+-- slave は明示的に付与しないと付かない（最低限の挨拶のみ可）。
 
 -- user_roles の CHECK 制約を更新
 ALTER TABLE user_roles
@@ -9,7 +9,7 @@ ALTER TABLE user_roles
 
 ALTER TABLE user_roles
   ADD CONSTRAINT user_roles_role_check
-    CHECK (role IN ('dorei', 'guest', 'member', 'admin', 'developer'));
+    CHECK (role IN ('slave', 'guest', 'member', 'admin', 'developer'));
 
 -- pending_perm_ops の role 列も同様に許容
 -- （CHECK が無い場合はスキップ）

@@ -1,6 +1,6 @@
 import type { Db } from "./client.js";
 
-export type UserRole = "dorei" | "guest" | "member" | "admin" | "developer";
+export type UserRole = "slave" | "guest" | "member" | "admin" | "developer";
 
 export type UserRoleRecord = {
   lineUserId: string;
@@ -59,7 +59,7 @@ export async function listUserRoles(db: Db): Promise<UserRoleRecord[]> {
      FROM user_roles
      WHERE role != 'guest'
      ORDER BY
-       CASE role WHEN 'developer' THEN 1 WHEN 'admin' THEN 2 WHEN 'member' THEN 3 WHEN 'dorei' THEN 5 ELSE 4 END,
+       CASE role WHEN 'developer' THEN 1 WHEN 'admin' THEN 2 WHEN 'member' THEN 3 WHEN 'slave' THEN 5 ELSE 4 END,
        granted_at ASC`
   );
   return r.rows.map((row) => ({

@@ -3,7 +3,7 @@ import type { IntentName } from "../models/intent.js";
 
 /** 権限レベルの数値（比較用） */
 export const ROLE_LEVEL: Record<UserRole, number> = {
-  dorei: 0,
+  slave: 0,
   guest: 1,
   member: 2,
   admin: 3,
@@ -11,7 +11,7 @@ export const ROLE_LEVEL: Record<UserRole, number> = {
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  dorei: "奴隷",
+  slave: "奴隷",
   guest: "ゲスト",
   member: "メンバー",
   admin: "管理者",
@@ -20,7 +20,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
 
 /** intent ごとに必要な最低権限 */
 const INTENT_REQUIRED_ROLE: Partial<Record<IntentName, UserRole>> = {
-  greeting: "dorei",           // 挨拶だけは奴隷でも可
+  greeting: "slave",            // 挨拶だけは奴隷でも可
   simple_question: "guest",
   help_capabilities: "guest",
   unknown_custom_request: "guest",

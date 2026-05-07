@@ -22,10 +22,10 @@ const log = getLogger();
 // ─── ロール別名 ──────────────────────────────────────────────────────────────
 
 const ROLE_ALIASES: Record<string, UserRole> = {
-  dorei: "dorei",
-  奴隷: "dorei",
-  どれい: "dorei",
-  slave: "dorei",
+  slave: "slave",
+  奴隷: "slave",
+  どれい: "slave",
+  dorei: "slave",
   guest: "guest",
   ゲスト: "guest",
   member: "member",

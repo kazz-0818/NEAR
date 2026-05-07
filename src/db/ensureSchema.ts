@@ -40,6 +40,7 @@ const MIGRATION_FILES = [
   "031_pending_perm_await_role.sql",
   "032_pending_perm_channel_scope.sql",
   "033_add_dorei_role.sql",
+  "034_fix_slave_constraint.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

@@ -270,7 +270,7 @@ export async function tryConsumePendingPermOp(input: {
       }
       return {
         handled: true,
-        reply: `「${t}」はレベルとして認識できませんでした。\n\`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
+        reply: `「${t}」はレベルとして認識できませんでした。\n\`slave\`（奴隷）/ \`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
       };
     }
     const nameQuery = pending.notes ?? "";
@@ -330,38 +330,51 @@ export async function tryConsumePendingPermOp(input: {
       };
     }
 
-    // 実行
-    await deletePendingPermOp(db, actorUserId);
+    // 実行（先に操作を完了させてから pending を削除する）
     const targetId = pending.targetLineUserId!;
     const displayName = pending.targetDisplayName ?? shortId(targetId);
 
-    if (pending.opType === "grant") {
-      const role = pending.role!;
-      const actorRole = await getUserRole(db, actorUserId);
-      if (!canGrantRole(actorRole, role)) {
-        return { handled: true, reply: `権限が変わったため、この操作は実行できませんでした。` };
+    try {
+      if (pending.opType === "grant") {
+        const role = pending.role!;
+        const actorRole = await getUserRole(db, actorUserId);
+        if (!canGrantRole(actorRole, role)) {
+          await deletePendingPermOp(db, actorUserId);
+          return { handled: true, reply: `権限が変わったため、この操作は実行できませんでした。` };
+        }
+        const currentRole = await getUserRole(db, targetId);
+        await upsertUserRole(db, targetId, role, actorUserId, pending.notes);
+        await deletePendingPermOp(db, actorUserId);
+        log.info({ targetId, role, actorUserId }, "user role granted (via name search)");
+        return {
+          handled: true,
+          reply: `${displayName} 様の権限を **${ROLE_LABEL[currentRole]}** → **${ROLE_LABEL[role]}** に変更しました。${pending.notes ? `\nメモ: ${pending.notes}` : ""}`,
+        };
+      } else {
+        const actorRole = await getUserRole(db, actorUserId);
+        const currentRole = await getUserRole(db, targetId);
+        if (currentRole === "guest") {
+          await deletePendingPermOp(db, actorUserId);
+          return { handled: true, reply: `${displayName} 様はすでにゲストです。` };
+        }
+        if (!canGrantRole(actorRole, currentRole)) {
+          await deletePendingPermOp(db, actorUserId);
+          return { handled: true, reply: `その権限レベルは削除できません。` };
+        }
+        await deleteUserRole(db, targetId);
+        await deletePendingPermOp(db, actorUserId);
+        log.info({ targetId, actorUserId }, "user role revoked (via name search)");
+        return {
+          handled: true,
+          reply: `${displayName} 様の権限（${ROLE_LABEL[currentRole]}）を削除し、ゲストに戻しました。`,
+        };
       }
-      const currentRole = await getUserRole(db, targetId);
-      await upsertUserRole(db, targetId, role, actorUserId, pending.notes);
-      log.info({ targetId, role, actorUserId }, "user role granted (via name search)");
+    } catch (execErr) {
+      log.error({ err: execErr, targetId, actorUserId }, "tryConsumePendingPermOp: execution failed");
+      // pending はそのまま残し、ユーザーに再試行を促す
       return {
         handled: true,
-        reply: `${displayName} 様の権限を **${ROLE_LABEL[currentRole]}** → **${ROLE_LABEL[role]}** に変更しました。${pending.notes ? `\nメモ: ${pending.notes}` : ""}`,
-      };
-    } else {
-      const actorRole = await getUserRole(db, actorUserId);
-      const currentRole = await getUserRole(db, targetId);
-      if (currentRole === "guest") {
-        return { handled: true, reply: `${displayName} 様はすでにゲストです。` };
-      }
-      if (!canGrantRole(actorRole, currentRole)) {
-        return { handled: true, reply: `その権限レベルは削除できません。` };
-      }
-      await deleteUserRole(db, targetId);
-      log.info({ targetId, actorUserId }, "user role revoked (via name search)");
-      return {
-        handled: true,
-        reply: `${displayName} 様の権限（${ROLE_LABEL[currentRole]}）を削除し、ゲストに戻しました。`,
+        reply: `権限変更の実行中にエラーが発生しました。もう一度「はい」を送るか、「キャンセル」してやり直してください。`,
       };
     }
   }
@@ -406,7 +419,7 @@ const PERM_HELP = `権限管理コマンドの使い方:
 
 **確認:** \`権限確認 {名前または userId}\`
 
-レベル: \`guest\`（閲覧のみ）/ \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`（開発者）`;
+レベル: \`slave\`（奴隷）/ \`guest\`（閲覧のみ）/ \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`（開発者）`;
 
 /**
  * 自然言語から「誰の権限をどうしたいか」をざっくり解釈してコマンドに変換する。
@@ -535,7 +548,7 @@ export async function tryHandlePermissionLine(input: {
       handled: true,
       reply:
         `**${parsed.name}** さんの権限を変更しますね。どのレベルにしますか？\n\n` +
-        `\`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`\n\n` +
+        `\`slave\`（奴隷）/ \`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`\n\n` +
         `例: \`member\` とだけ送ってください。キャンセルは「キャンセル」。`,
     };
   }

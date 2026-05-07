@@ -2,7 +2,7 @@
 export const NEAR_AGENT_SOFT_FAILURE_SUBSTRING = "外部の情報を取りに行く処理で一時的にうまくいきませんでした";
 
 export function nearAgentSoftFailureMessage(): string {
-  return `${NEAR_AGENT_SOFT_FAILURE_SUBSTRING}。言い換えて聞いてもらえると助かります。`;
+  return `${NEAR_AGENT_SOFT_FAILURE_SUBSTRING}。少し時間を置いてもう一度お試しください。`;
 }
 
 export function looksLikeAgentSoftFailureReply(text: string): boolean {

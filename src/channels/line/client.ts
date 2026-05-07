@@ -4,12 +4,22 @@ import { getLogger } from "../../lib/logger.js";
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 
+/** LINE テキストメッセージの上限は 5000 文字。超えると API エラーになり無返信になるため安全にカットする */
+const LINE_TEXT_MAX_CHARS = 5000;
+const LINE_TEXT_TRUNCATION_SUFFIX = "\n…（文字数の上限に達したため、続きは分けて聞いてください）";
+
+function safeTruncateLineText(text: string): string {
+  if ([...text].length <= LINE_TEXT_MAX_CHARS) return text;
+  const limit = LINE_TEXT_MAX_CHARS - [...LINE_TEXT_TRUNCATION_SUFFIX].length;
+  return [...text].slice(0, limit).join("") + LINE_TEXT_TRUNCATION_SUFFIX;
+}
+
 export async function replyText(replyToken: string, text: string): Promise<void> {
   const env = getEnv();
   const log = getLogger();
   const body = {
     replyToken,
-    messages: [{ type: "text", text }],
+    messages: [{ type: "text", text: safeTruncateLineText(text) }],
   };
   const res = await fetch(LINE_REPLY_URL, {
     method: "POST",
@@ -45,7 +55,7 @@ export async function pushText(userId: string, text: string): Promise<void> {
   const log = getLogger();
   const body = {
     to: userId,
-    messages: [{ type: "text", text }],
+    messages: [{ type: "text", text: safeTruncateLineText(text) }],
   };
   const res = await fetch(LINE_PUSH_URL, {
     method: "POST",

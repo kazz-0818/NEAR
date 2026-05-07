@@ -20,7 +20,9 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
 
   const relative = parseRelativeReminderAt(ctx.originalText, now);
   let iso = relative ?? parseIso(p.datetime_iso);
+  let pastTimeDetected = false;
   if (iso && !relative && isReminderTimeInPast(iso, now)) {
+    pastTimeDetected = true;
     iso = null;
   }
 
@@ -38,6 +40,15 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
     };
   }
 
+  if (pastTimeDetected) {
+    return {
+      success: true,
+      draft:
+        "指定された時刻はすでに過ぎています。改めて日付とお時間をお知らせいただけますか？（例: 「明日の10時」「30分後」）",
+      situation: "followup",
+    };
+  }
+
   if (ctx.intent.needs_followup && ctx.intent.followup_question) {
     return {
       success: true,
@@ -49,7 +60,7 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
   return {
     success: true,
     draft:
-      "リマインドのご依頼、承知しました。お手数ですが、日付とお時間を「4月5日10時」のように具体的にお知らせいただけますでしょうか。",
+      "リマインドの日付とお時間を教えてください。「4月5日10時」「30分後」のように送ってもらえると設定します。",
     situation: "followup",
   };
 }

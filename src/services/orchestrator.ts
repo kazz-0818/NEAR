@@ -121,8 +121,8 @@ function looksLikeShortEntityReply(text: string): boolean {
 
 function buildBroadConsultationFallbackDraft(): string {
   return (
-    "もちろんお手伝いできます。まずは実務で使える形で整理します。\n" +
-    "進め方は、①目的（売上・利益・認知のどれを優先するか）②対象（誰に売るか）③打ち手（集客・訴求・オファー）の3点を先に決めるのが最短です。"
+    "もちろんお手伝いできます。何を整理したいか、もう少し教えてもらえますか？\n" +
+    "ゴール・対象・現状のどれかを一言添えてもらえると、すぐ動けます。"
   );
 }
 

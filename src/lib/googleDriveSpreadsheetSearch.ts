@@ -216,9 +216,13 @@ export type DriveSpreadsheetSearchOutcome =
 
 function isInsufficientScopeError(err: unknown): boolean {
   const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : String(err);
-  const code =
-    err && typeof err === "object" && "code" in err ? Number((err as { code?: unknown }).code) : NaN;
-  return code === 403 || /Insufficient Permission|insufficient authentication scopes/i.test(msg);
+  // API 未有効化や共有外ファイルの 403 を誤検知しないよう、スコープ不足特有のメッセージのみ対象にする
+  return /Insufficient Permission|insufficient authentication scopes/i.test(msg);
+}
+
+function isApiNotEnabledError(err: unknown): boolean {
+  const msg = err && typeof err === "object" && "message" in err ? String((err as Error).message) : String(err);
+  return /has not been used|it is disabled|API.*not.*enabled|Enable it by visiting/i.test(msg);
 }
 
 /** ざっくりタイトルでも1件に絞れるよう、スコア差が十分なら自動選択する */
@@ -297,6 +301,7 @@ export async function searchSpreadsheetByUserHint(
     return decideOutcome(floorRanked);
   } catch (e) {
     if (isInsufficientScopeError(e)) return { kind: "insufficient_scope" };
+    if (isApiNotEnabledError(e)) return { kind: "insufficient_scope" }; // API 未有効化も同じ案内
     throw e;
   }
 }

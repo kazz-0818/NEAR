@@ -217,12 +217,12 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     let draft: string;
     if (driveSearchInsufficientScope && googleUserOAuthEnvConfigured()) {
       draft =
-        "以前の「Google連携」では **Drive の参照スコープ**が含まれていなかったため、ファイル名での自動検索ができません。\n\n" +
-        "【対処方法】\n" +
-        "1. LINE で「**Google連携**」と送る\n" +
-        "2. 届いた URL をブラウザで開く\n" +
-        "3. Google の許可画面で **Drive・スプレッドシート・カレンダー** にチェックを入れて再許可\n\n" +
-        "再許可完了後は、ファイル名だけでシートを探せるようになります。\n" +
+        "Drive でのファイル名検索ができない状態です。\n\n" +
+        "**考えられる原因と対処：**\n\n" +
+        "① **Google Drive API が未有効** の場合\n" +
+        "　GCP の「APIとサービス」→「ライブラリ」で `Google Drive API` を検索して有効化\n\n" +
+        "② **Drive スコープが未許可** の場合\n" +
+        "　LINE で「**Google連携**」→ URL を開く → Drive・スプレッドシート・カレンダーにチェックして再許可\n\n" +
         "今回はスプレッドシートの **URL** を貼ってもらえれば読み取りできます。";
     } else if (driveSearchAttempted) {
       draft =

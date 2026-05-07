@@ -32,6 +32,7 @@ const MIGRATION_FILES = [
   "024_user_profiles.sql",
   "025_tasks_group_support.sql",
   "026_user_roles.sql",
+  "027_pending_perm_ops.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

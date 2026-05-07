@@ -13,7 +13,7 @@ import {
   tryHandleGoogleOAuthUserLine,
 } from "../services/google_oauth_user_line.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
-import { tryHandlePermissionLine } from "../services/permission_line.js";
+import { tryHandlePermissionLine, tryConsumePendingPermOp } from "../services/permission_line.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
@@ -33,8 +33,15 @@ export async function runThinRouterPhase(input: {
   const log = getLogger();
   const { db, env, channelUserId, actorUserId, text, lineSourceType } = input;
 
-  // 権限管理コマンド（admin 以上のユーザーが送った場合）
   const effectiveActorId = actorUserId ?? channelUserId;
+
+  // 権限操作の保留応答（はい / 番号 / キャンセル）を最優先で処理
+  const pendingPerm = await tryConsumePendingPermOp({ db, actorUserId: effectiveActorId, text });
+  if (pendingPerm.handled) {
+    return { handled: true, finalText: pendingPerm.reply };
+  }
+
+  // 権限管理コマンド（admin 以上のユーザーが送った場合）
   const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, text });
   if (permResult.handled) {
     return { handled: true, finalText: permResult.reply };

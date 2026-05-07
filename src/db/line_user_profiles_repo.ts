@@ -26,6 +26,25 @@ export async function upsertLineUserProfile(
   );
 }
 
+/** 部分一致で display_name を検索（最大10件） */
+export async function searchLineUserProfilesByName(
+  db: Db,
+  query: string
+): Promise<{ lineUserId: string; displayName: string }[]> {
+  const r = await db.query<{ line_user_id: string; display_name: string }>(
+    `SELECT line_user_id, display_name
+     FROM line_user_profiles
+     WHERE display_name ILIKE $1
+     ORDER BY last_seen_at DESC
+     LIMIT 10`,
+    [`%${query.replace(/[%_\\]/g, "\\$&")}%`]
+  );
+  return r.rows.map((row) => ({
+    lineUserId: row.line_user_id,
+    displayName: row.display_name,
+  }));
+}
+
 export async function getLineUserProfile(db: Db, lineUserId: string): Promise<LineUserProfile | null> {
   const r = await db.query<{
     line_user_id: string;

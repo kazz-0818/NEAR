@@ -37,14 +37,21 @@ export function textContainsNearNameReferral(raw: string): boolean {
 }
 
 /**
- * テキスト先頭にある bot 名呼びかけ（「ニア」「NEAR」＋ 空白・句読点）を除去する。
- * 例: "ニア　ザキの権限変更したい" → "ザキの権限変更したい"
+ * テキスト先頭にある bot 名呼びかけを除去する。
+ * 対応形式:
+ *   - 「ニア　ザキの権限変更したい」→「ザキの権限変更したい」
+ *   - 「@NEAR-ニア- メンバー」→「メンバー」（LINE グループのメンション形式）
+ *   - 「`member`」→「member」（バッククォート除去も行う）
  */
 export function stripBotNamePrefix(text: string): string {
-  const t = text.normalize("NFKC").trimStart();
-  return t
-    .replace(/^(?:ニア|NEAR)\s*[、,，　\s]*(?=\S)/iu, "")
-    .trimStart();
+  let t = text.normalize("NFKC").trimStart();
+  // LINE グループのメンション形式: @{任意の表示名} (例: @NEAR-ニア-)
+  t = t.replace(/^@[^\s　,、，。！!？?\u0000-\u001f\u007f]+\s*/u, "").trimStart();
+  // 「ニア」「NEAR」単体の呼びかけ
+  t = t.replace(/^(?:ニア|NEAR)\s*[、,，　\s]*(?=\S)/iu, "").trimStart();
+  // バッククォートで囲まれたロール名を展開（「`member`」→「member」）
+  t = t.replace(/^`([^`]+)`$/u, "$1").trimStart();
+  return t;
 }
 
 /** グループなら groupId、トークルームなら roomId（それ以外は undefined） */

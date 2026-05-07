@@ -18,14 +18,46 @@ export function formatJstNowIsoForPrompt(from: Date = new Date()): string {
   return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}:${g("second")}+09:00`;
 }
 
-/** 意図分類 API に渡すユーザー欄（先頭に現在時刻コンテキスト） */
-export function buildIntentUserEnvelope(userText: string, from: Date = new Date()): string {
+export type IntentUserEnvelopeContext = {
+  recentUserMessages?: string[];
+  recentAssistantMessages?: string[];
+};
+
+/** 意図分類 API に渡すユーザー欄（先頭に現在時刻 + 会話履歴コンテキスト） */
+export function buildIntentUserEnvelope(
+  userText: string,
+  from: Date = new Date(),
+  context: IntentUserEnvelopeContext = {}
+): string {
   const iso = formatJstNowIsoForPrompt(from);
   const weekday = new Intl.DateTimeFormat("ja-JP", {
     timeZone: TZ,
     weekday: "long",
   }).format(from);
-  return `[参照: 現在は日本時間(JST) ${iso}（${weekday}）です。相対指定（○分後・○時間後など）はこの時刻を起点にし、reminder_request の datetime_iso にはその絶対時刻の ISO8601（タイムゾーン付き）を入れてください。]\n\n---\n\n${userText}`;
+
+  const header = `[参照: 現在は日本時間(JST) ${iso}（${weekday}）です。相対指定（○分後・○時間後など）はこの時刻を起点にし、reminder_request の datetime_iso にはその絶対時刻の ISO8601（タイムゾーン付き）を入れてください。]`;
+
+  const prevUser = (context.recentUserMessages ?? []).filter((s) => s.trim()).slice(-6);
+  const prevAsst = (context.recentAssistantMessages ?? []).filter((s) => s.trim()).slice(-4);
+
+  const contextBlocks: string[] = [];
+  if (prevUser.length > 0) {
+    const lines = prevUser.map((s, i) => `${i + 1}. ${s.length > 300 ? s.slice(0, 300) + "…" : s}`).join("\n");
+    contextBlocks.push(`[直近の会話（ユーザー側・古い順）:\n${lines}\n]`);
+  }
+  if (prevAsst.length > 0) {
+    const lines = prevAsst.map((s, i) => `${i + 1}. ${s.length > 400 ? s.slice(0, 400) + "…" : s}`).join("\n");
+    contextBlocks.push(`[直近の会話（NEAR 側・古い順）:\n${lines}\n]`);
+  }
+
+  const parts = [header];
+  if (contextBlocks.length > 0) {
+    parts.push(...contextBlocks);
+    parts.push("[上記の会話の流れを踏まえて、今回の発言の意図を分類してください。続き・省略・代名詞は前の文脈から補完する。]");
+  }
+  parts.push(`---\n\n${userText}`);
+
+  return parts.join("\n\n");
 }
 
 /**

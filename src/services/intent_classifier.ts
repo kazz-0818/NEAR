@@ -22,7 +22,15 @@ async function getSystemPrompt(): Promise<string> {
   return systemPromptCache;
 }
 
-export async function classifyIntent(userText: string): Promise<ParsedIntent> {
+export type ClassifyIntentOptions = {
+  recentUserMessages?: string[];
+  recentAssistantMessages?: string[];
+};
+
+export async function classifyIntent(
+  userText: string,
+  options: ClassifyIntentOptions = {}
+): Promise<ParsedIntent> {
   const heuristic = matchIntentHeuristic(userText);
   if (heuristic) {
     return heuristic;
@@ -33,12 +41,17 @@ export async function classifyIntent(userText: string): Promise<ParsedIntent> {
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
   const system = await getSystemPrompt();
 
+  const userContent = buildIntentUserEnvelope(userText, undefined, {
+    recentUserMessages: options.recentUserMessages,
+    recentAssistantMessages: options.recentAssistantMessages,
+  });
+
   try {
     const completion = await client.chat.completions.create({
       model: env.OPENAI_INTENT_MODEL,
       messages: [
         { role: "system", content: system },
-        { role: "user", content: buildIntentUserEnvelope(userText) },
+        { role: "user", content: userContent },
       ],
       response_format: {
         type: "json_schema",

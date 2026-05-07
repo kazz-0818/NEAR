@@ -3,6 +3,11 @@ import type { Db } from "../db/client.js";
 export type LoadRecentUserMessagesOptions = {
   limit?: number;
   maxCharsPerMessage?: number;
+  /**
+   * グループ会話のとき、発言したユーザーの LINE userId を指定すると
+   * そのユーザー固有の発言履歴を取得できる（未指定時は channel_user_id のみで検索）
+   */
+  actorUserId?: string;
 };
 
 /**
@@ -37,19 +42,33 @@ export async function loadRecentUserMessages(
   beforeInboundId: number,
   options: LoadRecentUserMessagesOptions = {}
 ): Promise<string[]> {
-  const limit = options.limit ?? 12;
-  const maxChars = options.maxCharsPerMessage ?? 800;
+  const limit = options.limit ?? 16;
+  const maxChars = options.maxCharsPerMessage ?? 1000;
+  const actorUserId = options.actorUserId;
 
-  const res = await db.query<{ text: string }>(
-    `SELECT text FROM inbound_messages
-     WHERE channel = $1 AND channel_user_id = $2
-       AND id < $3
-       AND text IS NOT NULL
-       AND btrim(text) <> ''
-     ORDER BY id DESC
-     LIMIT $4`,
-    [channel, channelUserId, beforeInboundId, limit]
-  );
+  // グループでは actor_user_id（発言者）を優先して絞り込む。なければ channel_user_id で取得。
+  const res = actorUserId
+    ? await db.query<{ text: string }>(
+        `SELECT text FROM inbound_messages
+         WHERE channel = $1
+           AND (actor_user_id = $2 OR (actor_user_id IS NULL AND channel_user_id = $2))
+           AND id < $3
+           AND text IS NOT NULL
+           AND btrim(text) <> ''
+         ORDER BY id DESC
+         LIMIT $4`,
+        [channel, actorUserId, beforeInboundId, limit]
+      )
+    : await db.query<{ text: string }>(
+        `SELECT text FROM inbound_messages
+         WHERE channel = $1 AND channel_user_id = $2
+           AND id < $3
+           AND text IS NOT NULL
+           AND btrim(text) <> ''
+         ORDER BY id DESC
+         LIMIT $4`,
+        [channel, channelUserId, beforeInboundId, limit]
+      );
 
   const chronological = [...res.rows].reverse();
   return chronological.map((r) => {
@@ -69,7 +88,7 @@ export async function loadRecentAssistantMessages(
   beforeInboundId: number,
   options: LoadRecentUserMessagesOptions = {}
 ): Promise<string[]> {
-  const limit = options.limit ?? 8;
+  const limit = options.limit ?? 10;
   const maxChars = options.maxCharsPerMessage ?? 12000;
 
   const res = await db.query<{ text: string }>(

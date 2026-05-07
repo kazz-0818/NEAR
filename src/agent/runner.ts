@@ -28,12 +28,12 @@ function collectFunctionCalls(output: Response["output"]): ResponseFunctionToolC
 function buildAgentUserContent(input: NearAgentTurnInput): string {
   const prevU = input.recentUserMessages
     .filter((s) => s.trim())
-    .slice(-6)
+    .slice(-10)
     .map((s, i) => `${i + 1}. ${s.trim()}`)
     .join("\n");
   const prevA = input.recentAssistantMessages
     .filter((s) => s.trim())
-    .slice(-4)
+    .slice(-6)
     .map((s, i) => `${i + 1}. ${s.trim()}`)
     .join("\n\n");
 

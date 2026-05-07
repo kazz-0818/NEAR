@@ -151,6 +151,7 @@ async function lineMessagingWebhook(c: Context) {
     const { id: inboundId, isDuplicate } = await saveInboundMessage(db, {
       channel: "line",
       channelUserId: userId,
+      actorUserId: userId,  // グループでも発言者の userId が取れる
       messageId,
       messageType,
       text: messageType === "text" ? String(message.text ?? "") : null,

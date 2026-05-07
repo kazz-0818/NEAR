@@ -163,7 +163,10 @@ export async function handleLineTextMessage(input: {
   let recentUserMessages: string[] = [];
   let recentAssistantMessages: string[] = [];
   try {
-    recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId);
+    // グループ会話では actorUserId を渡して発言者固有の履歴を取得
+    recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId, {
+      actorUserId: actorUserId ?? undefined,
+    });
     recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId);
   } catch (ctxErr) {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
@@ -292,7 +295,7 @@ export async function handleLineTextMessage(input: {
     };
   } else {
     try {
-      parsed = await classifyIntent(text);
+      parsed = await classifyIntent(text, { recentUserMessages, recentAssistantMessages });
     } catch (e) {
       log.error({ err: e }, "classifyIntent threw");
       parsed = {

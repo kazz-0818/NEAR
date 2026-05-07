@@ -52,6 +52,23 @@ async function fetchLineGroupMemberProfile(
 }
 
 /**
+ * DBキャッシュだけ見て表示名を返す（LINE API は呼ばない）。
+ * 高速・ノンブロッキング。キャッシュ未存在なら null。
+ * プロフィール更新は fireAndForgetRefreshProfile に任せる。
+ */
+export async function resolveDisplayNameCacheOnly(
+  db: Db,
+  userId: string
+): Promise<string | null> {
+  try {
+    const cached = await getLineUserProfile(db, userId);
+    return cached?.displayName ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * ユーザーの表示名を取得する。
  * DBキャッシュがあればそれを使い、なければLINE APIで取得してDBに保存する。
  * 失敗時は null を返す（呼び出し元は graceful に処理する）。

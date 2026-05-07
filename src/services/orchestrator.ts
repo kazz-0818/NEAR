@@ -21,7 +21,7 @@ import {
   loadRecentAssistantMessages,
   loadRecentUserMessages,
 } from "./conversation_context.js";
-import { resolveDisplayName } from "../lib/lineUserProfile.js";
+import { resolveDisplayNameCacheOnly } from "../lib/lineUserProfile.js";
 import { getUserRole } from "../db/user_roles_repo.js";
 import { hasRole, insufficientRoleMessage, requiredRoleForIntent } from "../lib/permissions.js";
 import {
@@ -142,8 +142,10 @@ export async function handleLineTextMessage(input: {
   const log = getLogger();
   const { db, replyToken, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType } = input;
 
+  // キャッシュのみ参照（LINE API を同期で呼ばない）。
+  // 実際の取得は index.ts の fireAndForgetRefreshProfile が非同期で行う。
   const actorDisplayName = actorUserId
-    ? (await resolveDisplayName(db, actorUserId, groupId).catch(() => null)) ?? undefined
+    ? (await resolveDisplayNameCacheOnly(db, actorUserId).catch(() => null)) ?? undefined
     : undefined;
   const channel = "line";
   const env = getEnv();

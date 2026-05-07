@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPool } from "./client.js";
+import { getLogger } from "../lib/logger.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -35,12 +36,55 @@ const MIGRATION_FILES = [
   "027_pending_perm_ops.sql",
 ] as const;
 
-/** Idempotent: safe to run on every server start. */
+const CREATE_MIGRATION_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS schema_migrations (
+    filename   TEXT        PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`;
+
+/** 適用済みマイグレーション一覧をセットで返す */
+async function loadApplied(pool: ReturnType<typeof getPool>): Promise<Set<string>> {
+  try {
+    const r = await pool.query<{ filename: string }>("SELECT filename FROM schema_migrations");
+    return new Set(r.rows.map((row) => row.filename));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * 未適用のマイグレーションだけを実行する（初回起動以外は高速）。
+ * schema_migrations テーブルで適用済みを追跡するため、
+ * 既存の SQL は全て IF NOT EXISTS / DO NOTHING 形式で冪等になっている前提。
+ */
 export async function ensureSchema(): Promise<void> {
+  const log = getLogger();
   const pool = getPool();
-  for (const name of MIGRATION_FILES) {
+
+  // migrations 追跡テーブルを確保
+  await pool.query(CREATE_MIGRATION_TABLE_SQL);
+
+  const applied = await loadApplied(pool);
+  const pending = MIGRATION_FILES.filter((f) => !applied.has(f));
+
+  if (pending.length === 0) {
+    log.info("ensureSchema: all migrations already applied, nothing to do");
+    return;
+  }
+
+  log.info({ count: pending.length }, "ensureSchema: applying pending migrations");
+
+  for (const name of pending) {
     const sqlPath = join(__dirname, "migrations", name);
     const sql = await readFile(sqlPath, "utf-8");
     await pool.query(sql);
+    await pool.query(
+      "INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
+      [name]
+    );
+    log.info({ migration: name }, "migration applied");
   }
+
+  log.info({ count: pending.length }, "ensureSchema: done");
 }

@@ -23,6 +23,22 @@ export async function evaluateGrowthSuggestionEligibility(input: {
     return { allow: true, reason: "gate_disabled" };
   }
 
+  // 定型インテントは絶対に成長候補にしない（正常動作しているものを誤検知しないよう明示的にブロック）
+  const ALWAYS_HANDLED_INTENTS = new Set([
+    "greeting",
+    "help_capabilities",
+    "simple_question",
+    "task_create",
+    "memo_save",
+    "summarize",
+    "reminder_request",
+    "google_sheets_query",
+    "google_calendar_query",
+  ]);
+  if (ALWAYS_HANDLED_INTENTS.has(input.parsed.intent)) {
+    return { allow: false, reason: "always_handled_intent" };
+  }
+
   const trimmed = input.text.normalize("NFKC").trim();
   const improvementKind: ImprovementKind = inferImprovementKind(input.text, input.parsed);
   const fingerprint = messageFingerprint(input.text);

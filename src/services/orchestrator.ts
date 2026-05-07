@@ -298,6 +298,22 @@ export async function handleLineTextMessage(input: {
     log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");
   }
 
+  // 「何ができる」「使い方」系が unknown に落ちたら help_capabilities へ救済する
+  if (
+    parsed.intent === "unknown_custom_request" &&
+    /何ができ|できること|使い方|ヘルプ|help|何ができますか|何を手伝|何が使え|機能一覧|機能は何/iu.test(text.normalize("NFKC"))
+  ) {
+    parsed = {
+      ...parsed,
+      intent: "help_capabilities",
+      can_handle: true,
+      needs_followup: false,
+      followup_question: null,
+      reason: "orchestrator_help_capabilities_rescue",
+      suggested_category: null,
+    };
+  }
+
   // GPT寄り運用: 一般相談が unknown に落ちたら simple_question へ救済して会話で巻き取る。
   if (parsed.intent === "unknown_custom_request" && looksLikeBroadConsultation(text)) {
     parsed = {

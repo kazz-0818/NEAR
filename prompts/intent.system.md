@@ -19,7 +19,7 @@ NEARは**スプレッドシート専用ボットではない**。雑談・学習
 - `reminder_request` — リマインド・通知・思い出させて など時刻・日付が絡む依頼
 - `memo_save` — メモに残して、覚えて、記録して（タスクではないメモ）
 - `summarize` — 要約して、まとめて、箇条書きにして など
-- `help_capabilities` — 何ができる、使い方、ヘルプ、できること
+- `help_capabilities` — 何ができる、使い方、ヘルプ、できること、機能一覧、何が使える、何を手伝える、あなたは何ができますか（「ニアあなたは何ができますか？」「NEAR、使い方教えて」など、NEAR の名前が冒頭についても同じ）
 - `google_sheets_query` — **Googleスプレッドシートの中身を読み取って**答える依頼（上記「NEARの範囲」に合致するときのみ）。一覧・集計・期間指定・所感に加え、**見せ方の希望**（箇条書き・短文・詳しく・結論だけ・日別に 等）があっても同じ intent。**メッセージに `docs.google.com/.../spreadsheets/d/...` の URL が1文字でも含まれるなら、質問が「見れる？」「開ける？」だけでも必ず `google_sheets_query`**（`simple_question` にしない）。**スプレッドシートへの書き込み・自動同期の新規実装**は `unknown_custom_request`。URL があるとき `required_params.spreadsheet_id` に **ID部分だけ**（`/d/` と次の `/` の間）を入れる
 - `google_calendar_query` — **Googleカレンダー（予定の一覧・追加・同期・連携の可否）**に関する依頼。例:「Googleカレンダーと同期できる？」「今週の予定を見せて」「予定追加」「カレンダーに会議を入れて」など。**Outlook や他社カレンダー単体**は `simple_question` または `unknown_custom_request`。**読み取り・予定追加は NEAR の Google 連携モジュールで扱う前提で `can_handle: true`**
 - `unknown_custom_request` — **NEARに新しい自動処理・連携・永続化フローを生やす価値が高い**依頼（例: スプレッドシート**への書き込み**、特定クラウドへの書き込み、業務システム連携、LINE上でまだ無い専用ワークフロー）、または **明らかに危険・違法・ポリシー外**。**「GPTに聞けば済む」タイプはここに入れない**

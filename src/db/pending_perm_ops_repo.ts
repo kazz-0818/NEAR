@@ -23,7 +23,7 @@ export async function savePendingPermOp(db: Db, op: PendingPermOp): Promise<void
     `INSERT INTO pending_perm_ops
        (actor_line_user_id, op_type, stage, candidates_json, target_line_user_id,
         target_display_name, role, notes, channel_id, expires_at)
-     VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9, now() + interval '10 minutes')
+     VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9, now() + interval '3 minutes')
      ON CONFLICT (actor_line_user_id) DO UPDATE SET
        op_type             = EXCLUDED.op_type,
        stage               = EXCLUDED.stage,

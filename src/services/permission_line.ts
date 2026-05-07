@@ -249,7 +249,14 @@ export async function tryConsumePendingPermOp(input: {
   if (pending.stage === "await_role") {
     const roleParsed = parseRole(t);
     if (!roleParsed) {
-      // ロールとして認識できない場合はもう一度聞く
+      // 短い発言でロールに一致しない場合だけエラーを返す
+      // 長い文・別の依頼っぽい内容ならキャンセルして通常処理に戻す
+      const isLikelyUnrelatedRequest = t.length > 20 || /出して|教えて|見て|売上|シート|確認|どう|何|ください/.test(t);
+      if (isLikelyUnrelatedRequest) {
+        await deletePendingPermOp(db, actorUserId);
+        log.info({ actorUserId }, "await_role auto-cancelled: unrelated message detected");
+        return { handled: false, reply: "" };
+      }
       return {
         handled: true,
         reply: `「${t}」はレベルとして認識できませんでした。\n\`guest\` / \`member\` / \`admin\` / \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
@@ -267,6 +274,11 @@ export async function tryConsumePendingPermOp(input: {
   if (pending.stage === "pick") {
     const numMatch = t.match(NUMBER_RE);
     if (!numMatch) {
+      // 長い文・別の依頼なら自動キャンセル
+      if (t.length > 20 || /出して|教えて|見て|売上|シート|確認|どう|何|ください/.test(t)) {
+        await deletePendingPermOp(db, actorUserId);
+        return { handled: false, reply: "" };
+      }
       return {
         handled: true,
         reply: `番号（1〜${pending.candidates.length}）か「キャンセル」を送ってください。`,
@@ -296,6 +308,11 @@ export async function tryConsumePendingPermOp(input: {
   // --- confirm ステージ: はい / キャンセル ---
   if (pending.stage === "confirm") {
     if (!YES_RE.test(t)) {
+      // 長い文・別の依頼なら自動キャンセル
+      if (t.length > 20 || /出して|教えて|見て|売上|シート|確認|どう|何|ください/.test(t)) {
+        await deletePendingPermOp(db, actorUserId);
+        return { handled: false, reply: "" };
+      }
       return {
         handled: true,
         reply: `「はい」か「キャンセル」で答えてください。\n（確認: **${pending.targetDisplayName ?? "?"}** 様への ${pending.opType === "grant" ? `${ROLE_LABEL[pending.role ?? "member"]} 権限付与` : "権限削除"}）`,

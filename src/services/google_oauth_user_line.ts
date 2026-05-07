@@ -105,24 +105,57 @@ export async function tryHandleGoogleDiagnostic(input: {
   lines.push(`サービスアカウント: ${saOk ? "✓ 設定済み" : "✗ 未設定"}`);
 
   // 連携アカウント
+  const REQUIRED_SCOPES = ["drive.metadata.readonly", "spreadsheets.readonly", "calendar.events"] as const;
+  const requiredScopePatterns = REQUIRED_SCOPES.map((s) => new RegExp(s.replace(".", "\\."), "i"));
+
   if (oauthEnvOk) {
     const accounts = await listGoogleAccountsForLine(input.db, input.channelUserId);
     lines.push(`\n連携アカウント数: ${accounts.length} 件`);
     if (accounts.length > 0) {
       const pairs = await listGoogleOAuthTokenPairsOrdered(input.db, input.channelUserId);
       const validSubs = new Set(pairs.map((p) => p.googleSub));
+
+      // scope 情報を DB から取得
+      const scopeMap = new Map<string, string>();
+      for (const a of accounts) {
+        const r = await input.db.query<{ scope: string | null }>(
+          `SELECT scope FROM user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
+          [input.channelUserId, a.googleSub]
+        );
+        scopeMap.set(a.googleSub, r.rows[0]?.scope ?? "");
+      }
+
+      let anyNeedsReauth = false;
       for (let i = 0; i < accounts.length; i++) {
         const a = accounts[i]!;
         const tokenOk = validSubs.has(a.googleSub);
         const mark = a.isActive ? "★" : "　";
         const label = a.email ?? "（メール未取得）";
-        const tokenStatus = tokenOk ? "トークン✓" : "⚠ トークン復号失敗（再連携が必要）";
-        lines.push(`  ${mark} ${i + 1}. ${label} — ${tokenStatus}`);
+
+        if (!tokenOk) {
+          lines.push(`  ${mark} ${i + 1}. ${label} — ⚠ トークン復号失敗（再連携が必要）`);
+          anyNeedsReauth = true;
+          continue;
+        }
+
+        const scope = scopeMap.get(a.googleSub) ?? "";
+        const missingScopes = REQUIRED_SCOPES.filter((_, si) => !requiredScopePatterns[si]!.test(scope));
+        if (missingScopes.length > 0) {
+          lines.push(`  ${mark} ${i + 1}. ${label} — ⚠ スコープ不足: ${missingScopes.join(", ")} が未許可`);
+          anyNeedsReauth = true;
+        } else {
+          lines.push(`  ${mark} ${i + 1}. ${label} — トークン✓ スコープ✓`);
+        }
+      }
+
+      if (anyNeedsReauth) {
+        lines.push("\n⚠ 再連携が必要なアカウントがあります。");
+        lines.push("→「**Google連携**」を送って、ブラウザで再許可してください。");
+        lines.push("  （Google の許可画面で Drive・スプレッドシート・カレンダーにチェックを入れてください）");
       }
       if (pairs.length === 0) {
         lines.push("\n⚠ 全アカウントのトークンが復号できません。");
         lines.push("原因: GOOGLE_OAUTH_TOKEN_SECRET が変わった可能性があります。");
-        lines.push("→ もう一度「**Google連携**」を送って、ブラウザで再許可してください。");
       }
     } else {
       lines.push("→ まだ連携していません。「**Google連携**」を送ってください。");

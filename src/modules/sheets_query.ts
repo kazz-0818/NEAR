@@ -211,9 +211,13 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
     let draft: string;
     if (driveSearchInsufficientScope && googleUserOAuthEnvConfigured()) {
       draft =
-        "Drive の参照権限が不足しているため、ファイル名検索が使えない状態です。\n" +
-        "「**Google連携**」と送って再許可してもらえると、次回からリンクなしで探せます。\n\n" +
-        "今回はスプレッドシートのリンクを貼ってもらえますか？";
+        "以前の「Google連携」では **Drive の参照スコープ**が含まれていなかったため、ファイル名での自動検索ができません。\n\n" +
+        "【対処方法】\n" +
+        "1. LINE で「**Google連携**」と送る\n" +
+        "2. 届いた URL をブラウザで開く\n" +
+        "3. Google の許可画面で **Drive・スプレッドシート・カレンダー** にチェックを入れて再許可\n\n" +
+        "再許可完了後は、ファイル名だけでシートを探せるようになります。\n" +
+        "今回はスプレッドシートの **URL** を貼ってもらえれば読み取りできます。";
     } else if (driveSearchAttempted) {
       draft =
         "Drive でファイル名を検索しましたが、ぴったりのスプレッドシートが見つかりませんでした。\n\n" +

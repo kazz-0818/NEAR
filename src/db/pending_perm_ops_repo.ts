@@ -14,14 +14,16 @@ export type PendingPermOp = {
   /** await_role ステージのとき: 検索に使った名前文字列を notes に格納 */
   role: UserRole | null;
   notes: string | null;
+  /** グループID または "1on1"。別グループに pending が引き継がれないようにスコープを絞る */
+  channelId: string;
 };
 
 export async function savePendingPermOp(db: Db, op: PendingPermOp): Promise<void> {
   await db.query(
     `INSERT INTO pending_perm_ops
        (actor_line_user_id, op_type, stage, candidates_json, target_line_user_id,
-        target_display_name, role, notes, expires_at)
-     VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8, now() + interval '10 minutes')
+        target_display_name, role, notes, channel_id, expires_at)
+     VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9, now() + interval '10 minutes')
      ON CONFLICT (actor_line_user_id) DO UPDATE SET
        op_type             = EXCLUDED.op_type,
        stage               = EXCLUDED.stage,
@@ -30,6 +32,7 @@ export async function savePendingPermOp(db: Db, op: PendingPermOp): Promise<void
        target_display_name = EXCLUDED.target_display_name,
        role                = EXCLUDED.role,
        notes               = EXCLUDED.notes,
+       channel_id          = EXCLUDED.channel_id,
        expires_at          = EXCLUDED.expires_at`,
     [
       op.actorLineUserId,
@@ -40,11 +43,16 @@ export async function savePendingPermOp(db: Db, op: PendingPermOp): Promise<void
       op.targetDisplayName,
       op.role,
       op.notes,
+      op.channelId,
     ]
   );
 }
 
-export async function getPendingPermOp(db: Db, actorLineUserId: string): Promise<PendingPermOp | null> {
+export async function getPendingPermOp(
+  db: Db,
+  actorLineUserId: string,
+  channelId: string
+): Promise<PendingPermOp | null> {
   const r = await db.query<{
     op_type: string;
     stage: string;
@@ -53,11 +61,12 @@ export async function getPendingPermOp(db: Db, actorLineUserId: string): Promise
     target_display_name: string | null;
     role: string | null;
     notes: string | null;
+    channel_id: string | null;
   }>(
-    `SELECT op_type, stage, candidates_json, target_line_user_id, target_display_name, role, notes
+    `SELECT op_type, stage, candidates_json, target_line_user_id, target_display_name, role, notes, channel_id
      FROM pending_perm_ops
-     WHERE actor_line_user_id = $1 AND expires_at > now()`,
-    [actorLineUserId]
+     WHERE actor_line_user_id = $1 AND channel_id = $2 AND expires_at > now()`,
+    [actorLineUserId, channelId]
   );
   const row = r.rows[0];
   if (!row) return null;
@@ -73,6 +82,7 @@ export async function getPendingPermOp(db: Db, actorLineUserId: string): Promise
     targetDisplayName: row.target_display_name,
     role: row.role as UserRole | null,
     notes: row.notes,
+    channelId: row.channel_id ?? channelId,
   };
 }
 

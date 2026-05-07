@@ -32,13 +32,16 @@ export async function runThinRouterPhase(input: {
   env: Env;
   channelUserId: string;
   actorUserId?: string;
+  groupId?: string;
   text: string;
   lineSourceType?: string;
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, actorUserId, text, lineSourceType } = input;
+  const { db, env, channelUserId, actorUserId, groupId, text, lineSourceType } = input;
 
   const effectiveActorId = actorUserId ?? channelUserId;
+  // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
+  const channelId = groupId ?? effectiveActorId;
 
   // スプレッドシート候補選択の保留がある場合、番号/短文を google_sheets_query に強制ルーティング
   // （intent 分類前にここで判断しないと「1」「最初のやつ」などが別 intent に誤分類される）
@@ -57,13 +60,13 @@ export async function runThinRouterPhase(input: {
   }
 
   // 権限操作の保留応答（はい / 番号 / キャンセル）を最優先で処理
-  const pendingPerm = await tryConsumePendingPermOp({ db, actorUserId: effectiveActorId, text });
+  const pendingPerm = await tryConsumePendingPermOp({ db, actorUserId: effectiveActorId, channelId, text });
   if (pendingPerm.handled) {
     return { handled: true, finalText: pendingPerm.reply };
   }
 
   // 権限管理コマンド（admin 以上のユーザーが送った場合）
-  const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, text });
+  const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, channelId, text });
   if (permResult.handled) {
     return { handled: true, finalText: permResult.reply };
   }

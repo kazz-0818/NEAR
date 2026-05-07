@@ -38,6 +38,7 @@ const MIGRATION_FILES = [
   "029_inbound_actor_user_id.sql",
   "030_user_sheet_last_queried.sql",
   "031_pending_perm_await_role.sql",
+  "032_pending_perm_channel_scope.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

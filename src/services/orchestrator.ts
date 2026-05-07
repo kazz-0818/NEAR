@@ -151,7 +151,7 @@ export async function handleLineTextMessage(input: {
   const env = getEnv();
   const outboundCtx = { channel, channelUserId, inboundMessageId };
 
-  const thin = await runThinRouterPhase({ db, env, channelUserId, actorUserId, text, lineSourceType });
+  const thin = await runThinRouterPhase({ db, env, channelUserId, actorUserId, groupId, text, lineSourceType });
   if (thin.handled) {
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
     return;

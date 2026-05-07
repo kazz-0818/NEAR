@@ -36,6 +36,17 @@ export function textContainsNearNameReferral(raw: string): boolean {
   return /(^|[^A-Za-z0-9])NEAR([^A-Za-z0-9]|$)/i.test(n);
 }
 
+/**
+ * テキスト先頭にある bot 名呼びかけ（「ニア」「NEAR」＋ 空白・句読点）を除去する。
+ * 例: "ニア　ザキの権限変更したい" → "ザキの権限変更したい"
+ */
+export function stripBotNamePrefix(text: string): string {
+  const t = text.normalize("NFKC").trimStart();
+  return t
+    .replace(/^(?:ニア|NEAR)\s*[、,，　\s]*(?=\S)/iu, "")
+    .trimStart();
+}
+
 /** グループなら groupId、トークルームなら roomId（それ以外は undefined） */
 export function getLineGroupOrRoomId(source: Record<string, unknown> | undefined): string | undefined {
   if (!source) return undefined;

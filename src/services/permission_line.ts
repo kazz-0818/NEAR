@@ -15,6 +15,7 @@ import {
   type PendingPermCandidate,
 } from "../db/pending_perm_ops_repo.js";
 import { getLogger } from "../lib/logger.js";
+import { stripBotNamePrefix } from "../channels/line/groupMention.js";
 
 const log = getLogger();
 
@@ -78,7 +79,8 @@ async function startNameSearchFlow(
   opType: "grant" | "revoke",
   nameQuery: string,
   role: UserRole | null,
-  notes: string | null
+  notes: string | null,
+  channelId: string
 ): Promise<string> {
   if (!canGrantRole(actorRole, role ?? "member")) {
     return `${ROLE_LABEL[actorRole]}は ${ROLE_LABEL[role ?? "member"]} の付与権限がありません。`;
@@ -100,7 +102,6 @@ async function startNameSearchFlow(
   }));
 
   if (candidates.length === 1) {
-    // 確認ステージへ
     const c = candidates[0]!;
     await savePendingPermOp(db, {
       actorLineUserId: actorUserId,
@@ -111,6 +112,7 @@ async function startNameSearchFlow(
       targetDisplayName: c.displayName,
       role,
       notes,
+      channelId,
     });
     return buildConfirmMessage(c.displayName, opType, role);
   }
@@ -125,13 +127,14 @@ async function startNameSearchFlow(
     targetDisplayName: null,
     role,
     notes,
+    channelId,
   });
   return buildPickMessage(candidates, opType, role);
 }
 
 // ─── コマンドパーサ ───────────────────────────────────────────────────────────
 
-async function handleGrant(db: Db, actorUserId: string, actorRole: UserRole, parts: string[]): Promise<string> {
+async function handleGrant(db: Db, actorUserId: string, actorRole: UserRole, parts: string[], channelId: string): Promise<string> {
   if (parts.length < 2) {
     return "書き方: `権限付与 {名前または userId} {レベル}`（例: `権限付与 田中 member`）";
   }
@@ -157,10 +160,10 @@ async function handleGrant(db: Db, actorUserId: string, actorRole: UserRole, par
   }
 
   // 名前検索フロー
-  return startNameSearchFlow(db, actorUserId, actorRole, "grant", target, targetRole, notes);
+  return startNameSearchFlow(db, actorUserId, actorRole, "grant", target, targetRole, notes, channelId);
 }
 
-async function handleRevoke(db: Db, actorUserId: string, actorRole: UserRole, parts: string[]): Promise<string> {
+async function handleRevoke(db: Db, actorUserId: string, actorRole: UserRole, parts: string[], channelId: string): Promise<string> {
   const target = parts[0]?.trim() ?? "";
   if (!target) return "書き方: `権限削除 {名前または userId}`";
 
@@ -178,7 +181,7 @@ async function handleRevoke(db: Db, actorUserId: string, actorRole: UserRole, pa
   }
 
   // 名前検索フロー
-  return startNameSearchFlow(db, actorUserId, actorRole, "revoke", target, null, null);
+  return startNameSearchFlow(db, actorUserId, actorRole, "revoke", target, null, null, channelId);
 }
 
 async function handleList(db: Db): Promise<string> {
@@ -226,12 +229,14 @@ const NUMBER_RE = /^\s*([1-9]\d?)\s*(?:番)?\s*$/u;
 export async function tryConsumePendingPermOp(input: {
   db: Db;
   actorUserId: string;
+  channelId: string;
   text: string;
 }): Promise<{ handled: boolean; reply: string }> {
-  const { db, actorUserId, text } = input;
-  const t = text.normalize("NFKC").trim();
+  const { db, actorUserId, channelId, text } = input;
+  // グループでは「ニア メンバー」のように bot 名が付く → 除去してから判定
+  const t = stripBotNamePrefix(text).normalize("NFKC").trim();
 
-  const pending = await getPendingPermOp(db, actorUserId);
+  const pending = await getPendingPermOp(db, actorUserId, channelId);
   if (!pending) return { handled: false, reply: "" };
 
   // キャンセル
@@ -254,7 +259,7 @@ export async function tryConsumePendingPermOp(input: {
     // await_role を削除して名前検索フローを起動
     await deletePendingPermOp(db, actorUserId);
     const actorRole = await getUserRole(db, actorUserId);
-    const reply = await startNameSearchFlow(db, actorUserId, actorRole, "grant", nameQuery, roleParsed, null);
+    const reply = await startNameSearchFlow(db, actorUserId, actorRole, "grant", nameQuery, roleParsed, null, channelId);
     return { handled: true, reply };
   }
 
@@ -424,10 +429,12 @@ function tryParseNaturalPermCommand(t: string): {
 export async function tryHandlePermissionLine(input: {
   db: Db;
   actorUserId: string;
+  channelId: string;
   text: string;
 }): Promise<{ handled: boolean; reply: string }> {
-  const { db, actorUserId, text } = input;
-  const t = text.normalize("NFKC").trim();
+  const { db, actorUserId, channelId, text } = input;
+  // グループでは「ニア　ザキの権限変更」のように bot 名が先頭に付く → 除去してから判定
+  const t = stripBotNamePrefix(text).normalize("NFKC").trim();
 
   if (!isPermissionCommand(t)) return { handled: false, reply: "" };
 
@@ -443,13 +450,13 @@ export async function tryHandlePermissionLine(input: {
   const grantMatch = t.match(GRANT_RE);
   if (grantMatch) {
     const parts = grantMatch[1]!.trim().split(/\s+/);
-    return { handled: true, reply: await handleGrant(db, actorUserId, actorRole, parts) };
+    return { handled: true, reply: await handleGrant(db, actorUserId, actorRole, parts, channelId) };
   }
 
   const revokeMatch = t.match(REVOKE_RE);
   if (revokeMatch) {
     const parts = revokeMatch[1]!.trim().split(/\s+/);
-    return { handled: true, reply: await handleRevoke(db, actorUserId, actorRole, parts) };
+    return { handled: true, reply: await handleRevoke(db, actorUserId, actorRole, parts, channelId) };
   }
 
   if (LIST_RE.test(t)) {
@@ -474,17 +481,15 @@ export async function tryHandlePermissionLine(input: {
   }
 
   if (parsed.op === "grant" && parsed.name && parsed.role) {
-    return { handled: true, reply: await handleGrant(db, actorUserId, actorRole, [parsed.name, parsed.role]) };
+    return { handled: true, reply: await handleGrant(db, actorUserId, actorRole, [parsed.name, parsed.role], channelId) };
   }
 
   if (parsed.op === "revoke" && parsed.name) {
-    return { handled: true, reply: await handleRevoke(db, actorUserId, actorRole, [parsed.name]) };
+    return { handled: true, reply: await handleRevoke(db, actorUserId, actorRole, [parsed.name], channelId) };
   }
 
   // 名前は取れたがロールが不明の場合 → await_role ステージを保存して聞き返す
   if (parsed.name) {
-    // candidates_json が空でも await_role ステージとして保存
-    // notes フィールドを検索名の一時保管に流用
     await savePendingPermOp(db, {
       actorLineUserId: actorUserId,
       opType: "grant",
@@ -493,7 +498,8 @@ export async function tryHandlePermissionLine(input: {
       targetLineUserId: null,
       targetDisplayName: null,
       role: null,
-      notes: parsed.name, // 検索名を notes に保持
+      notes: parsed.name,
+      channelId,
     });
     return {
       handled: true,

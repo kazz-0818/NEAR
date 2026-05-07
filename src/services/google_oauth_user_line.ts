@@ -2,10 +2,12 @@ import { randomBytes } from "node:crypto";
 import type { Db } from "../db/client.js";
 import {
   listGoogleAccountsForLine,
+  listGoogleOAuthTokenPairsOrdered,
   setActiveGoogleAccount,
 } from "../db/user_google_oauth_accounts_repo.js";
 import { getEffectivePublicBaseUrl } from "../lib/renderRuntime.js";
 import { googleUserOAuthEnvConfigured } from "../lib/googleUserOAuthConfig.js";
+import { googleSheetsConfigured } from "../lib/googleSheetsAuth.js";
 
 function accountLabel(a: { email: string | null; googleSub: string }): string {
   const mail = a.email?.trim();
@@ -77,6 +79,62 @@ export async function tryHandleGoogleOAuthUserLine(input: {
       extra,
     ].join("\n"),
   };
+}
+
+/**
+ * 「Google診断」「Google状態」コマンド: 連携状態の詳細を返す（開発者・デバッグ向け）。
+ */
+export async function tryHandleGoogleDiagnostic(input: {
+  db: Db;
+  text: string;
+  channelUserId: string;
+}): Promise<{ handled: boolean; reply?: string }> {
+  const t = input.text.normalize("NFKC").trim();
+  if (!/^(google|グーグル|ｇｏｏｇｌｅ)?\s*(診断|状態確認|状態|つながってる|つながってる？|接続確認)$/iu.test(t)) {
+    return { handled: false };
+  }
+
+  const lines: string[] = ["**Google 連携の診断結果**", ""];
+
+  // OAuth 環境変数
+  const oauthEnvOk = googleUserOAuthEnvConfigured();
+  lines.push(`OAuth 環境変数: ${oauthEnvOk ? "✓ 設定済み" : "✗ 未設定（GOOGLE_OAUTH_CLIENT_ID 等が必要）"}`);
+
+  // サービスアカウント
+  const saOk = googleSheetsConfigured();
+  lines.push(`サービスアカウント: ${saOk ? "✓ 設定済み" : "✗ 未設定"}`);
+
+  // 連携アカウント
+  if (oauthEnvOk) {
+    const accounts = await listGoogleAccountsForLine(input.db, input.channelUserId);
+    lines.push(`\n連携アカウント数: ${accounts.length} 件`);
+    if (accounts.length > 0) {
+      const pairs = await listGoogleOAuthTokenPairsOrdered(input.db, input.channelUserId);
+      const validSubs = new Set(pairs.map((p) => p.googleSub));
+      for (let i = 0; i < accounts.length; i++) {
+        const a = accounts[i]!;
+        const tokenOk = validSubs.has(a.googleSub);
+        const mark = a.isActive ? "★" : "　";
+        const label = a.email ?? "（メール未取得）";
+        const tokenStatus = tokenOk ? "トークン✓" : "⚠ トークン復号失敗（再連携が必要）";
+        lines.push(`  ${mark} ${i + 1}. ${label} — ${tokenStatus}`);
+      }
+      if (pairs.length === 0) {
+        lines.push("\n⚠ 全アカウントのトークンが復号できません。");
+        lines.push("原因: GOOGLE_OAUTH_TOKEN_SECRET が変わった可能性があります。");
+        lines.push("→ もう一度「**Google連携**」を送って、ブラウザで再許可してください。");
+      }
+    } else {
+      lines.push("→ まだ連携していません。「**Google連携**」を送ってください。");
+    }
+  }
+
+  if (!oauthEnvOk && !saOk) {
+    lines.push("\n⚠ Sheets を使うには OAuth か サービスアカウントの設定が必要です。");
+    lines.push("DEPLOY.md「Google スプレッドシート」を参照してください。");
+  }
+
+  return { handled: true, reply: lines.join("\n") };
 }
 
 /**

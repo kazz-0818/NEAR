@@ -22,6 +22,7 @@ import { clipTsv, escapeSheetTitleForA1, resolveSheetTitle, valuesToTsv } from "
 import { setActiveGoogleAccount } from "../db/user_google_oauth_accounts_repo.js";
 import { searchSpreadsheetByUserHint } from "../lib/googleDriveSpreadsheetSearch.js";
 import { listSheetsAndDriveClientsOrdered, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
+import { listGoogleAccountsForLine } from "../db/user_google_oauth_accounts_repo.js";
 import { getLogger } from "../lib/logger.js";
 import type { sheets_v4 } from "googleapis";
 import type { ModuleContext, ModuleResult } from "./types.js";
@@ -123,12 +124,28 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
       { channelUserId: ctx.channelUserId.slice(0, 12) },
       "sheets_query: no spreadsheet id and no sheets/drive clients (OAuth or service account)"
     );
+
+    // アカウント行は存在するがトークン復号失敗の場合（TOKEN_SECRET 変更等）
+    const storedAccounts = googleUserOAuthEnvConfigured()
+      ? await listGoogleAccountsForLine(ctx.db, ctx.channelUserId).catch(() => [])
+      : [];
+    if (storedAccounts.length > 0) {
+      return {
+        success: true,
+        draft:
+          "以前 Google 連携をしていただきましたが、**トークンが無効**になっています（サーバー再設定などが原因の場合があります）。\n\n" +
+          "もう一度「**Google連携**」と送って、ブラウザで再許可してください。\n\n" +
+          "状態の詳細は「**Google診断**」で確認できます。",
+        situation: "followup",
+      };
+    }
+
     return {
       success: true,
       draft:
-        "スプレッドシート用の認証がありません。\n" +
-        "・トークで「**Google連携**」と送ると、ブラウザで許可する URL を出します（あなたの Google で見えるシートを読みます）。\n" +
-        "・または管理者にサービスアカウント連携とシート共有を依頼してください（DEPLOY.md）。",
+        "スプレッドシートを読むには **Google 連携**が必要です。\n\n" +
+        "「**Google連携**」と送ると、ブラウザで許可するための URL をお送りします。\n" +
+        "（あなたの Google で開けるシートをそのまま読めるようになります）",
       situation: "followup",
     };
   }

@@ -10,6 +10,7 @@ import { tryHandleAdminGrowthLine } from "../services/growth_admin_line.js";
 import { tryHandleGrowthRequestingUserLine } from "../services/growth_user_line.js";
 import {
   tryHandleGoogleAccountListOrSwitch,
+  tryHandleGoogleDiagnostic,
   tryHandleGoogleOAuthUserLine,
 } from "../services/google_oauth_user_line.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
@@ -57,6 +58,11 @@ export async function runThinRouterPhase(input: {
   const userGrowth = await tryHandleGrowthRequestingUserLine({ db, channelUserId, text, lineSourceType });
   if (userGrowth.handled) {
     return { handled: true, finalText: userGrowth.reply };
+  }
+
+  const googleDiag = await tryHandleGoogleDiagnostic({ db, channelUserId, text });
+  if (googleDiag.handled && googleDiag.reply) {
+    return { handled: true, finalText: googleDiag.reply };
   }
 
   const googleOauth = await tryHandleGoogleOAuthUserLine({ db, channelUserId, text });

@@ -21,6 +21,7 @@ import {
   loadRecentAssistantMessages,
   loadRecentUserMessages,
 } from "./conversation_context.js";
+import { resolveDisplayName } from "../lib/lineUserProfile.js";
 import {
   promoteGoogleSheetsFollowUp,
   promoteSheetsPendingAffirmative,
@@ -130,12 +131,18 @@ export async function handleLineTextMessage(input: {
   db: Db;
   replyToken: string;
   channelUserId: string;
+  actorUserId?: string;
+  groupId?: string;
   text: string;
   inboundMessageId: number;
   lineSourceType?: string;
 }): Promise<void> {
   const log = getLogger();
-  const { db, replyToken, channelUserId, text, inboundMessageId, lineSourceType } = input;
+  const { db, replyToken, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType } = input;
+
+  const actorDisplayName = actorUserId
+    ? (await resolveDisplayName(db, actorUserId, groupId).catch(() => null)) ?? undefined
+    : undefined;
   const channel = "line";
   const env = getEnv();
   const outboundCtx = { channel, channelUserId, inboundMessageId };
@@ -188,7 +195,7 @@ export async function handleLineTextMessage(input: {
             });
             let finalText = edited;
             try {
-              finalText = await composeNearReplyUnified({
+              finalText = await composeNearReplyUnified({ actorDisplayName,
                 draft: edited,
                 situation: "success",
                 userMessage: text,
@@ -236,7 +243,7 @@ export async function handleLineTextMessage(input: {
             });
             let finalText = clarifyDraft;
             try {
-              finalText = await composeNearReplyUnified({
+              finalText = await composeNearReplyUnified({ actorDisplayName,
                 draft: clarifyDraft,
                 situation: "followup",
                 userMessage: text,
@@ -353,6 +360,9 @@ export async function handleLineTextMessage(input: {
         db,
         channel,
         channelUserId,
+        groupId,
+        actorUserId,
+        actorDisplayName,
         inboundMessageId,
         userText: text,
         recentUserMessages,
@@ -374,7 +384,7 @@ export async function handleLineTextMessage(input: {
         let finalText = trimmed;
         if (!env.NEAR_AGENT_SKIP_COMPOSE) {
           try {
-            finalText = await composeNearReplyUnified({
+            finalText = await composeNearReplyUnified({ actorDisplayName,
               draft: trimmed,
               situation: agentResult.composeSituation,
               userMessage: text,
@@ -439,7 +449,7 @@ export async function handleLineTextMessage(input: {
       }
       let finalText = draft;
       try {
-        finalText = await composeNearReplyUnified({
+        finalText = await composeNearReplyUnified({ actorDisplayName,
           draft,
           situation: "unsupported",
           userMessage: text,
@@ -457,6 +467,9 @@ export async function handleLineTextMessage(input: {
       db,
       channel,
       channelUserId,
+      groupId,
+      actorUserId,
+      actorDisplayName,
       intent: parsed,
       originalText: text,
       inboundMessageId,
@@ -527,6 +540,9 @@ export async function handleLineTextMessage(input: {
           db,
           channel,
           channelUserId,
+          groupId,
+          actorUserId,
+          actorDisplayName,
           inboundMessageId,
           userText: text,
           recentUserMessages,
@@ -539,7 +555,7 @@ export async function handleLineTextMessage(input: {
           let finalText = retried;
           if (!env.NEAR_AGENT_SKIP_COMPOSE) {
             try {
-              finalText = await composeNearReplyUnified({
+              finalText = await composeNearReplyUnified({ actorDisplayName,
                 draft: retried,
                 situation: agentRetry.composeSituation,
                 userMessage: text,
@@ -591,7 +607,7 @@ export async function handleLineTextMessage(input: {
       finalText = `${finalText}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
     }
     try {
-      finalText = await composeNearReplyUnified({
+      finalText = await composeNearReplyUnified({ actorDisplayName,
         draft: finalText,
         situation,
         userMessage: text,
@@ -608,7 +624,7 @@ export async function handleLineTextMessage(input: {
       "申し訳ございません、少し調子が悪いようです。お手数ですが、もう一度お試しください。";
     let finalText = draft;
     try {
-      finalText = await composeNearReplyUnified({
+      finalText = await composeNearReplyUnified({ actorDisplayName,
         draft,
         situation: "error",
         userMessage: text,

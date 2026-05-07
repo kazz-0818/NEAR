@@ -59,6 +59,7 @@ export function classifyComposeMode(draft: string, situation: ComposeInput["situ
 
 /**
  * 全経路共通の返信整形入口（skip / light / full）。
+ * ComposeInput に actorDisplayName が含まれる場合、全モードで受け渡す。
  */
 export async function composeNearReplyUnified(input: ComposeInput): Promise<string> {
   const mode = classifyComposeMode(input.draft, input.situation);

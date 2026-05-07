@@ -6,6 +6,9 @@ export type NearAgentToolContext = {
   db: Db;
   channel: string;
   channelUserId: string;
+  groupId?: string;
+  actorUserId?: string;
+  actorDisplayName?: string;
   inboundMessageId: number;
   userText: string;
   recentUserMessages: string[];

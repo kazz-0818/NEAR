@@ -2,6 +2,16 @@
 
 このリポジトリは **Docker** でビルドできます。PaaS のダッシュボードに **環境変数** をそのまま登録してください（`.env` は Git に含めない）。
 
+## `System` 配下で `NEAR` だけをデプロイする設定
+
+`System` フォルダ内に複数プロジェクトを置く場合、デプロイ先の **Root Directory（作業ディレクトリ）を `NEAR`** に設定してください。
+
+- Render: サービス設定の Root Directory を `NEAR` にする
+- Railway: サービス設定の Root Directory を `NEAR` にする
+- GitHub Actions（もし `System` を親リポジトリとして運用する場合）: `paths` を使って `NEAR/**` の変更時のみ実行する
+
+現在のように `NEAR` 自体が独立した Git リポジトリであれば、追加設定なしでも `NEAR` だけが対象です。
+
 ## 必要な環境変数
 
 `.env.example` と同じキーが必要です。本番では少なくとも次を設定します。

@@ -19,6 +19,7 @@ import {
   textMessageMentionsBot,
 } from "./channels/line/groupMention.js";
 import { fireAndForgetObserveLineGroup } from "./services/line_group_observation.js";
+import { fireAndForgetRefreshProfile } from "./lib/lineUserProfile.js";
 import { getDeployedAtIso } from "./lib/buildInfo.js";
 import {
   escapeHtmlAttr,
@@ -202,10 +203,15 @@ async function lineMessagingWebhook(c: Context) {
     const text = String(message.text ?? "").trim();
     if (!text) continue;
 
+    const groupId = getLineGroupOrRoomId(source);
+    fireAndForgetRefreshProfile(db, userId, groupId);
+
     await handleLineTextMessage({
       db,
       replyToken,
       channelUserId: userId,
+      actorUserId: userId,
+      groupId,
       text,
       inboundMessageId: inboundId,
       lineSourceType: typeof source?.type === "string" ? source.type : undefined,

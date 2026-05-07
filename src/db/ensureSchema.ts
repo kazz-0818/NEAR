@@ -29,6 +29,8 @@ const MIGRATION_FILES = [
   "021_growth_unified_promotion.sql",
   "022_enable_rls_public.sql",
   "023_drop_unused_audit_tables.sql",
+  "024_user_profiles.sql",
+  "025_tasks_group_support.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

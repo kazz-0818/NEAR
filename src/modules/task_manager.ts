@@ -7,6 +7,11 @@ function pickTitle(ctx: ModuleContext): string {
   return ctx.originalText.trim().slice(0, 500);
 }
 
+/** 「グループタスク」指定かどうかをテキストから判定 */
+function isGroupTaskIntent(text: string): boolean {
+  return /(グループ|みんな|全員|チーム|共有|共通|グループで|みんなで)/i.test(text.normalize("NFKC"));
+}
+
 export async function taskManager(ctx: ModuleContext): Promise<ModuleResult> {
   const title = pickTitle(ctx);
   const notes =
@@ -14,14 +19,21 @@ export async function taskManager(ctx: ModuleContext): Promise<ModuleResult> {
       ? String((ctx.intent.required_params as Record<string, unknown>).notes)
       : null;
 
+  const isGroup = !!ctx.groupId;
+  const taskScope = isGroup && isGroupTaskIntent(ctx.originalText) ? "group" : "personal";
+
   await ctx.db.query(
-    `INSERT INTO tasks (channel, channel_user_id, title, notes) VALUES ($1, $2, $3, $4)`,
-    [ctx.channel, ctx.channelUserId, title, notes]
+    `INSERT INTO tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [ctx.channel, ctx.channelUserId, ctx.actorUserId ?? null, ctx.groupId ?? null, taskScope, title, notes]
   );
 
+  const name = ctx.actorDisplayName ?? null;
+  const scopeLabel = taskScope === "group" ? "グループ共有タスク" : "個人タスク";
+  const who = name ? `${name}さんの` : "";
   return {
     success: true,
-    draft: `タスクとして承りました。「${title}」を記録済みです。`,
+    draft: `承りました。${who}${scopeLabel}として「${title}」を記録しました。`,
     situation: "success",
   };
 }

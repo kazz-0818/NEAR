@@ -23,6 +23,8 @@ export type ComposeInput = {
   recentUserMessages?: string[];
   /** 今回より前の NEAR 返答（古い順）。続きの整形依頼の文脈用（任意） */
   recentAssistantMessages?: string[];
+  /** 発言者の表示名（LINE Profile）。自然な呼びかけに使う（任意） */
+  actorDisplayName?: string;
 };
 
 function temperatureForSituation(s: ComposeInput["situation"]): number {
@@ -80,6 +82,13 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
       "- ユーザーの発言があれば、長くならない範囲で軽く拾ってよい。",
       "- 読みやすいよう改行を入れる。",
     ];
+    if (input.actorDisplayName?.trim()) {
+      userBits.push(
+        "",
+        `ユーザーの表示名: ${input.actorDisplayName.trim()}`,
+        "- 自然な流れで名前を呼んでよい（毎回冒頭に付けなくてもよい。文中に1回入れる程度）。"
+      );
+    }
     if (input.userMessage?.trim()) {
       userBits.push("", `ユーザー発言: ${input.userMessage.trim()}`);
     }

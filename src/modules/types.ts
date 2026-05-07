@@ -5,6 +5,12 @@ export type ModuleContext = {
   db: Db;
   channel: string;
   channelUserId: string;
+  /** グループ/トークルームID。個人1:1 の場合は undefined */
+  groupId?: string;
+  /** グループ内で実際に発言したユーザーの LINE userId（個人1:1 では channelUserId と同じ） */
+  actorUserId?: string;
+  /** 発言者の表示名（LINE Profile APIで取得）。NEARが名前で呼びかけるために使う */
+  actorDisplayName?: string;
   intent: ParsedIntent;
   originalText: string;
   inboundMessageId: number;

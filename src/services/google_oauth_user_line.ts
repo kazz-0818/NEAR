@@ -139,12 +139,18 @@ export async function tryHandleGoogleDiagnostic(input: {
         }
 
         const scope = scopeMap.get(a.googleSub) ?? "";
-        const missingScopes = REQUIRED_SCOPES.filter((_, si) => !requiredScopePatterns[si]!.test(scope));
-        if (missingScopes.length > 0) {
-          lines.push(`  ${mark} ${i + 1}. ${label} — ⚠ スコープ不足: ${missingScopes.join(", ")} が未許可`);
+        if (!scope) {
+          // scope が空 = tokens.scope が null だった（GCP 未承認スコープの可能性大）
+          lines.push(`  ${mark} ${i + 1}. ${label} — ⚠ スコープ情報なし（GCP 同意画面の設定を確認し再連携を）`);
           anyNeedsReauth = true;
         } else {
-          lines.push(`  ${mark} ${i + 1}. ${label} — トークン✓ スコープ✓`);
+          const missingScopes = REQUIRED_SCOPES.filter((_, si) => !requiredScopePatterns[si]!.test(scope));
+          if (missingScopes.length > 0) {
+            lines.push(`  ${mark} ${i + 1}. ${label} — ⚠ スコープ不足: ${missingScopes.join(", ")} が未許可`);
+            anyNeedsReauth = true;
+          } else {
+            lines.push(`  ${mark} ${i + 1}. ${label} — トークン✓ スコープ✓`);
+          }
         }
       }
 

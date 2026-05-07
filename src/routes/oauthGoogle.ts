@@ -102,7 +102,9 @@ export function createGoogleOAuthApp(): Hono {
       }
       const env = getEnv();
       const cipher = encryptRefreshToken(refresh, env.GOOGLE_OAUTH_TOKEN_SECRET!);
-      const scopeStr = tokens.scope ?? GOOGLE_USER_OAUTH_SCOPES.join(" ");
+      // tokens.scope が null のときはフォールバックせず空文字を保存する。
+      // フォールバックすると「実際には未付与なのに付与済み」と誤認識するため。
+      const scopeStr = tokens.scope ?? "";
 
       let sub: string | null = null;
       let email: string | null = null;

@@ -20,6 +20,7 @@ import {
 } from "./channels/line/groupMention.js";
 import { fireAndForgetObserveLineGroup } from "./services/line_group_observation.js";
 import { fireAndForgetRefreshProfile } from "./lib/lineUserProfile.js";
+import { upsertUserRole } from "./db/user_roles_repo.js";
 import { getDeployedAtIso } from "./lib/buildInfo.js";
 import {
   escapeHtmlAttr,
@@ -231,11 +232,20 @@ app.post("/webhook", lineMessagingWebhook);
 app.post("/webhook/", lineMessagingWebhook);
 
 async function main() {
-  getEnv();
+  const env = getEnv();
   await ensureSchema();
+
+  // ADMIN_LINE_USER_ID を developer に自動設定（起動のたびに upsert して外れないようにする）
+  if (env.ADMIN_LINE_USER_ID) {
+    const pool = getPool();
+    await upsertUserRole(pool, env.ADMIN_LINE_USER_ID, "developer", null, "auto-set from ADMIN_LINE_USER_ID").catch(
+      (e) => log.warn({ err: e }, "auto-set developer role failed")
+    );
+    log.info({ userId: env.ADMIN_LINE_USER_ID.slice(0, 12) }, "developer role ensured for ADMIN_LINE_USER_ID");
+  }
+
   startReminderCron();
 
-  const env = getEnv();
   serve(
     {
       fetch: app.fetch,

@@ -22,6 +22,8 @@ import {
   loadRecentUserMessages,
 } from "./conversation_context.js";
 import { resolveDisplayName } from "../lib/lineUserProfile.js";
+import { getUserRole } from "../db/user_roles_repo.js";
+import { hasRole, insufficientRoleMessage, requiredRoleForIntent } from "../lib/permissions.js";
 import {
   promoteGoogleSheetsFollowUp,
   promoteSheetsPendingAffirmative,
@@ -147,7 +149,7 @@ export async function handleLineTextMessage(input: {
   const env = getEnv();
   const outboundCtx = { channel, channelUserId, inboundMessageId };
 
-  const thin = await runThinRouterPhase({ db, env, channelUserId, text, lineSourceType });
+  const thin = await runThinRouterPhase({ db, env, channelUserId, actorUserId, text, lineSourceType });
   if (thin.handled) {
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
     return;
@@ -347,6 +349,15 @@ export async function handleLineTextMessage(input: {
     } catch (se) {
       log.warn({ err: se }, "short interval followup signal failed");
     }
+  }
+
+  // 権限チェック
+  const actorRole = await getUserRole(db, actorUserId ?? channelUserId).catch(() => "guest" as const);
+  const requiredRole = requiredRoleForIntent(parsed.intent);
+  if (!hasRole(actorRole, requiredRole)) {
+    const denyText = insufficientRoleMessage(requiredRole);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log);
+    return;
   }
 
   const handler = getHandler(parsed.intent);

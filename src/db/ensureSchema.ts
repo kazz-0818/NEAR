@@ -31,6 +31,7 @@ const MIGRATION_FILES = [
   "023_drop_unused_audit_tables.sql",
   "024_user_profiles.sql",
   "025_tasks_group_support.sql",
+  "026_user_roles.sql",
 ] as const;
 
 /** Idempotent: safe to run on every server start. */

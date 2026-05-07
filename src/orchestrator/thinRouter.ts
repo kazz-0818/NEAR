@@ -13,6 +13,7 @@ import {
   tryHandleGoogleOAuthUserLine,
 } from "../services/google_oauth_user_line.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
+import { tryHandlePermissionLine } from "../services/permission_line.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
@@ -25,11 +26,19 @@ export async function runThinRouterPhase(input: {
   db: Db;
   env: Env;
   channelUserId: string;
+  actorUserId?: string;
   text: string;
   lineSourceType?: string;
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, text, lineSourceType } = input;
+  const { db, env, channelUserId, actorUserId, text, lineSourceType } = input;
+
+  // 権限管理コマンド（admin 以上のユーザーが送った場合）
+  const effectiveActorId = actorUserId ?? channelUserId;
+  const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, text });
+  if (permResult.handled) {
+    return { handled: true, finalText: permResult.reply };
+  }
 
   if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
     const growth = await tryHandleAdminGrowthLine({ db, adminUserId: channelUserId, text });

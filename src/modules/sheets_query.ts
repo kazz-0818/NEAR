@@ -188,7 +188,7 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   // 直前の NEAR 返答にシート回答（参照マーカー）があるかどうかも確認してから適用
   if (!spreadsheetId) {
     const FOLLOWUP_WORDS_RE =
-      /これ|それ|あれ|さっき|先ほど|前の|このデータ|そのデータ|あのデータ|さっきの|先ほどの|前のやつ|もう一度|再度|同じシート|同シート|どう思|所感|感想|コメント|分析|傾向/u;
+      /これ|それ|あれ|さっき|先ほど|前の|このデータ|そのデータ|あのデータ|さっきの|先ほどの|前のやつ|もう一度|再度|同じシート|同シート|どう思|所感|感想|コメント|分析|傾向|集計|月別|週別|日別|年別|内訳|詳しく|詳細|まとめ|比較|ランキング|上位|下位|最高|最低|平均|合計|割合|占め|トップ|並べ|ソート|絞り|他は|残り|もっと|さらに|件数|総計|全体|推移|変化|増減|差|割|倍|率|点/u;
     const hadRecentSheetReply = (ctx.recentAssistantMessages ?? []).some((m) =>
       SHEET_READ_SUCCESS_HEADER_REGEX.test(m)
     );

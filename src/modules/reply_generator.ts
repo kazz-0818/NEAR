@@ -1,4 +1,5 @@
 import type { ModuleContext, ModuleResult } from "./types.js";
+import { getUserRole } from "../db/user_roles_repo.js";
 
 const GREETING_DRAFTS = [
   "こんにちは。NEARです。本日はどのようなことでお手伝いできますでしょうか。",
@@ -9,8 +10,24 @@ const GREETING_DRAFTS = [
   "NEARです。今日も人類の面倒くさいを引き受けます。何をしましょう。",
 ];
 
-export async function greetingReply(_ctx: ModuleContext): Promise<ModuleResult> {
-  const draft = GREETING_DRAFTS[Math.floor(Math.random() * GREETING_DRAFTS.length)]!;
+// slave ロール向け: 適当・雑な挨拶
+const SLAVE_GREETING_DRAFTS = [
+  "あ、どうも。",
+  "はいはい。",
+  "…なんすか。",
+  "どうぞ。（特に何もないけど）",
+  "うい。",
+  "おっす。",
+  "あ、どうせ挨拶だけっすよね。",
+  "…（軽くうなずく）",
+];
+
+export async function greetingReply(ctx: ModuleContext): Promise<ModuleResult> {
+  const actorId = ctx.actorUserId ?? ctx.channelUserId;
+  const role = await getUserRole(ctx.db, actorId);
+
+  const pool = role === "slave" ? SLAVE_GREETING_DRAFTS : GREETING_DRAFTS;
+  const draft = pool[Math.floor(Math.random() * pool.length)]!;
   return {
     success: true,
     draft,

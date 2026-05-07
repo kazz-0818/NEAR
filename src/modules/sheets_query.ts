@@ -10,8 +10,11 @@ import {
 } from "../db/user_sheet_pending_confirm_repo.js";
 import {
   clearPendingSheetPick,
+  consumePendingSheetPickByIndex,
+  peekPendingSheetPick,
   savePendingSheetPick,
   tryConsumePendingSheetPick,
+  type SheetPickOption,
 } from "../db/user_sheet_pending_pick_repo.js";
 import { getEnv } from "../config/env.js";
 import {
@@ -34,6 +37,7 @@ import {
   answerSheetQuestionWithLlm,
   inferDriveSheetSearchKeywordsFromLlm,
   pickSheetWithLlm,
+  resolvePickIndexWithLlm,
 } from "./sheets_query_llm.js";
 
 const SET_DEFAULT_RE =
@@ -96,7 +100,21 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   let restoredOriginalQuery: string | null = null;
   if (!spreadsheetId) {
     try {
-      const pickResult = await tryConsumePendingSheetPick(ctx.db, ctx.channelUserId, ctx.originalText);
+      // まず正規表現で番号を取れるか試す
+      let pickResult = await tryConsumePendingSheetPick(ctx.db, ctx.channelUserId, ctx.originalText);
+
+      // 取れなかった場合は LLM に「何番か」を聞く（「最初のやつ」「一番上」などに対応）
+      if (!pickResult) {
+        const peek = await peekPendingSheetPick(ctx.db, ctx.channelUserId);
+        if (peek && peek.options.length > 0) {
+          const llmIdx = await resolvePickIndexWithLlm(ctx.originalText, peek.options);
+          if (llmIdx != null) {
+            pickResult = await consumePendingSheetPickByIndex(ctx.db, ctx.channelUserId, llmIdx);
+            log.info({ llmIdx }, "pending sheet pick resolved via LLM fallback");
+          }
+        }
+      }
+
       if (pickResult && isValidSpreadsheetId(pickResult.spreadsheetId)) {
         spreadsheetId = pickResult.spreadsheetId;
         restoredOriginalQuery = pickResult.originalQuery;

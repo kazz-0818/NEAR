@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
+import type { SheetPickOption } from "../db/user_sheet_pending_pick_repo.js";
 
 const DRIVE_SHEET_KEYWORDS_SCHEMA = {
   name: "near_drive_sheet_keywords",
@@ -143,4 +144,48 @@ export async function answerSheetQuestionWithLlm(
     temperature: 0.35,
   });
   return completion.choices[0]?.message?.content?.trim() ?? "すみません、回答を組み立てられませんでした。";
+}
+
+/**
+ * ユーザーの自由テキストから、候補リスト内の何番を選んでいるかを LLM で推定する。
+ * 正規表現で取れなかった「最初のやつ」「上から2つ目」「一番上」などに対応。
+ * 判断できない場合は null を返す。
+ */
+export async function resolvePickIndexWithLlm(
+  userText: string,
+  options: SheetPickOption[]
+): Promise<number | null> {
+  if (options.length === 0) return null;
+  const env = getEnv();
+  const log = getLogger();
+  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+
+  const candidateList = options.map((o, i) => `${i + 1}. ${o.name}`).join("\n");
+  try {
+    const completion = await client.chat.completions.create({
+      model: env.OPENAI_INTENT_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "ユーザーの発言が、以下の候補リストの何番を選んでいるかを判定してください。" +
+            "1〜" + options.length + " の整数のみ返してください。判断できない場合は null を返してください。" +
+            "余計な説明や句読点は不要です。",
+        },
+        {
+          role: "user",
+          content: `候補リスト:\n${candidateList}\n\nユーザー発言: 「${userText}」`,
+        },
+      ],
+      max_tokens: 8,
+      temperature: 0,
+    });
+    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    if (/^null$/i.test(raw)) return null;
+    const n = parseInt(raw, 10);
+    if (!isNaN(n) && n >= 1 && n <= options.length) return n;
+  } catch (e) {
+    log.warn({ err: e }, "resolvePickIndexWithLlm failed");
+  }
+  return null;
 }

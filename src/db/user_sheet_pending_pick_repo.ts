@@ -81,15 +81,14 @@ export async function clearPendingSheetPick(db: Db, lineUserId: string): Promise
 
 export type SheetPickResult = { spreadsheetId: string; originalQuery: string | null };
 
-export async function tryConsumePendingSheetPick(
+/**
+ * pending pick がある場合に候補リストと現在のテキストを返す（LLM fallback 用）。
+ * 消費はしない。
+ */
+export async function peekPendingSheetPick(
   db: Db,
-  lineUserId: string,
-  text: string
-): Promise<SheetPickResult | null> {
-  if (!isPendingSheetPickIndexMessage(text)) return null;
-  const idx = parsePendingSheetPickIndex(text);
-  if (idx == null || idx < 1) return null;
-
+  lineUserId: string
+): Promise<{ options: SheetPickOption[]; originalQuery: string | null } | null> {
   const r = await db.query<{ options_json: unknown; original_query: string | null }>(
     `SELECT options_json, original_query FROM user_sheet_pending_pick
      WHERE line_user_id = $1 AND expires_at > now()`,
@@ -98,12 +97,31 @@ export async function tryConsumePendingSheetPick(
   const row = r.rows[0];
   if (!row) return null;
   const options = Array.isArray(row.options_json) ? (row.options_json as SheetPickOption[]) : [];
-  const picked = options[idx - 1];
+  return { options, originalQuery: row.original_query };
+}
+
+export async function consumePendingSheetPickByIndex(
+  db: Db,
+  lineUserId: string,
+  idx: number
+): Promise<SheetPickResult | null> {
+  const peek = await peekPendingSheetPick(db, lineUserId);
+  if (!peek) return null;
+  const picked = peek.options[idx - 1];
   const id = picked?.id;
   if (typeof id !== "string" || id.length === 0) return null;
-
   await db.query(`DELETE FROM user_sheet_pending_pick WHERE line_user_id = $1`, [lineUserId]);
-  return { spreadsheetId: id, originalQuery: row.original_query };
+  return { spreadsheetId: id, originalQuery: peek.originalQuery };
+}
+
+export async function tryConsumePendingSheetPick(
+  db: Db,
+  lineUserId: string,
+  text: string
+): Promise<SheetPickResult | null> {
+  const idx = parsePendingSheetPickIndex(text);
+  if (idx == null || idx < 1) return null;
+  return consumePendingSheetPickByIndex(db, lineUserId, idx);
 }
 
 export async function hasPendingSheetPick(db: Db, lineUserId: string): Promise<boolean> {

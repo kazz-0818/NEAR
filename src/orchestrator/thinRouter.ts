@@ -40,12 +40,18 @@ export async function runThinRouterPhase(input: {
 
   const effectiveActorId = actorUserId ?? channelUserId;
 
-  // スプレッドシート候補選択の保留がある場合、番号メッセージを google_sheets_query に強制ルーティング
-  // （intent 分類前にここで判断しないと「1」が別 intent に誤分類される）
-  if (isPendingSheetPickIndexMessage(text)) {
+  // スプレッドシート候補選択の保留がある場合、番号/短文を google_sheets_query に強制ルーティング
+  // （intent 分類前にここで判断しないと「1」「最初のやつ」などが別 intent に誤分類される）
+  // 正規表現で番号を取れる場合・取れない短文(50字以下)の場合、どちらも sheets_query に任せて
+  // 内部で LLM fallback を使って番号を解決する
+  const textNorm = text.normalize("NFKC").trim();
+  const looksLikePick =
+    isPendingSheetPickIndexMessage(text) ||
+    (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
+  if (looksLikePick) {
     const hasPick = await hasPendingSheetPick(db, channelUserId).catch(() => false);
     if (hasPick) {
-      log.info({ channelUserId }, "pending sheet pick detected — forcing google_sheets_query");
+      log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
       return { handled: false, forceIntent: "google_sheets_query" };
     }
   }

@@ -37,6 +37,7 @@ const MIGRATION_FILES = [
   "028_sheet_pending_pick_original_query.sql",
   "029_inbound_actor_user_id.sql",
   "030_user_sheet_last_queried.sql",
+  "031_pending_perm_await_role.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

@@ -240,6 +240,24 @@ export async function tryConsumePendingPermOp(input: {
     return { handled: true, reply: "権限操作をキャンセルしました。" };
   }
 
+  // --- await_role ステージ: ロール名を受け取る ---
+  if (pending.stage === "await_role") {
+    const roleParsed = parseRole(t);
+    if (!roleParsed) {
+      // ロールとして認識できない場合はもう一度聞く
+      return {
+        handled: true,
+        reply: `「${t}」はレベルとして認識できませんでした。\n\`guest\` / \`member\` / \`admin\` / \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
+      };
+    }
+    const nameQuery = pending.notes ?? "";
+    // await_role を削除して名前検索フローを起動
+    await deletePendingPermOp(db, actorUserId);
+    const actorRole = await getUserRole(db, actorUserId);
+    const reply = await startNameSearchFlow(db, actorUserId, actorRole, "grant", nameQuery, roleParsed, null);
+    return { handled: true, reply };
+  }
+
   // --- pick ステージ: 番号を受け取る ---
   if (pending.stage === "pick") {
     const numMatch = t.match(NUMBER_RE);
@@ -463,14 +481,26 @@ export async function tryHandlePermissionLine(input: {
     return { handled: true, reply: await handleRevoke(db, actorUserId, actorRole, [parsed.name]) };
   }
 
-  // 名前は取れたがロールが不明の場合 → 案内メッセージ
+  // 名前は取れたがロールが不明の場合 → await_role ステージを保存して聞き返す
   if (parsed.name) {
+    // candidates_json が空でも await_role ステージとして保存
+    // notes フィールドを検索名の一時保管に流用
+    await savePendingPermOp(db, {
+      actorLineUserId: actorUserId,
+      opType: "grant",
+      stage: "await_role",
+      candidates: [],
+      targetLineUserId: null,
+      targetDisplayName: null,
+      role: null,
+      notes: parsed.name, // 検索名を notes に保持
+    });
     return {
       handled: true,
       reply:
         `**${parsed.name}** さんの権限を変更しますね。どのレベルにしますか？\n\n` +
-        `例: \`権限付与 ${parsed.name} member\`\n\n` +
-        `レベル: \`guest\` / \`member\` / \`admin\` / \`developer\``,
+        `\`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`\n\n` +
+        `例: \`member\` とだけ送ってください。キャンセルは「キャンセル」。`,
     };
   }
 

@@ -6,10 +6,12 @@ export type PendingPermCandidate = { lineUserId: string; displayName: string };
 export type PendingPermOp = {
   actorLineUserId: string;
   opType: "grant" | "revoke";
-  stage: "pick" | "confirm";
+  /** pick: 複数候補から選択中 / confirm: 確認待ち / await_role: 名前は取れたがロール待ち */
+  stage: "pick" | "confirm" | "await_role";
   candidates: PendingPermCandidate[];
   targetLineUserId: string | null;
   targetDisplayName: string | null;
+  /** await_role ステージのとき: 検索に使った名前文字列を notes に格納 */
   role: UserRole | null;
   notes: string | null;
 };
@@ -65,7 +67,7 @@ export async function getPendingPermOp(db: Db, actorLineUserId: string): Promise
   return {
     actorLineUserId,
     opType: row.op_type as "grant" | "revoke",
-    stage: row.stage as "pick" | "confirm",
+    stage: row.stage as "pick" | "confirm" | "await_role",
     candidates,
     targetLineUserId: row.target_line_user_id,
     targetDisplayName: row.target_display_name,

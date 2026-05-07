@@ -43,10 +43,21 @@ export async function runThinRouterPhase(input: {
   // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
   const channelId = groupId ?? effectiveActorId;
 
+  // 権限操作の保留応答（はい / 番号 / キャンセル）を最優先で処理
+  // ※ sheet pick の短文チェックより前に実行して権限フローが sheet pick に誤爆しないようにする
+  const pendingPerm = await tryConsumePendingPermOp({ db, actorUserId: effectiveActorId, channelId, text });
+  if (pendingPerm.handled) {
+    return { handled: true, finalText: pendingPerm.reply };
+  }
+
+  // 権限管理コマンド（admin 以上のユーザーが送った場合）
+  const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, channelId, text });
+  if (permResult.handled) {
+    return { handled: true, finalText: permResult.reply };
+  }
+
   // スプレッドシート候補選択の保留がある場合、番号/短文を google_sheets_query に強制ルーティング
-  // （intent 分類前にここで判断しないと「1」「最初のやつ」などが別 intent に誤分類される）
-  // 正規表現で番号を取れる場合・取れない短文(50字以下)の場合、どちらも sheets_query に任せて
-  // 内部で LLM fallback を使って番号を解決する
+  // （権限フローの後に配置して、権限フローが sheet pick に誤爆しないようにする）
   const textNorm = text.normalize("NFKC").trim();
   const looksLikePick =
     isPendingSheetPickIndexMessage(text) ||
@@ -57,18 +68,6 @@ export async function runThinRouterPhase(input: {
       log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
       return { handled: false, forceIntent: "google_sheets_query" };
     }
-  }
-
-  // 権限操作の保留応答（はい / 番号 / キャンセル）を最優先で処理
-  const pendingPerm = await tryConsumePendingPermOp({ db, actorUserId: effectiveActorId, channelId, text });
-  if (pendingPerm.handled) {
-    return { handled: true, finalText: pendingPerm.reply };
-  }
-
-  // 権限管理コマンド（admin 以上のユーザーが送った場合）
-  const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, channelId, text });
-  if (permResult.handled) {
-    return { handled: true, finalText: permResult.reply };
   }
 
   if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {

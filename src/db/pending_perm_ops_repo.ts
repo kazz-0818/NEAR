@@ -63,9 +63,12 @@ export async function getPendingPermOp(
     notes: string | null;
     channel_id: string | null;
   }>(
+    // channel_id が一致するか、旧データ（NULL）の場合も消費できるようにする
     `SELECT op_type, stage, candidates_json, target_line_user_id, target_display_name, role, notes, channel_id
      FROM pending_perm_ops
-     WHERE actor_line_user_id = $1 AND channel_id = $2 AND expires_at > now()`,
+     WHERE actor_line_user_id = $1
+       AND (channel_id = $2 OR channel_id IS NULL)
+       AND expires_at > now()`,
     [actorLineUserId, channelId]
   );
   const row = r.rows[0];

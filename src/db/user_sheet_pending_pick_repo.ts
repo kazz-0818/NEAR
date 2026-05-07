@@ -2,19 +2,59 @@ import type { Db } from "./client.js";
 
 export type SheetPickOption = { id: string; name: string };
 
-/** 「1」「2番」「3版」など候補番号だけの短文 */
+/**
+ * 候補選択待ち（pending あり）のとき、ユーザーが番号を指定したかを判定する。
+ * 「1」「2番」「③」「No.3」「いち」「一番目」「1版」など表記ゆれを広く受け付ける。
+ * pending がない状態での誤検知を防ぐため呼び出し側で hasPendingSheetPick を確認済みの前提。
+ */
 export function isPendingSheetPickIndexMessage(text: string): boolean {
   const t = text.normalize("NFKC").trim();
-  if (t.length > 14) return false;
-  // 「番」「版」「個」などの助数詞、または数字のみを許容
-  return /^\s*([1-9]|1[0-5])\s*(番|版|個|番目|つ目)?\s*$/u.test(t);
+  if (t.length > 30) return false;
+  return parsePendingSheetPickIndex(t) !== null;
 }
 
+/** テキストから選択番号を抽出（1〜15 の範囲）。認識できない場合は null。 */
 export function parsePendingSheetPickIndex(text: string): number | null {
   const t = text.normalize("NFKC").trim();
-  const m = t.match(/^\s*([1-9]|1[0-5])\b/u);
-  if (!m) return null;
-  return parseInt(m[1], 10);
+
+  // ① アラビア数字（先頭優先）: 「1」「2番」「3版」「No.4」「#5」「5番目」など
+  const arabic = t.match(/^(?:no\.?|No\.?|#|番号)?\s*([1-9]|1[0-5])\b/u);
+  if (arabic) {
+    const n = parseInt(arabic[1], 10);
+    if (n >= 1 && n <= 15) return n;
+  }
+
+  // ② 丸数字: ①〜⑮
+  const circledMatch = t.match(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])/u);
+  if (circledMatch) {
+    const circledMap: Record<string, number> = {
+      "①": 1, "②": 2, "③": 3, "④": 4, "⑤": 5,
+      "⑥": 6, "⑦": 7, "⑧": 8, "⑨": 9, "⑩": 10,
+      "⑪": 11, "⑫": 12, "⑬": 13, "⑭": 14, "⑮": 15,
+    };
+    return circledMap[circledMatch[1]] ?? null;
+  }
+
+  // ③ 漢数字（一〜十五）単独発言
+  const kanjiMap: Record<string, number> = {
+    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+    "十一": 11, "十二": 12, "十三": 13, "十四": 14, "十五": 15,
+  };
+  for (const [kanji, num] of Object.entries(kanjiMap)) {
+    if (t.startsWith(kanji)) return num;
+  }
+
+  // ④ ひらがな（いち〜じゅう）単独発言
+  const kanaMap: Record<string, number> = {
+    "いち": 1, "に": 2, "さん": 3, "し": 4, "ご": 5,
+    "ろく": 6, "なな": 7, "はち": 8, "きゅう": 9, "じゅう": 10,
+  };
+  for (const [kana, num] of Object.entries(kanaMap)) {
+    if (t === kana || t === kana + "ばん" || t === kana + "番") return num;
+  }
+
+  return null;
 }
 
 export async function savePendingSheetPick(

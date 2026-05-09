@@ -24,6 +24,14 @@ export type PendingToolConfirmHandlerInput = {
   recentAssistantMessages: string[];
 };
 
+function hasPendingToolConfirmPromptAnchor(recentAssistantMessages: string[]): boolean {
+  const recent = recentAssistantMessages.slice(-2).map((m) => m.normalize("NFKC"));
+  return recent.some((m) =>
+    /よろしければ.{0,12}はい/u.test(m) &&
+    /(取りやめるときは|いいえ)/u.test(m)
+  );
+}
+
 /**
  * Thin Router の直後に呼ぶ。保留中の副作用ツール確認を消費する。
  * NEAR_TOOL_CONFIRM_ENABLED がオフなら常に handled: false。
@@ -42,6 +50,7 @@ export async function tryHandlePendingToolConfirmation(
   if (!pending) {
     return { handled: false };
   }
+  const hasAnchor = hasPendingToolConfirmPromptAnchor(input.recentAssistantMessages);
 
   const agentCtx: NearAgentTurnInput = {
     db: input.db,
@@ -53,7 +62,7 @@ export async function tryHandlePendingToolConfirmation(
     recentAssistantMessages: input.recentAssistantMessages,
   };
 
-  if (isSpreadsheetConfirmNegative(input.text)) {
+  if (isSpreadsheetConfirmNegative(input.text) && hasAnchor) {
     await cancelPendingToolConfirmation(input.db, input.channel, input.channelUserId);
     let finalText = "了解しました。登録は取りやめました。";
     try {
@@ -71,6 +80,13 @@ export async function tryHandlePendingToolConfirmation(
   }
 
   if (isSpreadsheetConfirmAffirmative(input.text)) {
+    if (!hasAnchor) {
+      log.info(
+        { channelUserId: input.channelUserId, toolName: pending.tool_name, text: input.text },
+        "skip pending tool confirmation consume: no recent confirmation anchor"
+      );
+      return { handled: false };
+    }
     const row = await finalizePendingToolConfirmation(input.db, input.channel, input.channelUserId);
     if (!row) {
       let finalText = "確認の有効期限が切れているか、すでに処理済みのようです。もう一度お願いします。";

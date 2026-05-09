@@ -60,7 +60,7 @@ async function saveIntentRun(
 
 async function replyLineAndRememberOutbound(
   db: Db,
-  ctx: { channel: string; channelUserId: string; inboundMessageId: number },
+  ctx: { channel: string; channelUserId: string; groupId?: string | null; inboundMessageId: number },
   replyToken: string,
   lineUserId: string,
   finalText: string,
@@ -71,6 +71,7 @@ async function replyLineAndRememberOutbound(
     await saveOutboundAssistantText(db, {
       channel: ctx.channel,
       channelUserId: ctx.channelUserId,
+      groupId: ctx.groupId ?? null,
       text: finalText,
       inboundMessageId: ctx.inboundMessageId,
     });
@@ -149,16 +150,21 @@ export async function handleLineTextMessage(input: {
     : undefined;
   const channel = "line";
   const env = getEnv();
-  const outboundCtx = { channel, channelUserId, inboundMessageId };
+  // groupId をコンテキストに含め、返答保存時にも紐付ける
+  const outboundCtx = { channel, channelUserId, groupId, inboundMessageId };
 
   // 会話コンテキストを thinRouter より先に取得（タスク続き発言の判定に必要）
+  // groupId スコープでフィルタリングして個人/グループの会話混在を防ぐ
   let recentUserMessages: string[] = [];
   let recentAssistantMessages: string[] = [];
   try {
     recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId, {
       actorUserId: actorUserId ?? undefined,
+      groupId: groupId ?? null,
     });
-    recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId);
+    recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId, {
+      groupId: groupId ?? null,
+    });
   } catch (ctxErr) {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }

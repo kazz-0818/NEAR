@@ -8,6 +8,11 @@ export type LoadRecentUserMessagesOptions = {
    * そのユーザー固有の発言履歴を取得できる（未指定時は channel_user_id のみで検索）
    */
   actorUserId?: string;
+  /**
+   * グループ/ルームの LINE ID。指定するとそのグループ内の発言のみ取得。
+   * null/undefined = 個人1:1チャット（group_id IS NULL の行のみ取得）。
+   */
+  groupId?: string | null;
 };
 
 /**
@@ -45,12 +50,30 @@ export async function loadRecentUserMessages(
   const limit = options.limit ?? 16;
   const maxChars = options.maxCharsPerMessage ?? 1000;
   const actorUserId = options.actorUserId;
+  const groupId = options.groupId ?? null;
 
-  // グループでは actor_user_id（発言者）を優先して絞り込む。なければ channel_user_id で取得。
-  const res = actorUserId
-    ? await db.query<{ text: string }>(
+  let res: { rows: { text: string }[] };
+  if (actorUserId) {
+    if (groupId) {
+      // グループ内の特定ユーザー発言のみ
+      res = await db.query<{ text: string }>(
         `SELECT text FROM inbound_messages
          WHERE channel = $1
+           AND group_id = $2
+           AND actor_user_id = $3
+           AND id < $4
+           AND text IS NOT NULL
+           AND btrim(text) <> ''
+         ORDER BY id DESC
+         LIMIT $5`,
+        [channel, groupId, actorUserId, beforeInboundId, limit]
+      );
+    } else {
+      // 個人チャット（group_id IS NULL）の特定ユーザー発言
+      res = await db.query<{ text: string }>(
+        `SELECT text FROM inbound_messages
+         WHERE channel = $1
+           AND group_id IS NULL
            AND (actor_user_id = $2 OR (actor_user_id IS NULL AND channel_user_id = $2))
            AND id < $3
            AND text IS NOT NULL
@@ -58,10 +81,28 @@ export async function loadRecentUserMessages(
          ORDER BY id DESC
          LIMIT $4`,
         [channel, actorUserId, beforeInboundId, limit]
-      )
-    : await db.query<{ text: string }>(
+      );
+    }
+  } else {
+    if (groupId) {
+      res = await db.query<{ text: string }>(
         `SELECT text FROM inbound_messages
-         WHERE channel = $1 AND channel_user_id = $2
+         WHERE channel = $1
+           AND group_id = $2
+           AND id < $3
+           AND text IS NOT NULL
+           AND btrim(text) <> ''
+         ORDER BY id DESC
+         LIMIT $4`,
+        [channel, groupId, beforeInboundId, limit]
+      );
+    } else {
+      // 個人チャット（group_id IS NULL）
+      res = await db.query<{ text: string }>(
+        `SELECT text FROM inbound_messages
+         WHERE channel = $1
+           AND channel_user_id = $2
+           AND group_id IS NULL
            AND id < $3
            AND text IS NOT NULL
            AND btrim(text) <> ''
@@ -69,6 +110,8 @@ export async function loadRecentUserMessages(
          LIMIT $4`,
         [channel, channelUserId, beforeInboundId, limit]
       );
+    }
+  }
 
   const chronological = [...res.rows].reverse();
   return chronological.map((r) => {
@@ -79,7 +122,7 @@ export async function loadRecentUserMessages(
 }
 
 /**
- * 同一ユーザーについて、今回の inbound より前に送った NEAR 側テキストを古い順で返す（続き一言の文脈用）。
+ * 同一ユーザー（または同一グループ）について、今回の inbound より前に送った NEAR 側テキストを古い順で返す（続き一言の文脈用）。
  */
 export async function loadRecentAssistantMessages(
   db: Db,
@@ -90,16 +133,33 @@ export async function loadRecentAssistantMessages(
 ): Promise<string[]> {
   const limit = options.limit ?? 10;
   const maxChars = options.maxCharsPerMessage ?? 12000;
+  const groupId = options.groupId ?? null;
 
-  const res = await db.query<{ text: string }>(
-    `SELECT text FROM outbound_messages
-     WHERE channel = $1 AND channel_user_id = $2
-       AND inbound_message_id IS NOT NULL
-       AND inbound_message_id < $3
-     ORDER BY inbound_message_id DESC
-     LIMIT $4`,
-    [channel, channelUserId, beforeInboundId, limit]
-  );
+  let res: { rows: { text: string }[] };
+  if (groupId) {
+    // グループ内の NEAR 返答のみ
+    res = await db.query<{ text: string }>(
+      `SELECT text FROM outbound_messages
+       WHERE channel = $1 AND group_id = $2
+         AND inbound_message_id IS NOT NULL
+         AND inbound_message_id < $3
+       ORDER BY inbound_message_id DESC
+       LIMIT $4`,
+      [channel, groupId, beforeInboundId, limit]
+    );
+  } else {
+    // 個人チャット（group_id IS NULL）の NEAR 返答
+    res = await db.query<{ text: string }>(
+      `SELECT text FROM outbound_messages
+       WHERE channel = $1 AND channel_user_id = $2
+         AND group_id IS NULL
+         AND inbound_message_id IS NOT NULL
+         AND inbound_message_id < $3
+       ORDER BY inbound_message_id DESC
+       LIMIT $4`,
+      [channel, channelUserId, beforeInboundId, limit]
+    );
+  }
 
   const chronological = [...res.rows].reverse();
   return chronological.map((r) => {

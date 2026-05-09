@@ -42,6 +42,7 @@ const MIGRATION_FILES = [
   "033_add_dorei_role.sql",
   "034_fix_slave_constraint.sql",
   "035_tasks_updated_at.sql",
+  "036_context_group_id.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

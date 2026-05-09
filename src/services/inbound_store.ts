@@ -5,6 +5,8 @@ export type SaveInboundInput = {
   channelUserId: string;
   /** グループ内で実際に発言したユーザーの LINE userId（個人1:1 では channelUserId と同じため省略可） */
   actorUserId?: string | null;
+  /** グループ/ルームの LINE ID。個人1:1 の場合は null/undefined。 */
+  groupId?: string | null;
   messageId: string;
   messageType: string;
   text: string | null;
@@ -18,14 +20,15 @@ export type SaveInboundResult = {
 
 export async function saveInboundMessage(db: Db, input: SaveInboundInput): Promise<SaveInboundResult> {
   const res = await db.query<{ id: string }>(
-    `INSERT INTO inbound_messages (channel, channel_user_id, actor_user_id, message_id, message_type, text, raw_payload)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+    `INSERT INTO inbound_messages (channel, channel_user_id, actor_user_id, group_id, message_id, message_type, text, raw_payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
      ON CONFLICT (channel, message_id) DO NOTHING
      RETURNING id`,
     [
       input.channel,
       input.channelUserId,
       input.actorUserId ?? null,
+      input.groupId ?? null,
       input.messageId,
       input.messageType,
       input.text,

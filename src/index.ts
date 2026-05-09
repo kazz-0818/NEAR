@@ -148,10 +148,12 @@ async function lineMessagingWebhook(c: Context) {
     if (!messageId) continue;
 
     const db = getPool();
+    const observedGroupId = getLineGroupOrRoomId(source);
     const { id: inboundId, isDuplicate } = await saveInboundMessage(db, {
       channel: "line",
       channelUserId: userId,
       actorUserId: userId,  // グループでも発言者の userId が取れる
+      groupId: observedGroupId ?? null,
       messageId,
       messageType,
       text: messageType === "text" ? String(message.text ?? "") : null,
@@ -163,7 +165,6 @@ async function lineMessagingWebhook(c: Context) {
       continue;
     }
 
-    const observedGroupId = getLineGroupOrRoomId(source);
     if (observedGroupId) {
       fireAndForgetObserveLineGroup(
         db,

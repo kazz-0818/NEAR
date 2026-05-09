@@ -7,9 +7,15 @@ function pickTitle(ctx: ModuleContext): string {
   return ctx.originalText.trim().slice(0, 500);
 }
 
-/** 「グループタスク」指定かどうかをテキストから判定 */
-function isGroupTaskIntent(text: string): boolean {
-  return /(グループ|みんな|全員|チーム|共有|共通|グループで|みんなで)/i.test(text.normalize("NFKC"));
+/** グループ内で「個人タスクとして」と明示しているか（それ以外はグループ共有がデフォルト） */
+function isExplicitPersonalTaskIntent(text: string): boolean {
+  const n = text.normalize("NFKC");
+  return (
+    /個人(?:タスク|のタスク|だけ|用|向け|的に)/i.test(n) ||
+    /自分(?:だけ|のみ|用|のタスク)/i.test(n) ||
+    /(?:俺|僕|私)(?:だけ|のみ|用)/i.test(n) ||
+    /プライベート|private/i.test(n)
+  );
 }
 
 export async function taskManager(ctx: ModuleContext): Promise<ModuleResult> {
@@ -20,7 +26,8 @@ export async function taskManager(ctx: ModuleContext): Promise<ModuleResult> {
       : null;
 
   const isGroup = !!ctx.groupId;
-  const taskScope = isGroup && isGroupTaskIntent(ctx.originalText) ? "group" : "personal";
+  // グループではデフォルトでグループ共有タスク、個人と明示した場合のみ個人タスク
+  const taskScope = !isGroup ? "personal" : isExplicitPersonalTaskIntent(ctx.originalText) ? "personal" : "group";
 
   await ctx.db.query(
     `INSERT INTO tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes)

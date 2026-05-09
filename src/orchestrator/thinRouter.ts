@@ -19,6 +19,7 @@ import {
   hasPendingSheetPick,
   isPendingSheetPickIndexMessage,
 } from "../db/user_sheet_pending_pick_repo.js";
+import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_line.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
@@ -54,6 +55,20 @@ export async function runThinRouterPhase(input: {
   const permResult = await tryHandlePermissionLine({ db, actorUserId: effectiveActorId, channelId, text });
   if (permResult.handled) {
     return { handled: true, finalText: permResult.reply };
+  }
+
+  // タスク管理コマンド（一覧・完了・削除・編集）
+  if (isTaskManagementCommand(text)) {
+    const taskResult = await tryHandleTaskLine({
+      db,
+      text,
+      channelUserId,
+      actorUserId: effectiveActorId,
+      groupId,
+    });
+    if (taskResult.handled) {
+      return { handled: true, finalText: taskResult.reply };
+    }
   }
 
   // スプレッドシート候補選択の保留がある場合、番号/短文を google_sheets_query に強制ルーティング

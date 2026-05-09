@@ -28,8 +28,16 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
 
   if (iso) {
     await ctx.db.query(
-      `INSERT INTO reminders (channel, channel_user_id, remind_at, message, status) VALUES ($1, $2, $3, $4, 'pending')`,
-      [ctx.channel, ctx.channelUserId, iso.toISOString(), message]
+      `INSERT INTO reminders (channel, channel_user_id, actor_user_id, group_id, remind_at, message, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
+      [
+        ctx.channel,
+        ctx.channelUserId,
+        ctx.actorUserId ?? null,
+        ctx.groupId ?? null,
+        iso.toISOString(),
+        message,
+      ]
     );
 
     const when = iso.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });

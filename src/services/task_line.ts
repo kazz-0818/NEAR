@@ -33,11 +33,14 @@ const LIST_RE =
   /タスク(?:一覧|リスト|みせて|見せて|教えて|確認|一覧出して)|(?:今の|今日の|現在の)?タスク(?:一覧|リスト)|タスクは(?:何|なん)|タスク出して/u;
 
 // 番号指定（1件）
-const DONE_RE =
-  /(?:タスク)?(?:完了|終わった|終了|やった|できた|done)[^\d０-９]*([1-9０-９][0-9０-９]?)(?:番)?|([1-9０-９][0-9０-９]?)番(?:目)?(?:のタスク)?(?:完了|終了|やった|done)/iu;
-const DELETE_RE =
-  /(?:タスク)?(?:削除|消して|消去|delete)[^\d０-９]*([1-9０-９][0-9０-９]?)番?|([1-9０-９][0-9０-９]?)番(?:目)?(?:のタスク)?(?:削除|消して)/iu;
+// パターン1: 動詞が先「削除 2」「完了 2」
+// パターン2: 番号が先「2番削除」「2削除して」「2を消して」
+const DONE_RE = /(?:タスク\s*)?(?:完了|終わった|終了|やった|できた|done)\s*([1-9０-９][0-9０-９]?)番?|([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?\s*(?:の(?:タスク)?)?\s*(?:を|は)?\s*(?:完了|終わった|終了|やった|できた|done)/iu;
+const DELETE_RE = /(?:タスク\s*)?(?:削除|消して|消去|delete)\s*([1-9０-９][0-9０-９]?)番?|([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?\s*(?:の(?:タスク)?)?\s*(?:を|は)?\s*(?:削除|消して|消去|delete)/iu;
 const EDIT_RE = /タスク(?:編集|変更|修正)[^\d０-９]*([1-9０-９][0-9０-９]?)番?\s+(.+)/u;
+
+// タスク一覧の後に「2番」「2」だけ送った場合の文脈選択
+const CONTEXT_NUM_ONLY_RE = /^([1-9０-９][0-9０-９]?)(?:番目?|つ目)?$/u;
 
 // 一括操作（全部・両方・二つとも・すべて）
 const ALL_DELETE_RE =
@@ -68,9 +71,10 @@ export function isTaskManagementCommand(
   const t = text.normalize("NFKC");
   if (LIST_RE.test(t) || DONE_RE.test(t) || DELETE_RE.test(t) || EDIT_RE.test(t)) return true;
   if (ALL_DELETE_RE.test(t) || ALL_DONE_RE.test(t)) return true;
-  // タスク一覧の直後なら短い「削除して」「両方消して」も受け付ける
+  // タスク一覧の直後なら「削除して」「両方消して」「2番」だけの発言も受け付ける
   if (recentAssistantMessages && hadRecentTaskListReply(recentAssistantMessages)) {
     if (CONTEXT_DELETE_RE.test(t) || CONTEXT_DONE_RE.test(t)) return true;
+    if (CONTEXT_NUM_ONLY_RE.test(t)) return true;
   }
   return false;
 }
@@ -196,6 +200,25 @@ export async function tryHandleTaskLine(input: {
     } catch (e) {
       log.error({ err: e }, "task list failed");
       return { handled: true, reply: "タスクの取得中にエラーが発生しました。" };
+    }
+  }
+
+  // ─ タスク文脈中に数字だけ送られた場合（「2番」「2」）→ 一覧を再表示してガイド ─
+  if (inTaskContext && CONTEXT_NUM_ONLY_RE.test(t)) {
+    const numStr = t.match(CONTEXT_NUM_ONLY_RE)?.[1] ?? "";
+    const idx = toHalfNum(numStr) - 1;
+    try {
+      const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
+      const target = tasks[idx];
+      if (!target) {
+        return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
+      }
+      return {
+        handled: true,
+        reply: `「${target.title}」について何をしますか？\n\n・完了 → 「タスク完了 ${idx + 1}」\n・削除 → 「タスク削除 ${idx + 1}」`,
+      };
+    } catch (e) {
+      return { handled: false, reply: "" };
     }
   }
 

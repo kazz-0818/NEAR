@@ -3,7 +3,7 @@ import type { IntentName } from "../models/intent.js";
 
 /** 権限レベルの数値（比較用） */
 export const ROLE_LEVEL: Record<UserRole, number> = {
-  slave: 0,
+  restricted: 0,
   guest: 1,
   member: 2,
   admin: 3,
@@ -11,7 +11,7 @@ export const ROLE_LEVEL: Record<UserRole, number> = {
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  slave: "奴隷",
+  restricted: "制限ユーザー",
   guest: "ゲスト",
   member: "メンバー",
   admin: "管理者",
@@ -20,7 +20,7 @@ export const ROLE_LABEL: Record<UserRole, string> = {
 
 /** intent ごとに必要な最低権限 */
 const INTENT_REQUIRED_ROLE: Partial<Record<IntentName, UserRole>> = {
-  greeting: "slave",            // 挨拶だけは奴隷でも可
+  greeting: "restricted", // 【動作確認】挨拶のみは制限ユーザーも可
   simple_question: "guest",
   help_capabilities: "guest",
   unknown_custom_request: "guest",
@@ -42,7 +42,7 @@ export function hasRole(role: UserRole, required: UserRole): boolean {
   return ROLE_LEVEL[role] >= ROLE_LEVEL[required];
 }
 
-/** 権限付与ガード: admin は dorei〜member まで操作可、developer は全て操作可 */
+/** 権限付与ガード: admin は restricted〜member まで操作可、developer は全て操作可 */
 export function canGrantRole(granterRole: UserRole, targetRole: UserRole): boolean {
   if (granterRole === "developer") return true;
   if (granterRole === "admin") return ROLE_LEVEL[targetRole] <= ROLE_LEVEL["member"];
@@ -55,7 +55,7 @@ export function insufficientRoleMessage(required: UserRole): string {
   return `その機能は **${label}以上** の権限が必要です。\n権限については管理者か開発者にご連絡ください。`;
 }
 
-/** 奴隷ロール向けのブロックメッセージ */
-export function doreiBlockMessage(): string {
+/** 制限ユーザー向けのブロックメッセージ（定型・システム臭さ抑制用） */
+export function restrictedBlockMessage(): string {
   return `申し訳ありません。現在その操作は許可されていません。`;
 }

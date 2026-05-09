@@ -65,16 +65,19 @@ export async function setFirstApproval(
   const { approval_status: ap } = cur.rows[0];
   if (ap !== "pending") return { ok: false, error: "first approval already resolved" };
   if (decision === "rejected") {
+    // 【動作確認】failure_reason は定型メッセージ、review_notes はオプションの補足のみ（混在させない）。
+    const failureReason = "承認: いいえ";
+    const notes = reviewNotes ?? null;
     await db.query(
       `UPDATE implementation_suggestions
        SET approval_status = 'rejected',
            implementation_state = 'failed',
-           failure_reason = COALESCE($1, '成長候補が見送られました'),
+           failure_reason = $1,
            review_notes = COALESCE($2, review_notes),
            reviewed_at = now(),
            updated_at = now()
        WHERE id = $3`,
-      [reviewNotes ?? "承認: いいえ", reviewNotes, suggestionId]
+      [failureReason, notes, suggestionId]
     );
     await syncUnsupportedStatusForSuggestion(db, suggestionId, "rejected");
     return { ok: true };

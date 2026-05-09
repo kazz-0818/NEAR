@@ -30,6 +30,9 @@ function looksLikeNumberedChoiceListDraft(draft: string): boolean {
 /**
  * auto: ドラフトと状況から skip / light / full。
  * NEAR_COMPOSE_MODE=full: 事実保護スキップのみ適用し、それ以外は常に full 整形。
+ *
+ * 【動作確認】SHEET_READ_SUCCESS_HEADER_REGEX による整形スキップはこの関数のみ。
+ * composeNearReply / composeNearReplyLight 側では判定しない（composeNearReplyUnified 経由前提）。
  */
 export function classifyComposeMode(draft: string, situation: ComposeInput["situation"]): ComposeMode {
   const env = getEnv();

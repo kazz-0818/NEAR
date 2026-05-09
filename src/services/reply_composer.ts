@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import { getEnv } from "../config/env.js";
-import { SHEET_READ_SUCCESS_HEADER_REGEX } from "../lib/sheetReplyMarker.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
 
@@ -62,13 +61,8 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
   const env = getEnv();
   const log = getLogger();
 
-  // シート読取成功ドラフトは API 済みの事実が本文に含まれる。ペルソナ整形で「リンクを開けない」等が
-  // 付くと論理矛盾になるため、そのまま返す（answerWithLlm 側で NEAR 口調の土台はある）。
-  const sheetsSuccess =
-    input.situation === "success" && SHEET_READ_SUCCESS_HEADER_REGEX.test(input.draft);
-  if (sheetsSuccess) {
-    return input.draft;
-  }
+  // 【動作確認】シート読取成功ドラフトのスキップは agent/compose/nearComposer.ts の classifyComposeMode のみ。
+  // composeNearReplyUnified 経由で skip/light/full が決まる。ここでは二重判定しない。
 
   const persona = await getPersona();
 
@@ -162,9 +156,7 @@ export async function composeNearReplyLight(input: ComposeInput): Promise<string
   const env = getEnv();
   const log = getLogger();
 
-  if (input.situation === "success" && SHEET_READ_SUCCESS_HEADER_REGEX.test(input.draft)) {
-    return input.draft;
-  }
+  // 【動作確認】シート成功ヘッダの early-return は nearComposer.classifyComposeMode に一本化。
 
   const persona = await getPersona();
 

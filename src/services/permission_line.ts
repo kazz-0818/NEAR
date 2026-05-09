@@ -22,10 +22,11 @@ const log = getLogger();
 // ─── ロール別名 ──────────────────────────────────────────────────────────────
 
 const ROLE_ALIASES: Record<string, UserRole> = {
-  slave: "slave",
-  奴隷: "slave",
-  どれい: "slave",
-  dorei: "slave",
+  restricted: "restricted",
+  slave: "restricted",
+  奴隷: "restricted",
+  どれい: "restricted",
+  dorei: "restricted",
   guest: "guest",
   ゲスト: "guest",
   member: "member",
@@ -270,7 +271,7 @@ export async function tryConsumePendingPermOp(input: {
       }
       return {
         handled: true,
-        reply: `「${t}」はレベルとして認識できませんでした。\n\`slave\`（奴隷）/ \`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
+        reply: `「${t}」はレベルとして認識できませんでした。\n\`restricted\`（制限ユーザー）/ \`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\` のいずれかを送ってください。\nキャンセルは「キャンセル」。`,
       };
     }
     const nameQuery = pending.notes ?? "";
@@ -419,7 +420,7 @@ const PERM_HELP = `権限管理コマンドの使い方:
 
 **確認:** \`権限確認 {名前または userId}\`
 
-レベル: \`slave\`（奴隷）/ \`guest\`（閲覧のみ）/ \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`（開発者）`;
+レベル: \`restricted\`（制限ユーザー）/ \`guest\`（閲覧のみ）/ \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`（開発者）`;
 
 /**
  * 自然言語から「誰の権限をどうしたいか」をざっくり解釈してコマンドに変換する。
@@ -548,7 +549,7 @@ export async function tryHandlePermissionLine(input: {
       handled: true,
       reply:
         `**${parsed.name}** さんの権限を変更しますね。どのレベルにしますか？\n\n` +
-        `\`slave\`（奴隷）/ \`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`\n\n` +
+        `\`restricted\`（制限ユーザー）/ \`guest\` / \`member\`（一般）/ \`admin\`（管理者）/ \`developer\`\n\n` +
         `例: \`member\` とだけ送ってください。キャンセルは「キャンセル」。`,
     };
   }

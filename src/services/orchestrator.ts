@@ -426,8 +426,8 @@ export async function handleLineTextMessage(input: {
   const actorRole = await getUserRole(db, actorUserId ?? channelUserId).catch(() => "guest" as const);
   const requiredRole = requiredRoleForIntent(parsed.intent);
   if (!hasRole(actorRole, requiredRole)) {
-    // slave には冷たく一言だけ返す
-    const SLAVE_DENY_REPLIES = [
+    // 【動作確認】restricted（制限ユーザー）には冷たく一言だけ返す
+    const RESTRICTED_DENY_REPLIES = [
       "知らん。",
       "。",
       "は？",
@@ -436,8 +436,8 @@ export async function handleLineTextMessage(input: {
       "…。",
       "どうぞ（無視）。",
     ];
-    const denyText = actorRole === "slave"
-      ? SLAVE_DENY_REPLIES[Math.floor(Math.random() * SLAVE_DENY_REPLIES.length)]!
+    const denyText = actorRole === "restricted"
+      ? RESTRICTED_DENY_REPLIES[Math.floor(Math.random() * RESTRICTED_DENY_REPLIES.length)]!
       : insufficientRoleMessage(requiredRole);
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log);
     return;

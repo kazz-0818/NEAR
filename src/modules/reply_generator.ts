@@ -10,8 +10,8 @@ const GREETING_DRAFTS = [
   "NEARです。今日も人類の面倒くさいを引き受けます。何をしましょう。",
 ];
 
-// slave ロール向け: 適当・雑な挨拶
-const SLAVE_GREETING_DRAFTS = [
+// 【動作確認】restricted（制限ユーザー）向け: 適当・雑な挨拶
+const RESTRICTED_GREETING_DRAFTS = [
   "あ、どうも。",
   "はいはい。",
   "…なんすか。",
@@ -26,7 +26,7 @@ export async function greetingReply(ctx: ModuleContext): Promise<ModuleResult> {
   const actorId = ctx.actorUserId ?? ctx.channelUserId;
   const role = await getUserRole(ctx.db, actorId);
 
-  const pool = role === "slave" ? SLAVE_GREETING_DRAFTS : GREETING_DRAFTS;
+  const pool = role === "restricted" ? RESTRICTED_GREETING_DRAFTS : GREETING_DRAFTS;
   const draft = pool[Math.floor(Math.random() * pool.length)]!;
   return {
     success: true,

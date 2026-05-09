@@ -33,7 +33,7 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
     name: "near_google_sheets_query",
     strict: true,
     description:
-      "Google スプレッドシートを読み取り、質問に答える。ユーザーが表・売上・在庫など**スプレッドシート上のデータ**を知りたいときに使う。Google 連携またはサービスアカウント共有が必要。結果の draft はユーザー向け文案としてそのまま使える。",
+      "Google スプレッドシートを読み取り、質問に答える。売上・在庫・集計など**汎用のシート分析**に使う。タスク一覧/今日の指示/未完了タスク確認は near_read_task_sheet を優先。Google 連携またはサービスアカウント共有が必要。結果の draft はユーザー向け文案としてそのまま使える。",
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -53,6 +53,48 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
         },
       },
       required: ["question", "spreadsheet_id", "spreadsheet_name_hint"],
+    },
+  },
+  {
+    type: "function",
+    name: "near_read_task_sheet",
+    strict: true,
+    description:
+      "スプレッドシート上の**タスク管理シート専用**読み取り。『タスク一覧』『タスク見せて』『今日の指示』『未完了タスク』『進行中のタスク』などを取得するときに使う。『タスクを追加して』『これをタスクにして』の保存は near_save_task を使う。",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        query: {
+          type: "string",
+          description: "ユーザーが知りたい内容（例: 未完了のタスク一覧、今日の指示）",
+        },
+        status: {
+          type: ["string", "null"],
+          description: "未着手 / 進行中 / 確認待ち / 完了。指定がなければ null。",
+        },
+        assignee: {
+          type: ["string", "null"],
+          description: "担当者名。指定がなければ null。",
+        },
+        priority: {
+          type: ["string", "null"],
+          description: "高 / 中 / 低。指定がなければ null。",
+        },
+        due_filter: {
+          type: ["string", "null"],
+          description: "today / overdue / this_week / none など。指定がなければ null。",
+        },
+        spreadsheet_id: {
+          type: ["string", "null"],
+          description: "スプレッドシートID。明示されていなければ null（既定ロジックを使用）。",
+        },
+        sheet_name: {
+          type: ["string", "null"],
+          description: "シート名（例: タスク / タスク一覧）。指定がなければ null で自動推定。",
+        },
+      },
+      required: ["query", "status", "assignee", "priority", "due_filter", "spreadsheet_id", "sheet_name"],
     },
   },
   {

@@ -6,6 +6,7 @@ import { memoStore } from "../../modules/memo_store.js";
 import { reminderManager } from "../../modules/reminder_manager.js";
 import { sheetsQuery } from "../../modules/sheets_query.js";
 import { summarizer } from "../../modules/summarizer.js";
+import { taskSheetQuery } from "../../modules/task_sheet_query.js";
 import { taskManager } from "../../modules/task_manager.js";
 import type { ModuleResult } from "../../modules/types.js";
 import { listCapabilityLines } from "../../modules/capabilities.js";
@@ -142,6 +143,38 @@ export async function executeNearAgentFunction(
         }
         const intent = syntheticAgentIntent("google_sheets_query", params);
         const mod = await sheetsQuery(toModuleContext(input, intent, originalText));
+        return finishToolExecution(
+          input,
+          name,
+          started,
+          JSON.stringify({ ok: true, ...moduleResultToToolPayload(mod) }),
+          mod.situation
+        );
+      }
+      case "near_read_task_sheet": {
+        const query = typeof rec.query === "string" ? rec.query.trim() : "";
+        if (!query) {
+          return finishToolExecution(
+            input,
+            name,
+            started,
+            JSON.stringify({ ok: false, error: "query_required" })
+          );
+        }
+        const stringOrNull = (v: unknown): string | null =>
+          typeof v === "string" && v.trim() ? v.trim() : null;
+        const sid = stringOrNull(rec.spreadsheet_id);
+        const params: Record<string, unknown> = {
+          query,
+          status: stringOrNull(rec.status),
+          assignee: stringOrNull(rec.assignee),
+          priority: stringOrNull(rec.priority),
+          due_filter: stringOrNull(rec.due_filter),
+          spreadsheet_id: sid,
+          sheet_name: stringOrNull(rec.sheet_name),
+        };
+        const intent = syntheticAgentIntent("google_sheets_query", params);
+        const mod = await taskSheetQuery(toModuleContext(input, intent, query));
         return finishToolExecution(
           input,
           name,

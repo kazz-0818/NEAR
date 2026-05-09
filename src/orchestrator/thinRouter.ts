@@ -26,6 +26,22 @@ export type ThinRouterResult =
   | { handled: false; forceIntent?: string };
 
 /**
+ * 「スプレッドシート上のタスク一覧/未完了/指示確認」を local task_line ではなく
+ * シート読取に回すための判定。
+ */
+function looksLikeTaskSheetReadRequest(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  const hasSheetWord = /スプレッ?ト|スプレッド|スプシ|spreadsheet|docs\.google\.com\/spreadsheets|シート/u.test(t);
+  if (!hasSheetWord) return false;
+  const hasTaskTopic = /タスク|指示|未完了|進行中/u.test(t);
+  if (!hasTaskTopic) return false;
+  const readIntent = /一覧|見せ|見たい|出して|確認|教えて|読んで|読み取|取得/u.test(t);
+  if (!readIntent) return false;
+  const saveIntent = /追加|登録|保存|入れて|作成|新規/u.test(t);
+  return !saveIntent;
+}
+
+/**
  * LLM 意図分類より前の決定的ルート（成長・OAuth・テンプレ系）。
  */
 export async function runThinRouterPhase(input: {
@@ -69,6 +85,12 @@ export async function runThinRouterPhase(input: {
     : false;
   if (hasPick) {
     log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
+    return { handled: false, forceIntent: "google_sheets_query" };
+  }
+
+  // 「スプレッドシートのタスク一覧」などは local task ではなくシート読み取りを優先
+  if (looksLikeTaskSheetReadRequest(text)) {
+    log.info({ channelUserId, text }, "task-sheet read request detected — forcing google_sheets_query");
     return { handled: false, forceIntent: "google_sheets_query" };
   }
 

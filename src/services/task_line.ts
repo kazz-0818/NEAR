@@ -53,7 +53,7 @@ const ALL_DONE_RE =
 // 直前の NEAR 返答がタスク一覧だったときに追加で認識するパターン
 // 例: 「二つとも削除して」「両方消して」「全部やった」（タスク文脈を前提）
 const CONTEXT_DELETE_RE =
-  /(?:両方|二つとも|全部|全て|すべて|ぜんぶ)(?:とも)?(?:を)?(?:削除|消して|消去)|(?:削除|消して)/iu;
+  /(?:両方|二つとも|全部|全て|すべて|ぜんぶ)(?:とも)?(?:を)?(?:削除|消して|消去)/iu;
 const CONTEXT_DONE_RE =
   /(?:両方|二つとも|全部|全て|すべて|ぜんぶ)(?:とも)?(?:を)?(?:完了|終わった|終了|やった)/iu;
 
@@ -67,7 +67,7 @@ const DONE_NO_NUM_RE =
 
 // タスク追加
 const ADD_RE =
-  /(?:(.+?)(?:を|を?))?タスク(?:に)?(?:追加|入れて|登録|追加して|加えて)|(?:(.+?)(?:を|を?))?やること(?:に)?(?:追加|入れて|登録)|タスク追加[：:]\s*(.+)/u;
+  /(?:(.+?)(?:を|を?))?タスク(?:リスト)?(?:に)?(?:追加|入れて|登録|追加して|加えて)|(?:(.+?)(?:を|を?))?やること(?:リスト)?(?:に)?(?:追加|入れて|登録)|タスク追加[：:]\s*(.+)/u;
 
 // 「最初のやつ」「一番上」→ インデックス1として扱う
 const CONTEXT_FIRST_RE = /^(?:最初|一番上|いちばん上|1番目|一番目|先頭)(?:の(?:やつ|タスク|の)?)?$/u;
@@ -85,7 +85,7 @@ export function isTaskManagementCommand(
   text: string,
   recentAssistantMessages?: string[]
 ): boolean {
-  const t = text.normalize("NFKC");
+  const t = text.normalize("NFKC").replace(/\s+/g, " ").trim();
   if (LIST_RE.test(t) || DONE_RE.test(t) || DELETE_RE.test(t) || EDIT_RE.test(t)) return true;
   if (ALL_DELETE_RE.test(t) || ALL_DONE_RE.test(t)) return true;
   // タスク一覧の直後なら「削除して」「両方消して」「2番」だけの発言も受け付ける
@@ -168,7 +168,7 @@ export async function tryHandleTaskLine(input: {
   recentAssistantMessages?: string[];
 }): Promise<{ handled: boolean; reply: string }> {
   const { db, channelUserId, actorUserId, groupId, recentAssistantMessages = [] } = input;
-  const t = input.text.normalize("NFKC").trim();
+  const t = input.text.normalize("NFKC").replace(/\s+/g, " ").trim();
   const inTaskContext = hadRecentTaskListReply(recentAssistantMessages);
 
   // ─ タスク追加 ─

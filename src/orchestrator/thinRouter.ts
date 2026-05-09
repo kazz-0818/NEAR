@@ -36,9 +36,10 @@ export async function runThinRouterPhase(input: {
   groupId?: string;
   text: string;
   lineSourceType?: string;
+  recentAssistantMessages?: string[];
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, actorUserId, groupId, text, lineSourceType } = input;
+  const { db, env, channelUserId, actorUserId, groupId, text, lineSourceType, recentAssistantMessages } = input;
 
   const effectiveActorId = actorUserId ?? channelUserId;
   // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
@@ -58,13 +59,15 @@ export async function runThinRouterPhase(input: {
   }
 
   // タスク管理コマンド（一覧・完了・削除・編集）
-  if (isTaskManagementCommand(text)) {
+  // recentAssistantMessages を渡すことで「タスク一覧の直後の続き発言」も検出できる
+  if (isTaskManagementCommand(text, recentAssistantMessages)) {
     const taskResult = await tryHandleTaskLine({
       db,
       text,
       channelUserId,
       actorUserId: effectiveActorId,
       groupId,
+      recentAssistantMessages,
     });
     if (taskResult.handled) {
       return { handled: true, finalText: taskResult.reply };

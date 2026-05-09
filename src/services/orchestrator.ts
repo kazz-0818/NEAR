@@ -151,19 +151,10 @@ export async function handleLineTextMessage(input: {
   const env = getEnv();
   const outboundCtx = { channel, channelUserId, inboundMessageId };
 
-  const thin = await runThinRouterPhase({ db, env, channelUserId, actorUserId, groupId, text, lineSourceType });
-  if (thin.handled) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
-    return;
-  }
-
-  // thinRouter から強制 intent が返った場合は secretary 層・intent 分類をスキップして直接処理する
-  const thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
-
+  // 会話コンテキストを thinRouter より先に取得（タスク続き発言の判定に必要）
   let recentUserMessages: string[] = [];
   let recentAssistantMessages: string[] = [];
   try {
-    // グループ会話では actorUserId を渡して発言者固有の履歴を取得
     recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId, {
       actorUserId: actorUserId ?? undefined,
     });
@@ -171,6 +162,15 @@ export async function handleLineTextMessage(input: {
   } catch (ctxErr) {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }
+
+  const thin = await runThinRouterPhase({ db, env, channelUserId, actorUserId, groupId, text, lineSourceType, recentAssistantMessages });
+  if (thin.handled) {
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
+    return;
+  }
+
+  // thinRouter から強制 intent が返った場合は secretary 層・intent 分類をスキップして直接処理する
+  const thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
 
   const pendingHit = await tryHandlePendingToolConfirmation({
     db,

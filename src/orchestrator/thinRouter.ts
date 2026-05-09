@@ -78,6 +78,19 @@ export async function runThinRouterPhase(input: {
     log.info({ channelUserId, reason: taskClass.reason }, "task utterance classified as read_task_sheet");
     return { handled: false, forceIntent: "google_sheets_query" };
   }
+  if (taskClass.kind === "local_task_list") {
+    const taskResult = await tryHandleTaskLine({
+      db,
+      text,
+      channelUserId,
+      actorUserId: effectiveActorId,
+      groupId,
+      recentAssistantMessages,
+    });
+    if (taskResult.handled) {
+      return { handled: true, finalText: taskResult.reply };
+    }
+  }
   if (taskClass.kind === "ambiguous_task") {
     return {
       handled: true,

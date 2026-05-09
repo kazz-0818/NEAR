@@ -1,5 +1,6 @@
 export type TaskUtteranceKind =
   | "add_task"
+  | "local_task_list"
   | "read_task_sheet"
   | "delete_task"
   | "update_task"
@@ -14,17 +15,22 @@ export type TaskUtteranceClassification = {
   reason: string;
 };
 
-const TASK_WORD_RE = /(タスク|タスクリスト|todo|to\s*do|やること|やる事|リスト)/iu;
-const SHEET_WORD_RE = /(スプレッ?ドシート|スプシ|spreadsheet|シート|タスク管理表|管理表)/iu;
+const TASK_WORD_RE = /(タスク|タスクリスト|todo|to\s*do|やること|やる事|リスト|指示|ガントチャート|管理表)/iu;
+const SHEET_EXPLICIT_RE =
+  /(スプレッ?ドシート|スプシ|google\s*シート|google\s*sheets?|spreadsheet|シート(?:から|で|を|の)?|タスク管理表|ガントチャート|表から|シートから)/iu;
 const READ_WORD_RE =
-  /(一覧|見せ|見たい|教えて|ある\??|あります\??|何がある|今日|未完了|進行中|優先度|指示|次やること|今残って|残ってる)/iu;
+  /(一覧|見せ|見たい|教えて|ある\??|あります\??|何がある|今日|未完了|進行中|優先度|指示|次やること|今残って|残ってる|出して|確認)/iu;
 const ADD_WORD_RE =
-  /(追加|入れて|登録|タスク化|タスクにして|todoに|やることに|覚えておいて|リスト.*入れ|入れといて|保存して)/iu;
+  /(追加|入れて|タスク化|タスクにして|todoに|やることに|覚えておいて|リスト.*入れ|入れといて|保存して|登録して|(?:タスク|todo|やること).{0,6}登録)/iu;
 const DELETE_WORD_RE = /(削除|消して|消去|消す|外して|外す|remove|delete)/iu;
 const UPDATE_WORD_RE = /((?:^|[^未])完了|終わった|進行中にして|変更|修正|期限|担当|ステータス|優先度.*にして|内容修正)/iu;
 const AMBIGUOUS_ONLY_RE =
   /^(タスク|リスト|todo|やること|あれやっといて|さっきのやつ|さっきのやつお願い|それお願い|管理して|整理して)$/iu;
 const BULK_DELETE_RE = /(全部|全て|すべて|両方|二つとも|全消し|全削除)/iu;
+const LOCAL_LIST_RE =
+  /(タスク一覧|タスクリスト|todo一覧|やること一覧|今のタスク|現在のタスク|今日のタスク|登録したタスク|追加したタスク|俺のタスク|自分のタスク|残ってるタスク|残っているタスク|次やること何|今残ってるタスク何)/iu;
+const SHEET_TASK_READ_RE =
+  /(スプレッ?ドシート.*タスク|スプシ.*タスク|google\s*シート.*タスク|シート.*タスク|タスク管理表|ガントチャート|シート読んで.*タスク|シートから.*タスク|表から.*タスク)/iu;
 
 function normalizeText(text: string): { raw: string; flat: string; lines: string[] } {
   const raw = text.normalize("NFKC").replace(/\r\n/g, "\n").trim();
@@ -74,7 +80,7 @@ export function classifyTaskUtterance(text: string): TaskUtteranceClassification
   if (!flat) return { kind: "not_task", confidence: 0.99, reason: "empty" };
 
   const hasTaskWord = TASK_WORD_RE.test(flat);
-  const hasSheetWord = SHEET_WORD_RE.test(flat);
+  const hasSheetWord = SHEET_EXPLICIT_RE.test(flat);
   const hasReadWord = READ_WORD_RE.test(flat);
   const hasAddWord = ADD_WORD_RE.test(flat);
   const hasDeleteWord = DELETE_WORD_RE.test(flat);
@@ -85,19 +91,15 @@ export function classifyTaskUtterance(text: string): TaskUtteranceClassification
     return { kind: "ambiguous_task", confidence: 0.85, reason: "too_short_ambiguous" };
   }
 
-  // シート語 + タスク話題 + 参照語 は task_line より先にシート読取へ寄せる
-  if ((hasSheetWord && (hasTaskWord || /指示|未完了|進行中|優先度/u.test(flat)) && hasReadWord) || /タスク管理表/u.test(flat)) {
+  // A. 明示シート指定があるタスク参照は read_task_sheet（local より優先）
+  if (SHEET_TASK_READ_RE.test(flat) || (hasSheetWord && hasTaskWord && hasReadWord)) {
     return { kind: "read_task_sheet", confidence: 0.96, reason: "task_sheet_read_keywords" };
   }
-  if (/今日の指示|指示一覧|未完了タスク|進行中のタスク|優先度高いタスク|次やること|今残ってるタスク/u.test(flat)) {
-    return { kind: "read_task_sheet", confidence: 0.9, reason: "task_read_phrase" };
+  if (hasSheetWord && /見せ|見たい|読んで|出して|確認|教えて/u.test(flat)) {
+    return { kind: "read_task_sheet", confidence: 0.9, reason: "explicit_sheet_read" };
   }
 
-  // 追加と参照が同時なら参照優先（「タスク一覧見せて」誤判定防止）
-  if (hasAddWord && hasReadWord) {
-    return { kind: "read_task_sheet", confidence: 0.78, reason: "add_and_read_conflict_read_preferred" };
-  }
-
+  // C. 追加は一覧より優先（「〇〇をタスクにして」）
   if (hasAddWord || /タスク追加|タスク化|todoへ|やることに/u.test(flat)) {
     const extracted = extractTaskTitle(raw, flat, lines);
     return {
@@ -108,6 +110,12 @@ export function classifyTaskUtterance(text: string): TaskUtteranceClassification
     };
   }
 
+  // B. シート明示がない一覧参照は local_task_list
+  if (LOCAL_LIST_RE.test(flat) || (hasTaskWord && hasReadWord)) {
+    return { kind: "local_task_list", confidence: 0.9, reason: "local_task_list_keywords" };
+  }
+
+  // D. 更新/削除
   if (hasDeleteWord || BULK_DELETE_RE.test(flat)) {
     const ambiguousTarget =
       BULK_DELETE_RE.test(flat) ||
@@ -131,9 +139,6 @@ export function classifyTaskUtterance(text: string): TaskUtteranceClassification
     };
   }
 
-  if (hasTaskWord && hasReadWord) {
-    return { kind: "read_task_sheet", confidence: 0.8, reason: "task_read_keywords" };
-  }
   if (hasTaskWord) {
     return { kind: "ambiguous_task", confidence: 0.62, reason: "task_topic_but_unclear_action" };
   }

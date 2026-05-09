@@ -3,10 +3,12 @@
  * thinRouter から呼び出す（LLM を通さずに処理）
  *
  * 対応コマンド:
- *   タスク一覧 / タスクリスト / 今のタスク
- *   タスク完了 N  / N番完了  / 全部完了 / 両方完了
- *   タスク削除 N  / N番削除  / 全部削除 / 両方削除 / 二つとも削除
+ *   タスク一覧 / タスクリスト / 今のタスク / やること一覧 など
+ *   〇〇をタスクに追加 / タスク追加：タイトル
+ *   タスク完了 N  / N番完了  / 番号なし完了（1件時は即完了）/ 全部完了 / 両方完了
+ *   タスク削除 N  / N番削除  / 番号なし削除（1件時は即削除）/ 全部削除 / 二つとも削除 など
  *   タスク編集 N 新しいタイトル
+ *   一覧直後:「最初のやつ」「一番上」
  *
  * 会話コンテキスト判定:
  *   直前の NEAR 返答がタスク一覧だった場合、「削除して」「両方消して」なども受け付ける
@@ -30,7 +32,7 @@ type TaskRow = {
 // ─── コマンド判定 ─────────────────────────────────────────────────────────────
 
 const LIST_RE =
-  /タスク(?:一覧|リスト|みせて|見せて|教えて|確認|一覧出して)|(?:今の|今日の|現在の)?タスク(?:一覧|リスト)|タスクは(?:何|なん)|タスク出して/u;
+  /タスク(?:一覧|リスト|みせて|見せて|教えて|確認|一覧出して|ある\??|あります\??|どんなの|何がある|見たい|チェック)|(?:今の|今日の|現在の)?タスク(?:一覧|リスト)|タスクは(?:何|なん)|タスク出して|やること(?:一覧|リスト|みせて|見せて|教えて|確認|ある\??)/u;
 
 // 番号指定（1件）
 // パターン1: 動詞が先「削除 2」「完了 2」
@@ -44,7 +46,7 @@ const CONTEXT_NUM_ONLY_RE = /^([1-9０-９][0-9０-９]?)(?:番目?|つ目)?$/u;
 
 // 一括操作（全部・両方・二つとも・すべて）
 const ALL_DELETE_RE =
-  /(?:全部|全て|すべて|両方|二つとも|ぜんぶ|全タスク)(?:を)?(?:削除|消して|消去|delete)|(?:削除|消して|消去)(?:して)?(?:全部|全て|すべて|両方|二つとも)/iu;
+  /(?:全部|全て|すべて|両方|二つとも|ぜんぶ|全タスク)(?:を)?(?:削除|消して|消去|delete)|(?:削除|消して|消去)(?:して)?(?:全部|全て|すべて|両方|二つとも)|全消し|全削除/iu;
 const ALL_DONE_RE =
   /(?:全部|全て|すべて|両方|二つとも|ぜんぶ|全タスク)(?:を)?(?:完了|終わった|終了|やった|done)|(?:完了|終了)(?:して)?(?:全部|全て|すべて|両方|二つとも)/iu;
 
@@ -54,6 +56,21 @@ const CONTEXT_DELETE_RE =
   /(?:両方|二つとも|全部|全て|すべて|ぜんぶ)(?:とも)?(?:を)?(?:削除|消して|消去)|(?:削除|消して)/iu;
 const CONTEXT_DONE_RE =
   /(?:両方|二つとも|全部|全て|すべて|ぜんぶ)(?:とも)?(?:を)?(?:完了|終わった|終了|やった)/iu;
+
+// 番号なし削除（タスクが1件 or 文脈あり）
+const DELETE_NO_NUM_RE =
+  /^(?:タスク(?:を)?)?(?:削除|消して|消去)(?:して)?$/iu;
+
+// 番号なし完了（タスクが1件 or 文脈あり）
+const DONE_NO_NUM_RE =
+  /^(?:タスク(?:を)?)?(?:完了|終わった|終了|やった|できた)(?:にして)?$/iu;
+
+// タスク追加
+const ADD_RE =
+  /(?:(.+?)(?:を|を?))?タスク(?:に)?(?:追加|入れて|登録|追加して|加えて)|(?:(.+?)(?:を|を?))?やること(?:に)?(?:追加|入れて|登録)|タスク追加[：:]\s*(.+)/u;
+
+// 「最初のやつ」「一番上」→ インデックス1として扱う
+const CONTEXT_FIRST_RE = /^(?:最初|一番上|いちばん上|1番目|一番目|先頭)(?:の(?:やつ|タスク|の)?)?$/u;
 
 /** 直前の NEAR 発言がタスク一覧かどうか */
 function hadRecentTaskListReply(recentAssistantMessages: string[]): boolean {
@@ -75,7 +92,11 @@ export function isTaskManagementCommand(
   if (recentAssistantMessages && hadRecentTaskListReply(recentAssistantMessages)) {
     if (CONTEXT_DELETE_RE.test(t) || CONTEXT_DONE_RE.test(t)) return true;
     if (CONTEXT_NUM_ONLY_RE.test(t)) return true;
+    if (CONTEXT_FIRST_RE.test(t)) return true;
   }
+  if (ADD_RE.test(t)) return true;
+  if (DELETE_NO_NUM_RE.test(t)) return true;
+  if (DONE_NO_NUM_RE.test(t)) return true;
   return false;
 }
 
@@ -150,6 +171,66 @@ export async function tryHandleTaskLine(input: {
   const t = input.text.normalize("NFKC").trim();
   const inTaskContext = hadRecentTaskListReply(recentAssistantMessages);
 
+  // ─ タスク追加 ─
+  const addMatch = t.match(ADD_RE);
+  if (addMatch) {
+    const title = (addMatch[1] ?? addMatch[2] ?? addMatch[3] ?? "").trim();
+    if (!title) {
+      return { handled: true, reply: "追加するタスクのタイトルを教えてください。\n例: 「〇〇をタスクに追加して」" };
+    }
+    const taskScope = groupId ? "group" : "personal";
+    try {
+      await db.query(
+        `INSERT INTO tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, status, created_at, updated_at)
+         VALUES ('line', $1, $2, $3, $4, $5, NULL, 'open', now(), now())`,
+        [channelUserId, actorUserId, groupId ?? null, taskScope, title]
+      );
+      log.info({ title, actorUserId }, "task added");
+      return { handled: true, reply: `✅ 「${title}」をタスクに追加しました。` };
+    } catch (e) {
+      log.error({ err: e }, "task add failed");
+      return { handled: true, reply: "タスクの追加中にエラーが発生しました。" };
+    }
+  }
+
+  // ─ 削除（番号なし）─ タスクが1件なら即削除、複数なら一覧で確認（一括削除より先）
+  if (DELETE_NO_NUM_RE.test(t)) {
+    try {
+      const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
+      if (tasks.length === 0) {
+        return { handled: true, reply: "削除するタスクがありません。" };
+      }
+      if (tasks.length === 1) {
+        await db.query(`DELETE FROM tasks WHERE id = $1`, [tasks[0]!.id]);
+        log.info({ taskId: tasks[0]!.id, actorUserId }, "task deleted (no-num)");
+        return { handled: true, reply: `🗑️ 「${tasks[0]!.title}」を削除しました。` };
+      }
+      return { handled: true, reply: formatTaskList(tasks, groupId) + "\n\nどれを削除しますか？番号を送ってください。" };
+    } catch (e) {
+      log.error({ err: e }, "task delete no-num failed");
+      return { handled: true, reply: "タスクの削除中にエラーが発生しました。" };
+    }
+  }
+
+  // ─ 完了（番号なし）─ タスクが1件なら即完了、複数なら一覧で確認
+  if (DONE_NO_NUM_RE.test(t)) {
+    try {
+      const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
+      if (tasks.length === 0) {
+        return { handled: true, reply: "完了するタスクがありません。" };
+      }
+      if (tasks.length === 1) {
+        await db.query(`UPDATE tasks SET status = 'done', updated_at = now() WHERE id = $1`, [tasks[0]!.id]);
+        log.info({ taskId: tasks[0]!.id, actorUserId }, "task done (no-num)");
+        return { handled: true, reply: `✅ 「${tasks[0]!.title}」を完了にしました。` };
+      }
+      return { handled: true, reply: formatTaskList(tasks, groupId) + "\n\nどれを完了にしますか？番号を送ってください。" };
+    } catch (e) {
+      log.error({ err: e }, "task done no-num failed");
+      return { handled: true, reply: "タスクの更新中にエラーが発生しました。" };
+    }
+  }
+
   // ─ 一括削除（全部・両方・二つとも）─
   const isAllDelete =
     ALL_DELETE_RE.test(t) ||
@@ -200,6 +281,23 @@ export async function tryHandleTaskLine(input: {
     } catch (e) {
       log.error({ err: e }, "task list failed");
       return { handled: true, reply: "タスクの取得中にエラーが発生しました。" };
+    }
+  }
+
+  // ─ 「最初のやつ」「一番上」→ インデックス1として扱う ─
+  if (inTaskContext && CONTEXT_FIRST_RE.test(t)) {
+    try {
+      const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
+      const target = tasks[0];
+      if (!target) {
+        return { handled: true, reply: "タスクがありません。" };
+      }
+      return {
+        handled: true,
+        reply: `「${target.title}」について何をしますか？\n\n・完了 → 「タスク完了 1」\n・削除 → 「タスク削除 1」`,
+      };
+    } catch (e) {
+      return { handled: false, reply: "" };
     }
   }
 

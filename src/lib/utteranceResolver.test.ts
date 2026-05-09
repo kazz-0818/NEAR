@@ -11,6 +11,7 @@ test("normalizeUserUtterance keeps lines and compacts text", () => {
 
 test("task.add cases", () => {
   const cases = [
+    "システム開発 タスク追加して",
     "システム開発\nタスク追加して",
     "システム開発\nタスクリストに入れて",
     "請求書確認をタスクにして",
@@ -70,6 +71,14 @@ test("task.delete cases and confirmations", () => {
   const ambiguous1 = resolveUserOperation({ text: "2も消して" });
   assert.equal(ambiguous1.kind, "task.delete");
   assert.equal(ambiguous1.requiresConfirmation, true);
+
+  const withListContext = resolveUserOperation({
+    text: "2も消して",
+    recentAssistantMessages: ["📋 タスク一覧（3件）\n1. A\n2. B\n3. C"],
+  });
+  assert.equal(withListContext.kind, "task.delete");
+  assert.equal(withListContext.targetNumber, 2);
+  assert.equal(withListContext.requiresConfirmation, false);
 
   const ambiguous2 = resolveUserOperation({ text: "このタスク消して" });
   assert.equal(ambiguous2.requiresConfirmation, true);

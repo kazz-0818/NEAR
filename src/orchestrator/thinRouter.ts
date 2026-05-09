@@ -26,7 +26,19 @@ import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_lin
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
-  | { handled: false; forceIntent?: string };
+  | { handled: false; forceIntent?: string; forceRequiredParams?: Record<string, unknown> };
+
+function looksLikeContextDependentShortTaskText(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  return /(これ|それ|あれ|さっきの|上のやつ|お願い|入れといて|やっといて|消しといて|見せて|出して)/u.test(t);
+}
+
+function isMostlyHiraganaText(text: string): boolean {
+  const t = text.normalize("NFKC").replace(/\s+/g, "");
+  if (!t) return false;
+  const hiraLike = (t.match(/[ぁ-んー]/g) ?? []).length;
+  return hiraLike / t.length >= 0.45;
+}
 
 /**
  * LLM 意図分類より前の決定的ルート（成長・OAuth・テンプレ系）。
@@ -91,6 +103,16 @@ export async function runThinRouterPhase(input: {
     log.info({ channelUserId, reason: op.reason }, "task utterance resolved as task.list.sheet");
     return { handled: false, forceIntent: "google_sheets_query" };
   }
+  if (op.kind === "task.add" && op.extractedText && op.extractedText.length >= 2 && op.confidence >= 0.9) {
+    return {
+      handled: false,
+      forceIntent: "task_create",
+      forceRequiredParams: {
+        title: op.extractedText,
+        semantic_operation: op,
+      },
+    };
+  }
   if (op.kind === "task.list.local") {
     const taskResult = await tryHandleTaskLine({
       db,
@@ -105,10 +127,12 @@ export async function runThinRouterPhase(input: {
     }
   }
   if (op.kind === "task.clarify") {
-    return {
-      handled: true,
-      finalText: "タスクの追加・一覧確認・削除・更新のどれを行いますか？",
-    };
+    if (!env.SEMANTIC_ROUTER_ENABLED) {
+      return {
+        handled: true,
+        finalText: "タスクの追加・一覧確認・削除・更新のどれを行いますか？",
+      };
+    }
   }
 
   // タスク管理コマンド（一覧・完了・削除・編集）
@@ -154,10 +178,24 @@ export async function runThinRouterPhase(input: {
     return { handled: true, finalText: googleAcct.reply };
   }
 
+  // semantic router は fallback ではなく補助判定として利用する。
+  // deterministic が低信頼/曖昧/文脈依存のときに意味解釈を追加する。
+  const shouldRunSemanticAssist =
+    env.SEMANTIC_ROUTER_ENABLED &&
+    (
+      op.kind === "general.chat" ||
+      op.kind === "unknown" ||
+      op.kind === "task.clarify" ||
+      op.confidence < 0.9 ||
+      (op.kind === "task.add" && (!op.extractedText || op.extractedText.trim().length < 2)) ||
+      ((op.kind === "task.delete" || op.kind === "task.update") && op.requiresConfirmation === true) ||
+      looksLikeContextDependentShortTaskText(text) ||
+      isMostlyHiraganaText(text)
+    );
+
   // deterministic で拾い切れない曖昧表現は semantic router で意味解釈する（envで段階的にON）
   if (
-    env.SEMANTIC_ROUTER_ENABLED &&
-    (op.kind === "general.chat" || op.kind === "unknown")
+    shouldRunSemanticAssist
   ) {
     const sem = await resolveSemanticOperation({
       db,
@@ -168,6 +206,9 @@ export async function runThinRouterPhase(input: {
     log.info(
       {
         userText: text,
+        deterministic_kind: op.kind,
+        deterministic_confidence: op.confidence,
+        deterministic_reason: op.reason,
         kind: sem.kind,
         confidence: sem.confidence,
         route_hint: sem.route_hint,
@@ -177,41 +218,110 @@ export async function runThinRouterPhase(input: {
       },
       "semantic operation resolved"
     );
+    const logSemanticAdopt = (adoptedRoute: string) => {
+      log.info(
+        {
+          rawText: text,
+          deterministic_kind: op.kind,
+          deterministic_confidence: op.confidence,
+          deterministic_reason: op.reason,
+          semantic_kind: sem.kind,
+          semantic_confidence: sem.confidence,
+          semantic_reason: sem.reason,
+          adopted_route: adoptedRoute,
+          extracted_text: sem.extracted_text,
+          target_number: sem.target_number,
+          needs_confirmation: sem.needs_confirmation,
+        },
+        "semantic route adopted"
+      );
+    };
     if (sem.confidence >= env.SEMANTIC_ROUTER_MIN_CONFIDENCE) {
+      if (sem.kind === "task.add" && (!sem.extracted_text || sem.extracted_text.trim().length < 2)) {
+        logSemanticAdopt("clarify");
+        return {
+          handled: true,
+          finalText: "追加するタスク内容をもう少し具体的に教えてください。",
+        };
+      }
       if (sem.kind === "task.list.sheet" || sem.kind === "sheet.query") {
-        return { handled: false, forceIntent: "google_sheets_query" };
+        logSemanticAdopt("google_sheets_query");
+        return {
+          handled: false,
+          forceIntent: "google_sheets_query",
+          forceRequiredParams: {
+            semantic_operation: sem,
+          },
+        };
       }
       if (sem.kind === "calendar.query") {
-        return { handled: false, forceIntent: "google_calendar_query" };
+        logSemanticAdopt("google_calendar_query");
+        return {
+          handled: false,
+          forceIntent: "google_calendar_query",
+          forceRequiredParams: {
+            semantic_operation: sem,
+          },
+        };
       }
       if (sem.kind === "memo.save") {
-        return { handled: false, forceIntent: "memo_save" };
+        logSemanticAdopt("memo_save");
+        return {
+          handled: false,
+          forceIntent: "memo_save",
+          forceRequiredParams: {
+            body: sem.extracted_text ?? text,
+            semantic_operation: sem,
+          },
+        };
       }
       if (sem.kind === "reminder.create") {
-        return { handled: false, forceIntent: "reminder_request" };
+        logSemanticAdopt("reminder_request");
+        return {
+          handled: false,
+          forceIntent: "reminder_request",
+          forceRequiredParams: {
+            message: sem.extracted_text ?? text,
+            semantic_operation: sem,
+          },
+        };
       }
       if (sem.kind === "clarify") {
+        logSemanticAdopt("clarify");
         return {
           handled: true,
           finalText: "追加・一覧確認・削除・更新のどれを行いますか？",
         };
       }
       if (sem.kind === "task.delete" && sem.needs_confirmation) {
+        logSemanticAdopt("confirm_task_delete");
         return {
           handled: true,
           finalText: "削除対象を確認したいです。削除したいタスク番号、またはタスク名を教えてください。",
         };
       }
       if (sem.kind === "task.update" && sem.needs_confirmation) {
+        logSemanticAdopt("confirm_task_update");
         return {
           handled: true,
           finalText: "更新対象を確認したいです。対象のタスク番号、またはタスク名を教えてください。",
         };
       }
-      if (sem.kind === "task.add" || sem.kind === "task.list.local" || sem.kind === "task.delete" || sem.kind === "task.update") {
-        const routedText = sem.kind === "task.add" && sem.extracted_text
-          ? `${sem.extracted_text}\nタスク追加して`
-          : text;
+      if (sem.kind === "task.add") {
+        logSemanticAdopt("task_create");
+        return {
+          handled: false,
+          forceIntent: "task_create",
+          forceRequiredParams: {
+            title: sem.extracted_text,
+            target_number: sem.target_number,
+            target_label: sem.target_label,
+            semantic_operation: sem,
+          },
+        };
+      }
+      if (sem.kind === "task.list.local" || sem.kind === "task.delete" || sem.kind === "task.update") {
+        const routedText = text;
         const taskResult = await tryHandleTaskLine({
           db,
           text: routedText,
@@ -220,9 +330,13 @@ export async function runThinRouterPhase(input: {
           groupId,
           recentAssistantMessages,
         });
-        if (taskResult.handled) return { handled: true, finalText: taskResult.reply };
+        if (taskResult.handled) {
+          logSemanticAdopt("task_line_semantic");
+          return { handled: true, finalText: taskResult.reply };
+        }
       }
     }
+    logSemanticAdopt("deterministic_fallback_low_conf_or_unhandled");
   }
 
   if (isDeployTimeQuestion(text)) {

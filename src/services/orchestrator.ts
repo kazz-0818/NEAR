@@ -187,6 +187,7 @@ export async function handleLineTextMessage(input: {
 
   // thinRouter から強制 intent が返った場合は secretary 層・intent 分類をスキップして直接処理する
   const thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
+  const thinForceRequiredParams = !thin.handled ? thin.forceRequiredParams : undefined;
 
   const pendingHit = await tryHandlePendingToolConfirmation({
     db,
@@ -310,7 +311,7 @@ export async function handleLineTextMessage(input: {
       intent: thinForceIntent as ParsedIntent["intent"],
       confidence: 1,
       can_handle: true,
-      required_params: {},
+      required_params: thinForceRequiredParams ?? {},
       needs_followup: false,
       followup_question: null,
       reason: "thinRouter_force",

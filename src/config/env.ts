@@ -492,6 +492,28 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /**
+   * true / 1 で semantic operation router（LLM意味解釈）を有効化。
+   * 既定は false（段階的リリース）。
+   */
+  SEMANTIC_ROUTER_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
+  /** semantic router を採用する最低 confidence（既定 0.75） */
+  SEMANTIC_ROUTER_MIN_CONFIDENCE: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 0.75;
+      const n = parseFloat(s);
+      return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.75;
+    }),
+  /** 未設定時は OPENAI_INTENT_MODEL を使用 */
+  SEMANTIC_ROUTER_MODEL: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
 });
 
 export type Env = z.infer<typeof envSchema>;

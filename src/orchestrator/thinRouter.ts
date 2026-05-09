@@ -21,6 +21,7 @@ import {
 } from "../db/user_sheet_pending_pick_repo.js";
 import { normalizeUserUtterance } from "../lib/utteranceNormalizer.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
+import { resolveSemanticOperation } from "../services/semantic_operation_resolver.js";
 import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_line.js";
 
 export type ThinRouterResult =
@@ -151,6 +152,77 @@ export async function runThinRouterPhase(input: {
   const googleAcct = await tryHandleGoogleAccountListOrSwitch({ db, channelUserId, text });
   if (googleAcct.handled && googleAcct.reply) {
     return { handled: true, finalText: googleAcct.reply };
+  }
+
+  // deterministic で拾い切れない曖昧表現は semantic router で意味解釈する（envで段階的にON）
+  if (
+    env.SEMANTIC_ROUTER_ENABLED &&
+    (op.kind === "general.chat" || op.kind === "unknown")
+  ) {
+    const sem = await resolveSemanticOperation({
+      db,
+      userText: text,
+      recentUserMessages: recentUserMessages ?? [],
+      recentAssistantMessages: recentAssistantMessages ?? [],
+    });
+    log.info(
+      {
+        userText: text,
+        kind: sem.kind,
+        confidence: sem.confidence,
+        route_hint: sem.route_hint,
+        needs_confirmation: sem.needs_confirmation,
+        danger_level: sem.danger_level,
+        reason: sem.reason,
+      },
+      "semantic operation resolved"
+    );
+    if (sem.confidence >= env.SEMANTIC_ROUTER_MIN_CONFIDENCE) {
+      if (sem.kind === "task.list.sheet" || sem.kind === "sheet.query") {
+        return { handled: false, forceIntent: "google_sheets_query" };
+      }
+      if (sem.kind === "calendar.query") {
+        return { handled: false, forceIntent: "google_calendar_query" };
+      }
+      if (sem.kind === "memo.save") {
+        return { handled: false, forceIntent: "memo_save" };
+      }
+      if (sem.kind === "reminder.create") {
+        return { handled: false, forceIntent: "reminder_request" };
+      }
+      if (sem.kind === "clarify") {
+        return {
+          handled: true,
+          finalText: "追加・一覧確認・削除・更新のどれを行いますか？",
+        };
+      }
+      if (sem.kind === "task.delete" && sem.needs_confirmation) {
+        return {
+          handled: true,
+          finalText: "削除対象を確認したいです。削除したいタスク番号、またはタスク名を教えてください。",
+        };
+      }
+      if (sem.kind === "task.update" && sem.needs_confirmation) {
+        return {
+          handled: true,
+          finalText: "更新対象を確認したいです。対象のタスク番号、またはタスク名を教えてください。",
+        };
+      }
+      if (sem.kind === "task.add" || sem.kind === "task.list.local" || sem.kind === "task.delete" || sem.kind === "task.update") {
+        const routedText = sem.kind === "task.add" && sem.extracted_text
+          ? `${sem.extracted_text}\nタスク追加して`
+          : text;
+        const taskResult = await tryHandleTaskLine({
+          db,
+          text: routedText,
+          channelUserId,
+          actorUserId: effectiveActorId,
+          groupId,
+          recentAssistantMessages,
+        });
+        if (taskResult.handled) return { handled: true, finalText: taskResult.reply };
+      }
+    }
   }
 
   if (isDeployTimeQuestion(text)) {

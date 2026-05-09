@@ -1,3 +1,5 @@
+import { resolveUserOperation } from "./utteranceResolver.js";
+
 export type TaskUtteranceKind =
   | "add_task"
   | "local_task_list"
@@ -14,7 +16,6 @@ export type TaskUtteranceClassification = {
   targetNumber?: number;
   reason: string;
 };
-import { resolveUserOperation } from "./utteranceResolver.js";
 
 export function classifyTaskUtterance(text: string): TaskUtteranceClassification {
   const r = resolveUserOperation({ text });

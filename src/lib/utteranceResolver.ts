@@ -10,6 +10,7 @@ export type ResolvedOperationKind =
   | "memo.save"
   | "reminder.create"
   | "sheet.query"
+  | "calendar.query"
   | "general.chat"
   | "unknown";
 
@@ -35,6 +36,7 @@ const DELETE_WORD_RE = /(削除|消して|消去|消す|外して|外す|remove|
 const UPDATE_WORD_RE = /(完了|終わった|進行中にして|変更|修正|期限|担当|ステータス|内容修正|優先度.*にして)/iu;
 const MEMO_RE = /(メモ|覚えて|記録して|残して)/iu;
 const REMINDER_RE = /(リマインド|思い出させ|通知して|アラーム|明日|今日|分後|時間後|月\d+日|時)/iu;
+const CALENDAR_RE = /(カレンダー|予定|予定表|googleカレンダー|予定入れて|予定追加|予定確認)/iu;
 const AMBIGUOUS_TASK_RE = /^(タスク|リスト|todo|やること|あれやっといて|さっきのやつ(お願い)?|それお願い|整理して|管理して)$/iu;
 
 function extractTargetNumber(compact: string): number | undefined {
@@ -140,6 +142,9 @@ export function resolveUserOperation(input: {
   }
   if (REMINDER_RE.test(compact) && /(リマインド|通知|思い出させ|分後|時間後|明日|今日|時)/iu.test(compact)) {
     return { kind: "reminder.create", confidence: 0.68, reason: "reminder_keywords" };
+  }
+  if (CALENDAR_RE.test(compact)) {
+    return { kind: "calendar.query", confidence: 0.66, reason: "calendar_keywords" };
   }
   if (hasSheetWord) {
     return { kind: "sheet.query", confidence: 0.62, reason: "non_task_sheet_reference" };

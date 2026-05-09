@@ -58,8 +58,22 @@ export async function runThinRouterPhase(input: {
     return { handled: true, finalText: permResult.reply };
   }
 
+  // スプレッドシート候補選択の保留チェック（タスク管理より先に実行）
+  // 「5」「2番」などがタスク文脈に誤爆しないようにするため最優先で確認する
+  const textNorm = text.normalize("NFKC").trim();
+  const looksLikePick =
+    isPendingSheetPickIndexMessage(text) ||
+    (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
+  const hasPick = looksLikePick
+    ? await hasPendingSheetPick(db, channelUserId).catch(() => false)
+    : false;
+  if (hasPick) {
+    log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
+    return { handled: false, forceIntent: "google_sheets_query" };
+  }
+
   // タスク管理コマンド（一覧・完了・削除・編集）
-  // recentAssistantMessages を渡すことで「タスク一覧の直後の続き発言」も検出できる
+  // sheet pick がない場合のみ実行する（数字がシート候補番号に誤爆しないよう）
   if (isTaskManagementCommand(text, recentAssistantMessages)) {
     const taskResult = await tryHandleTaskLine({
       db,
@@ -71,20 +85,6 @@ export async function runThinRouterPhase(input: {
     });
     if (taskResult.handled) {
       return { handled: true, finalText: taskResult.reply };
-    }
-  }
-
-  // スプレッドシート候補選択の保留がある場合、番号/短文を google_sheets_query に強制ルーティング
-  // （権限フローの後に配置して、権限フローが sheet pick に誤爆しないようにする）
-  const textNorm = text.normalize("NFKC").trim();
-  const looksLikePick =
-    isPendingSheetPickIndexMessage(text) ||
-    (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
-  if (looksLikePick) {
-    const hasPick = await hasPendingSheetPick(db, channelUserId).catch(() => false);
-    if (hasPick) {
-      log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
-      return { handled: false, forceIntent: "google_sheets_query" };
     }
   }
 

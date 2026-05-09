@@ -227,7 +227,7 @@ export async function handleLineTextMessage(input: {
         }
       }
 
-      if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.52) {
+      if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.65) {
         const shouldSkipClarifyForConsultation =
           looksLikeBroadConsultation(text) ||
           looksLikeBroadConsultationFollowup(text, recentUserMessages) ||
@@ -244,6 +244,13 @@ export async function handleLineTextMessage(input: {
             { mode: interpretation.mode },
             "secretary clarify skipped: sheet read / drive search routing likely"
           );
+        } else if (
+          interpretation.confidence < 0.75 &&
+          recentAssistantMessages.length > 0 &&
+          text.trim().length <= 20
+        ) {
+          // 短文かつ直前の会話がある場合は続き発言と判断して clarify を抑制
+          log.info({ mode: interpretation.mode, confidence: interpretation.confidence }, "secretary clarify skipped: short followup likely");
         } else {
           try {
             const clarifyDraft = await buildSecretaryClarificationReply({
@@ -359,6 +366,25 @@ export async function handleLineTextMessage(input: {
       needs_followup: false,
       followup_question: null,
       reason: "orchestrator_broad_consultation_entity_followup_rescue",
+      suggested_category: null,
+    };
+  }
+
+  // 直前に会話があり、かつ短い発言（30文字以下）は続き発言として simple_question に昇格
+  // （タスク・シート・権限などの専用モジュールを通過した後のフォールバック）
+  if (
+    parsed.intent === "unknown_custom_request" &&
+    recentAssistantMessages.length > 0 &&
+    text.trim().length <= 30 &&
+    !/https?:\/\//i.test(text)
+  ) {
+    parsed = {
+      ...parsed,
+      intent: "simple_question",
+      can_handle: true,
+      needs_followup: false,
+      followup_question: null,
+      reason: "orchestrator_short_followup_rescue",
       suggested_category: null,
     };
   }

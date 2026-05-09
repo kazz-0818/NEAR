@@ -37,16 +37,16 @@ export function buildIntentUserEnvelope(
 
   const header = `[参照: 現在は日本時間(JST) ${iso}（${weekday}）です。相対指定（○分後・○時間後など）はこの時刻を起点にし、reminder_request の datetime_iso にはその絶対時刻の ISO8601（タイムゾーン付き）を入れてください。]`;
 
-  const prevUser = (context.recentUserMessages ?? []).filter((s) => s.trim()).slice(-6);
-  const prevAsst = (context.recentAssistantMessages ?? []).filter((s) => s.trim()).slice(-4);
+  const prevUser = (context.recentUserMessages ?? []).filter((s) => s.trim()).slice(-8);
+  const prevAsst = (context.recentAssistantMessages ?? []).filter((s) => s.trim()).slice(-5);
 
   const contextBlocks: string[] = [];
   if (prevUser.length > 0) {
-    const lines = prevUser.map((s, i) => `${i + 1}. ${s.length > 300 ? s.slice(0, 300) + "…" : s}`).join("\n");
+    const lines = prevUser.map((s, i) => `${i + 1}. ${s.length > 400 ? s.slice(0, 400) + "…" : s}`).join("\n");
     contextBlocks.push(`[直近の会話（ユーザー側・古い順）:\n${lines}\n]`);
   }
   if (prevAsst.length > 0) {
-    const lines = prevAsst.map((s, i) => `${i + 1}. ${s.length > 400 ? s.slice(0, 400) + "…" : s}`).join("\n");
+    const lines = prevAsst.map((s, i) => `${i + 1}. ${s.length > 1200 ? s.slice(0, 1200) + "…" : s}`).join("\n");
     contextBlocks.push(`[直近の会話（NEAR 側・古い順）:\n${lines}\n]`);
   }
 

@@ -55,7 +55,7 @@ export async function interpretSecretaryRequest(
     .join("\n");
   const prevAsst = input.recentAssistantMessages
     .filter((s) => s.trim())
-    .slice(-3)
+    .slice(-5)
     .map((s, i) => `${i + 1}. ${truncate(s, 8000)}`)
     .join("\n\n---\n\n");
 

@@ -125,14 +125,14 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s === undefined ? true : !(s === "false" || s === "0"))),
-  /** これ未満の文字数（Unicode コードポイント）では suggestion しない。0 で無効。既定 12。 */
+  /** これ未満の文字数（Unicode コードポイント）では suggestion しない。0 で無効。既定 20。 */
   GROWTH_MIN_MESSAGE_CHARS: z
     .string()
     .optional()
     .transform((s) => {
-      if (s == null || s.trim() === "") return 12;
+      if (s == null || s.trim() === "") return 20;
       const n = Number(s);
-      return Number.isFinite(n) && n >= 0 ? n : 12;
+      return Number.isFinite(n) && n >= 0 ? n : 20;
     }),
   /**
    * 同一 message_fingerprint の unsupported がこの件数に達したら suggestion 可（INSERT 後の COUNT）。

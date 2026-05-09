@@ -16,7 +16,7 @@
 
 import type { Db } from "../db/client.js";
 import { getLogger } from "../lib/logger.js";
-import { classifyTaskUtterance } from "../lib/taskUtteranceClassifier.js";
+import { resolveUserOperation } from "../lib/utteranceResolver.js";
 
 const log = getLogger();
 
@@ -87,8 +87,8 @@ export function isTaskManagementCommand(
   recentAssistantMessages?: string[]
 ): boolean {
   const t = text.normalize("NFKC").replace(/\s+/g, " ").trim();
-  const cls = classifyTaskUtterance(text);
-  if (cls.kind !== "not_task") return true;
+  const op = resolveUserOperation({ text, recentAssistantMessages });
+  if (op.kind.startsWith("task.")) return true;
   if (LIST_RE.test(t) || DONE_RE.test(t) || DELETE_RE.test(t) || EDIT_RE.test(t)) return true;
   if (ALL_DELETE_RE.test(t) || ALL_DONE_RE.test(t)) return true;
   // タスク一覧の直後なら「削除して」「両方消して」「2番」だけの発言も受け付ける
@@ -173,27 +173,27 @@ export async function tryHandleTaskLine(input: {
   const { db, channelUserId, actorUserId, groupId, recentAssistantMessages = [] } = input;
   const t = input.text.normalize("NFKC").replace(/\s+/g, " ").trim();
   const inTaskContext = hadRecentTaskListReply(recentAssistantMessages);
-  const taskClass = classifyTaskUtterance(input.text);
+  const op = resolveUserOperation({ text: input.text, recentAssistantMessages });
 
   // タスク読み取りは near_read_task_sheet / sheets 側に任せる
-  if (taskClass.kind === "read_task_sheet") {
+  if (op.kind === "task.list.sheet") {
     return { handled: false, reply: "" };
   }
-  if (taskClass.kind === "ambiguous_task") {
+  if (op.kind === "task.clarify") {
     return { handled: true, reply: "タスクの追加・一覧確認・削除・更新のどれを行いますか？" };
   }
 
   const deleteNeedConfirm =
-    taskClass.kind === "delete_task" &&
-    (taskClass.reason === "delete_target_ambiguous" || !taskClass.targetNumber);
+    op.kind === "task.delete" &&
+    (op.requiresConfirmation === true || !op.targetNumber);
   const updateNeedConfirm =
-    taskClass.kind === "update_task" &&
-    taskClass.reason === "update_target_ambiguous";
+    op.kind === "task.update" &&
+    op.requiresConfirmation === true;
 
   // ─ タスク追加 ─
   const addMatch = t.match(ADD_RE);
   if (addMatch) {
-    const title = (addMatch[1] ?? addMatch[2] ?? addMatch[3] ?? "").trim();
+    const title = (op.extractedText ?? addMatch[1] ?? addMatch[2] ?? addMatch[3] ?? "").trim();
     if (!title) {
       return { handled: true, reply: "追加するタスクのタイトルを教えてください。\n例: 「〇〇をタスクに追加して」" };
     }
@@ -224,7 +224,7 @@ export async function tryHandleTaskLine(input: {
       reply: "どのタスクを更新するか確認したいです。対象のタスク番号、またはタスク名を教えてください。",
     };
   }
-  if (taskClass.kind === "delete_task" && /[1-9][0-9]?(?:番)?も\s*(?:消して|削除|消去)/u.test(t) && !inTaskContext) {
+  if (op.kind === "task.delete" && /[1-9][0-9]?(?:番)?も\s*(?:消して|削除|消去)/u.test(t) && !inTaskContext) {
     return {
       handled: true,
       reply: "どのタスクを削除するか確認したいです。削除したいタスク番号、またはタスク名を教えてください。",

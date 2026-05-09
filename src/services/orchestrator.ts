@@ -169,7 +169,17 @@ export async function handleLineTextMessage(input: {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }
 
-  const thin = await runThinRouterPhase({ db, env, channelUserId, actorUserId, groupId, text, lineSourceType, recentAssistantMessages });
+  const thin = await runThinRouterPhase({
+    db,
+    env,
+    channelUserId,
+    actorUserId,
+    groupId,
+    text,
+    lineSourceType,
+    recentUserMessages,
+    recentAssistantMessages,
+  });
   if (thin.handled) {
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
     return;

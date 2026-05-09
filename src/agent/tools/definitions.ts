@@ -60,7 +60,7 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
     name: "near_read_task_sheet",
     strict: true,
     description:
-      "スプレッドシート上の**タスク管理シート専用**読み取り。『スプレッドシートのタスク一覧』『シートのタスク管理表』『ガントチャート見せて』『Googleシート上のタスク』など、明示的にシート参照が指定された場合に使う。『タスク一覧』『タスクリスト』『今のタスク』などシート指定なしの通常一覧は NEAR 内部DBの task_line を使う。",
+      "スプレッドシート上の**タスク管理シート専用**読み取り。『スプレッドシートのタスク一覧』『シートのタスク管理表』『ガントチャート』『Googleシート上のタスク』など、明示的にシート参照が指定された場合のみ使う。『タスク一覧』『タスクリスト』『今のタスク』などシート指定なしの通常一覧は使わない。",
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -101,7 +101,7 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
     type: "function",
     name: "near_save_task",
     strict: true,
-    description: "NEAR内部DBへ**タスク保存**する。『タスクを追加して』『これをタスクにして』『TODOに入れて』など追加要求で使う。保存したタスクの一覧確認は通常の『タスク一覧』で内部DBから返す。シート明示（スプレッドシート/シート/ガントチャート）がある場合のみ near_read_task_sheet を使う。",
+    description: "NEAR内部DBへ**タスク保存**する。『タスクを追加して』『これをタスクにして』『TODOに入れて』など追加要求で使う。保存済みタスクの一覧確認は通常の『タスク一覧』で内部DBから返す。",
     parameters: {
       type: "object",
       additionalProperties: false,

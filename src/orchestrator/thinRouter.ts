@@ -19,7 +19,8 @@ import {
   hasPendingSheetPick,
   isPendingSheetPickIndexMessage,
 } from "../db/user_sheet_pending_pick_repo.js";
-import { classifyTaskUtterance } from "../lib/taskUtteranceClassifier.js";
+import { normalizeUserUtterance } from "../lib/utteranceNormalizer.js";
+import { resolveUserOperation } from "../lib/utteranceResolver.js";
 import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_line.js";
 
 export type ThinRouterResult =
@@ -37,10 +38,11 @@ export async function runThinRouterPhase(input: {
   groupId?: string;
   text: string;
   lineSourceType?: string;
+  recentUserMessages?: string[];
   recentAssistantMessages?: string[];
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, actorUserId, groupId, text, lineSourceType, recentAssistantMessages } = input;
+  const { db, env, channelUserId, actorUserId, groupId, text, lineSourceType, recentUserMessages, recentAssistantMessages } = input;
 
   const effectiveActorId = actorUserId ?? channelUserId;
   // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
@@ -73,12 +75,22 @@ export async function runThinRouterPhase(input: {
     return { handled: false, forceIntent: "google_sheets_query" };
   }
 
-  const taskClass = classifyTaskUtterance(text);
-  if (taskClass.kind === "read_task_sheet") {
-    log.info({ channelUserId, reason: taskClass.reason }, "task utterance classified as read_task_sheet");
+  const norm = normalizeUserUtterance(text);
+  const op = resolveUserOperation({
+    text,
+    recentUserMessages,
+    recentAssistantMessages,
+  });
+  log.info(
+    { rawText: text, normalizedText: norm.compact, resolvedKind: op.kind, confidence: op.confidence, reason: op.reason },
+    "utterance resolved"
+  );
+
+  if (op.kind === "task.list.sheet") {
+    log.info({ channelUserId, reason: op.reason }, "task utterance resolved as task.list.sheet");
     return { handled: false, forceIntent: "google_sheets_query" };
   }
-  if (taskClass.kind === "local_task_list") {
+  if (op.kind === "task.list.local") {
     const taskResult = await tryHandleTaskLine({
       db,
       text,
@@ -91,7 +103,7 @@ export async function runThinRouterPhase(input: {
       return { handled: true, finalText: taskResult.reply };
     }
   }
-  if (taskClass.kind === "ambiguous_task") {
+  if (op.kind === "task.clarify") {
     return {
       handled: true,
       finalText: "タスクの追加・一覧確認・削除・更新のどれを行いますか？",

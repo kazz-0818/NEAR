@@ -33,3 +33,19 @@ test("single task list item can be auto-selected", async () => {
     assert.equal(r.targetNumber, 1);
   }
 });
+
+test("quoted task list is prioritized over recent list", async () => {
+  const r = await tryResolveReminderFromRecentTaskList({
+    db: {} as never,
+    channelUserId: "U1",
+    actorUserId: "U1",
+    text: "1ばん5分後にリマインドして",
+    recentAssistantMessages: ["📋 タスク一覧（1件）:\n1. 【個人】 新しい一覧B"],
+    quotedAssistantMessage: "📋 タスク一覧（1件）:\n1. 【個人】 古い一覧A",
+  });
+  assert.equal(r.matched, true);
+  if (r.matched && r.mode === "resolved") {
+    assert.equal(r.title, "古い一覧A");
+    assert.equal(r.targetNumber, 1);
+  }
+});

@@ -168,3 +168,45 @@ export async function loadRecentAssistantMessages(
     return `${t.slice(0, maxChars)}…`;
   });
 }
+
+export async function loadQuotedAssistantMessage(
+  db: Db,
+  input: {
+    inboundMessageId: number;
+    channel: string;
+    channelUserId: string;
+    groupId?: string | null;
+  }
+): Promise<string | null> {
+  const inbound = await db.query<{ quoted_message_id: string | null }>(
+    `SELECT quoted_message_id FROM inbound_messages WHERE id = $1 LIMIT 1`,
+    [input.inboundMessageId]
+  );
+  const quotedMessageId = inbound.rows[0]?.quoted_message_id;
+  if (!quotedMessageId) return null;
+  const groupId = input.groupId ?? null;
+  const out = groupId
+    ? await db.query<{ text: string }>(
+        `SELECT text
+           FROM outbound_messages
+          WHERE channel = $1
+            AND group_id = $2
+            AND line_message_id = $3
+          ORDER BY id DESC
+          LIMIT 1`,
+        [input.channel, groupId, quotedMessageId]
+      )
+    : await db.query<{ text: string }>(
+        `SELECT text
+           FROM outbound_messages
+          WHERE channel = $1
+            AND channel_user_id = $2
+            AND group_id IS NULL
+            AND line_message_id = $3
+          ORDER BY id DESC
+          LIMIT 1`,
+        [input.channel, input.channelUserId, quotedMessageId]
+      );
+  const text = out.rows[0]?.text?.replace(/\s+/g, " ").trim();
+  return text || null;
+}

@@ -56,9 +56,10 @@ export async function runThinRouterPhase(input: {
   lineSourceType?: string;
   recentUserMessages?: string[];
   recentAssistantMessages?: string[];
+  quotedAssistantMessage?: string;
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType, recentUserMessages, recentAssistantMessages } = input;
+  const { db, env, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType, recentUserMessages, recentAssistantMessages, quotedAssistantMessage } = input;
 
   const effectiveActorId = actorUserId ?? channelUserId;
   // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
@@ -94,7 +95,9 @@ export async function runThinRouterPhase(input: {
   const directRefNumber = parseTaskTargetNumber(textNorm);
   const looksLikeOnlyReference = directRefNumber != null && /^(?:[1-9][0-9]*\s*(?:番|ばん|つ目|個目)?|一番|いちばん|一つ目|ひとつめ|最初|上のやつ)$/u.test(textNorm);
   if (looksLikeOnlyReference) {
-    const items = extractTaskItemsFromAssistantMessages(recentAssistantMessages ?? []);
+    const items = extractTaskItemsFromAssistantMessages(
+      quotedAssistantMessage ? [...(recentAssistantMessages ?? []), quotedAssistantMessage] : (recentAssistantMessages ?? [])
+    );
     const item = items.find((x) => x.number === directRefNumber);
     if (item) {
       return {
@@ -115,6 +118,7 @@ export async function runThinRouterPhase(input: {
     groupId,
     text,
     recentAssistantMessages,
+    quotedAssistantMessage: quotedAssistantMessage ?? undefined,
     inboundMessageId,
   });
   if (reminderByList.matched) {
@@ -168,6 +172,7 @@ export async function runThinRouterPhase(input: {
       actorUserId: effectiveActorId,
       groupId,
       recentAssistantMessages,
+      quotedAssistantMessage: quotedAssistantMessage ?? undefined,
     });
     if (taskResult.handled) {
       return { handled: true, finalText: taskResult.reply };
@@ -192,6 +197,7 @@ export async function runThinRouterPhase(input: {
       actorUserId: effectiveActorId,
       groupId,
       recentAssistantMessages,
+      quotedAssistantMessage: quotedAssistantMessage ?? undefined,
     });
     if (taskResult.handled) {
       return { handled: true, finalText: taskResult.reply };
@@ -379,6 +385,7 @@ export async function runThinRouterPhase(input: {
           actorUserId: effectiveActorId,
           groupId,
           recentAssistantMessages,
+          quotedAssistantMessage: quotedAssistantMessage ?? undefined,
         });
         if (taskResult.handled) {
           logSemanticAdopt("task_line_semantic");

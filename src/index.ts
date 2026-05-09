@@ -145,6 +145,10 @@ async function lineMessagingWebhook(c: Context) {
 
     const messageType = String(message.type ?? "unknown");
     const messageId = String(message.id ?? "");
+    const quotedMessageIdRaw = message.quotedMessageId;
+    const quotedMessageId = typeof quotedMessageIdRaw === "string" && quotedMessageIdRaw.trim()
+      ? quotedMessageIdRaw.trim()
+      : null;
     if (!messageId) continue;
 
     const db = getPool();
@@ -155,6 +159,7 @@ async function lineMessagingWebhook(c: Context) {
       actorUserId: userId,  // グループでも発言者の userId が取れる
       groupId: observedGroupId ?? null,
       messageId,
+      quotedMessageId,
       messageType,
       text: messageType === "text" ? String(message.text ?? "") : null,
       rawPayload: ev,

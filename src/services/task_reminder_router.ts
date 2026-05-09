@@ -14,6 +14,7 @@ export async function tryResolveReminderFromRecentTaskList(input: {
   groupId?: string;
   text: string;
   recentAssistantMessages?: string[];
+  quotedAssistantMessage?: string;
   inboundMessageId?: number;
 }): Promise<
   | { matched: false }
@@ -23,7 +24,10 @@ export async function tryResolveReminderFromRecentTaskList(input: {
   if (!looksLikeReminderRequest(input.text)) return { matched: false };
   const whenDescription = parseReminderWhenDescription(input.text);
   if (!whenDescription) return { matched: false };
-  const candidates = extractTaskItemsFromAssistantMessages(input.recentAssistantMessages ?? []);
+  const contextMessages = input.quotedAssistantMessage
+    ? [...(input.recentAssistantMessages ?? []), input.quotedAssistantMessage]
+    : (input.recentAssistantMessages ?? []);
+  const candidates = extractTaskItemsFromAssistantMessages(contextMessages);
   if (candidates.length === 0) return { matched: false };
   const targetNumber = parseTaskTargetNumber(input.text);
   if (targetNumber != null) {

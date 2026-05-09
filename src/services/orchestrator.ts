@@ -18,6 +18,7 @@ import {
 } from "./growth_candidate_signal_service.js";
 import {
   getPreviousInboundMeta,
+  loadQuotedAssistantMessage,
   loadRecentAssistantMessages,
   loadRecentUserMessages,
 } from "./conversation_context.js";
@@ -67,7 +68,7 @@ async function replyLineAndRememberOutbound(
   finalText: string,
   log: ReturnType<typeof getLogger>
 ): Promise<void> {
-  await replyOrPush(replyToken, lineUserId, finalText);
+  const sent = await replyOrPush(replyToken, lineUserId, finalText);
   try {
     await saveOutboundAssistantText(db, {
       channel: ctx.channel,
@@ -75,6 +76,7 @@ async function replyLineAndRememberOutbound(
       groupId: ctx.groupId ?? null,
       text: finalText,
       inboundMessageId: ctx.inboundMessageId,
+      lineMessageId: sent.sentMessageIds[0] ?? null,
     });
   } catch (e) {
     log.warn({ err: e }, "saveOutboundAssistantText failed");
@@ -158,12 +160,19 @@ export async function handleLineTextMessage(input: {
   // groupId スコープでフィルタリングして個人/グループの会話混在を防ぐ
   let recentUserMessages: string[] = [];
   let recentAssistantMessages: string[] = [];
+  let quotedAssistantMessage: string | null = null;
   try {
     recentUserMessages = await loadRecentUserMessages(db, channel, channelUserId, inboundMessageId, {
       actorUserId: actorUserId ?? undefined,
       groupId: groupId ?? null,
     });
     recentAssistantMessages = await loadRecentAssistantMessages(db, channel, channelUserId, inboundMessageId, {
+      groupId: groupId ?? null,
+    });
+    quotedAssistantMessage = await loadQuotedAssistantMessage(db, {
+      inboundMessageId,
+      channel,
+      channelUserId,
       groupId: groupId ?? null,
     });
   } catch (ctxErr) {
@@ -181,6 +190,7 @@ export async function handleLineTextMessage(input: {
     lineSourceType,
     recentUserMessages,
     recentAssistantMessages,
+    quotedAssistantMessage: quotedAssistantMessage ?? undefined,
   });
   if (thin.handled) {
     await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);

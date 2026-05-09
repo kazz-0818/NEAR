@@ -8,13 +8,27 @@ const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 const LINE_TEXT_MAX_CHARS = 5000;
 const LINE_TEXT_TRUNCATION_SUFFIX = "\n…（文字数の上限に達したため、続きは分けて聞いてください）";
 
+export type LineSendResult = {
+  sentMessageIds: string[];
+  via: "reply" | "push";
+};
+
 function safeTruncateLineText(text: string): string {
   if ([...text].length <= LINE_TEXT_MAX_CHARS) return text;
   const limit = LINE_TEXT_MAX_CHARS - [...LINE_TEXT_TRUNCATION_SUFFIX].length;
   return [...text].slice(0, limit).join("") + LINE_TEXT_TRUNCATION_SUFFIX;
 }
 
-export async function replyText(replyToken: string, text: string): Promise<void> {
+function extractSentMessageIds(responseBody: unknown): string[] {
+  if (!responseBody || typeof responseBody !== "object") return [];
+  const sent = (responseBody as Record<string, unknown>).sentMessages;
+  if (!Array.isArray(sent)) return [];
+  return sent
+    .map((v) => (v && typeof v === "object" ? (v as Record<string, unknown>).id : null))
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+}
+
+export async function replyText(replyToken: string, text: string): Promise<LineSendResult> {
   const env = getEnv();
   const log = getLogger();
   const body = {
@@ -34,23 +48,24 @@ export async function replyText(replyToken: string, text: string): Promise<void>
     log.error({ status: res.status, errText }, "LINE reply failed");
     throw new Error(`LINE reply failed: ${res.status}`);
   }
+  const responseJson = await res.json().catch(() => null);
+  return { sentMessageIds: extractSentMessageIds(responseJson), via: "reply" };
 }
 
 /**
  * まず reply（無料・低遅延）。失効・エラー時は push にフォールバック（返信が消えるのを防ぐ）。
  */
-export async function replyOrPush(replyToken: string, lineUserId: string, text: string): Promise<void> {
+export async function replyOrPush(replyToken: string, lineUserId: string, text: string): Promise<LineSendResult> {
   const log = getLogger();
   try {
-    await replyText(replyToken, text);
-    return;
+    return await replyText(replyToken, text);
   } catch (e) {
     log.warn({ err: e }, "LINE reply failed, falling back to push");
   }
-  await pushText(lineUserId, text);
+  return await pushText(lineUserId, text);
 }
 
-export async function pushText(userId: string, text: string): Promise<void> {
+export async function pushText(userId: string, text: string): Promise<LineSendResult> {
   const env = getEnv();
   const log = getLogger();
   const body = {
@@ -70,4 +85,6 @@ export async function pushText(userId: string, text: string): Promise<void> {
     log.error({ status: res.status, errText }, "LINE push failed");
     throw new Error(`LINE push failed: ${res.status}`);
   }
+  const responseJson = await res.json().catch(() => null);
+  return { sentMessageIds: extractSentMessageIds(responseJson), via: "push" };
 }

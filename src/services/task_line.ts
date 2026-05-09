@@ -17,6 +17,7 @@
 import type { Db } from "../db/client.js";
 import { getLogger } from "../lib/logger.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
+import { extractTaskItemsFromAssistantMessages } from "../lib/taskListContext.js";
 
 const log = getLogger();
 
@@ -176,10 +177,15 @@ export async function tryHandleTaskLine(input: {
   actorUserId: string;
   groupId?: string;
   recentAssistantMessages?: string[];
+  quotedAssistantMessage?: string;
 }): Promise<{ handled: boolean; reply: string }> {
-  const { db, channelUserId, actorUserId, groupId, recentAssistantMessages = [] } = input;
+  const { db, channelUserId, actorUserId, groupId, recentAssistantMessages = [], quotedAssistantMessage } = input;
   const t = input.text.normalize("NFKC").replace(/\s+/g, " ").trim();
   const inTaskContext = hadRecentTaskListReply(recentAssistantMessages);
+  const contextMessages = quotedAssistantMessage
+    ? [...recentAssistantMessages, quotedAssistantMessage]
+    : recentAssistantMessages;
+  const contextItems = extractTaskItemsFromAssistantMessages(contextMessages);
   const op = resolveUserOperation({ text: input.text, recentAssistantMessages });
 
   // タスク読み取りは near_read_task_sheet / sheets 側に任せる
@@ -229,7 +235,10 @@ export async function tryHandleTaskLine(input: {
     }
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      const target = tasks[idx];
+      let target: TaskRow | undefined = tasks[idx];
+      if (!target && contextItems[idx]) {
+        target = tasks.find((row) => row.title === contextItems[idx]!.title);
+      }
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }
@@ -250,7 +259,10 @@ export async function tryHandleTaskLine(input: {
     }
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      const target = tasks[idx];
+      let target: TaskRow | undefined = tasks[idx];
+      if (!target && contextItems[idx]) {
+        target = tasks.find((row) => row.title === contextItems[idx]!.title);
+      }
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }
@@ -399,7 +411,10 @@ export async function tryHandleTaskLine(input: {
     const idx = toHalfNum(numStr) - 1;
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      const target = tasks[idx];
+      let target: TaskRow | undefined = tasks[idx];
+      if (!target && contextItems[idx]) {
+        target = tasks.find((row) => row.title === contextItems[idx]!.title);
+      }
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }
@@ -419,7 +434,10 @@ export async function tryHandleTaskLine(input: {
     const idx = toHalfNum(numStr) - 1;
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      const target = tasks[idx];
+      let target: TaskRow | undefined = tasks[idx];
+      if (!target && contextItems[idx]) {
+        target = tasks.find((row) => row.title === contextItems[idx]!.title);
+      }
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください（例: 「タスク完了 1」）。` };
       }
@@ -442,7 +460,10 @@ export async function tryHandleTaskLine(input: {
     const idx = toHalfNum(numStr) - 1;
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      const target = tasks[idx];
+      let target: TaskRow | undefined = tasks[idx];
+      if (!target && contextItems[idx]) {
+        target = tasks.find((row) => row.title === contextItems[idx]!.title);
+      }
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください（例: 「タスク削除 1」）。` };
       }
@@ -466,7 +487,10 @@ export async function tryHandleTaskLine(input: {
     }
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      const target = tasks[idx];
+      let target: TaskRow | undefined = tasks[idx];
+      if (!target && contextItems[idx]) {
+        target = tasks.find((row) => row.title === contextItems[idx]!.title);
+      }
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }

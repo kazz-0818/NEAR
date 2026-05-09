@@ -32,6 +32,7 @@ export const semanticOperationSchema = z.object({
   kind: z.enum(SEMANTIC_OPERATION_KINDS),
   confidence: z.number().min(0).max(1),
   extracted_text: z.string().nullable(),
+  when_description: z.string().nullable().optional().default(null),
   target_number: z.number().int().positive().nullable(),
   target_label: z.string().nullable(),
   needs_confirmation: z.boolean(),

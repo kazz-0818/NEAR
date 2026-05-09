@@ -36,6 +36,7 @@ export async function resolveSemanticOperation(
     kind: "unknown",
     confidence: 0,
     extracted_text: null,
+    when_description: null,
     target_number: null,
     target_label: null,
     needs_confirmation: false,

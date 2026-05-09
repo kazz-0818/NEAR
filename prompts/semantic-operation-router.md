@@ -54,6 +54,12 @@
 8. **表記ゆれは意味で解釈**
    - ひらがな/カタカナ/漢字/誤字/略語（例: たすくいれて, めもって, りまいんどして, すぷしみて, しーとみて）を意味で判定する
 
+9. **番号参照**
+   - 「一番」「1ばん」「最初」「上のやつ」は直近の番号付きリストを参照している可能性が高い
+   - 「一番5分後にリマインドして」は `reminder.create` として `target_number=1`, `when_description=5分後` を入れる
+   - 「5分後にリマインドして」で対象不明なら `clarify`。ただし直近タスクリストが1件だけならその1件を候補化してよい
+   - 直前の質問への短文回答（例:「1ばん」）は文脈回答として扱う
+
 ## confidence目安
 
 - 0.90以上: かなり確実
@@ -86,6 +92,7 @@
   "kind": "task.add",
   "confidence": 0.0,
   "extracted_text": null,
+  "when_description": null,
   "target_number": null,
   "target_label": null,
   "needs_confirmation": false,

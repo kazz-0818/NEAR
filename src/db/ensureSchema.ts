@@ -44,6 +44,7 @@ const MIGRATION_FILES = [
   "035_tasks_updated_at.sql",
   "036_context_group_id.sql",
   "037_rename_slave_to_restricted_role.sql",
+  "038_pending_clarifications.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

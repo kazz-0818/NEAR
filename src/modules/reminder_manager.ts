@@ -17,8 +17,12 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
     typeof p.message === "string" && p.message.trim()
       ? p.message.trim()
       : ctx.originalText.trim().slice(0, 500);
+  const whenDescription =
+    typeof p.when_description === "string" && p.when_description.trim()
+      ? p.when_description.trim()
+      : null;
 
-  const relative = parseRelativeReminderAt(ctx.originalText, now);
+  const relative = parseRelativeReminderAt(whenDescription ?? ctx.originalText, now);
   let iso = relative ?? parseIso(p.datetime_iso);
   let pastTimeDetected = false;
   if (iso && !relative && isReminderTimeInPast(iso, now)) {

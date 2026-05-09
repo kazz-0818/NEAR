@@ -23,6 +23,8 @@ import { normalizeUserUtterance } from "../lib/utteranceNormalizer.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
 import { resolveSemanticOperation } from "../services/semantic_operation_resolver.js";
 import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_line.js";
+import { tryResolveReminderFromRecentTaskList } from "../services/task_reminder_router.js";
+import { extractTaskItemsFromAssistantMessages, parseTaskTargetNumber } from "../lib/taskListContext.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
@@ -50,12 +52,13 @@ export async function runThinRouterPhase(input: {
   actorUserId?: string;
   groupId?: string;
   text: string;
+  inboundMessageId?: number;
   lineSourceType?: string;
   recentUserMessages?: string[];
   recentAssistantMessages?: string[];
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, actorUserId, groupId, text, lineSourceType, recentUserMessages, recentAssistantMessages } = input;
+  const { db, env, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType, recentUserMessages, recentAssistantMessages } = input;
 
   const effectiveActorId = actorUserId ?? channelUserId;
   // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
@@ -86,6 +89,50 @@ export async function runThinRouterPhase(input: {
   if (hasPick) {
     log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
     return { handled: false, forceIntent: "google_sheets_query" };
+  }
+
+  const directRefNumber = parseTaskTargetNumber(textNorm);
+  const looksLikeOnlyReference = directRefNumber != null && /^(?:[1-9][0-9]*\s*(?:番|ばん|つ目|個目)?|一番|いちばん|一つ目|ひとつめ|最初|上のやつ)$/u.test(textNorm);
+  if (looksLikeOnlyReference) {
+    const items = extractTaskItemsFromAssistantMessages(recentAssistantMessages ?? []);
+    const item = items.find((x) => x.number === directRefNumber);
+    if (item) {
+      return {
+        handled: true,
+        finalText: `${item.number}番の「${item.title}」ですね。完了・削除・リマインドなど、どうしますか？`,
+      };
+    }
+    return {
+      handled: true,
+      finalText: "どの一覧の1番か分かりませんでした。",
+    };
+  }
+
+  const reminderByList = await tryResolveReminderFromRecentTaskList({
+    db,
+    channelUserId,
+    actorUserId: effectiveActorId,
+    groupId,
+    text,
+    recentAssistantMessages,
+    inboundMessageId,
+  });
+  if (reminderByList.matched) {
+    if (reminderByList.mode === "resolved") {
+      return {
+        handled: false,
+        forceIntent: "reminder_request",
+        forceRequiredParams: {
+          message: reminderByList.title,
+          when_description: reminderByList.whenDescription,
+          target_number: reminderByList.targetNumber,
+        },
+      };
+    }
+    return {
+      handled: true,
+      finalText: `どのタスクを${reminderByList.whenDescription}にリマインドしますか？番号で教えてください。`,
+    };
   }
 
   const norm = normalizeUserUtterance(text);
@@ -282,6 +329,9 @@ export async function runThinRouterPhase(input: {
           forceIntent: "reminder_request",
           forceRequiredParams: {
             message: sem.extracted_text ?? text,
+            when_description: sem.when_description ?? undefined,
+            target_number: sem.target_number,
+            target_label: sem.target_label,
             semantic_operation: sem,
           },
         };

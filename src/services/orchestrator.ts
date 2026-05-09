@@ -44,6 +44,7 @@ import { runThinRouterPhase } from "../orchestrator/thinRouter.js";
 import { runNearAgentTurn } from "../agent/runner.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
 import { tryHandlePendingToolConfirmation } from "./pending_tool_confirm_handler.js";
+import { tryHandlePendingClarification } from "./pending_clarification_handler.js";
 
 async function saveIntentRun(
   db: Db,
@@ -176,6 +177,7 @@ export async function handleLineTextMessage(input: {
     actorUserId,
     groupId,
     text,
+    inboundMessageId,
     lineSourceType,
     recentUserMessages,
     recentAssistantMessages,
@@ -186,8 +188,25 @@ export async function handleLineTextMessage(input: {
   }
 
   // thinRouter から強制 intent が返った場合は secretary 層・intent 分類をスキップして直接処理する
-  const thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
-  const thinForceRequiredParams = !thin.handled ? thin.forceRequiredParams : undefined;
+  let thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
+  let thinForceRequiredParams = !thin.handled ? thin.forceRequiredParams : undefined;
+
+  const pendingClarification = await tryHandlePendingClarification({
+    db,
+    channel,
+    channelUserId,
+    actorUserId,
+    groupId,
+    text,
+  });
+  if (pendingClarification.handled) {
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log);
+    return;
+  }
+  if ("forceIntent" in pendingClarification && pendingClarification.forceIntent) {
+    thinForceIntent = pendingClarification.forceIntent;
+    thinForceRequiredParams = pendingClarification.forceRequiredParams;
+  }
 
   const pendingHit = await tryHandlePendingToolConfirmation({
     db,

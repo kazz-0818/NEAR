@@ -41,6 +41,12 @@ const LIST_RE =
 const DONE_RE = /(?:タスク\s*)?(?:完了|終わった|終了|やった|できた|done)\s*([1-9０-９][0-9０-９]?)番?|([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?\s*(?:の(?:タスク)?)?\s*(?:を|は)?\s*(?:完了|終わった|終了|やった|できた|done)/iu;
 const DELETE_RE = /(?:タスク\s*)?(?:削除|消して|消去|delete)\s*([1-9０-９][0-9０-９]?)番?|([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?\s*(?:の(?:タスク)?)?\s*(?:を|は)?\s*(?:削除|消して|消去|delete)/iu;
 const EDIT_RE = /タスク(?:編集|変更|修正)[^\d０-９]*([1-9０-９][0-9０-９]?)番?\s+(.+)/u;
+const TITLE_UPDATE_RE =
+  /([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?(?:の)?(?:タスク名|タイトル|名前)(?:を)?\s*[「"]?(.+?)[」"]?\s*(?:に変更|にして|へ変更|へ|へ更新)/u;
+const TITLE_UPDATE_SHORT_RE =
+  /([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?(?:を|は)?\s*[「"]?(.+?)[」"]?\s*(?:に変更|にして|へ変更|へ更新)/u;
+const NOTE_UPDATE_RE =
+  /([1-9０-９][0-9０-９]?)(?:番目?|つ目|個目)?(?:の)?(?:メモ|備考|ノート)(?:を)?\s*[「"]?(.+?)[」"]?\s*(?:に変更|に更新|にして|へ変更|へ更新|に追記)/u;
 
 // タスク一覧の後に「2番」「2」だけ送った場合の文脈選択
 const CONTEXT_NUM_ONLY_RE = /^([1-9０-９][0-9０-９]?)(?:番目?|つ目)?$/u;
@@ -90,6 +96,7 @@ export function isTaskManagementCommand(
   const op = resolveUserOperation({ text, recentAssistantMessages });
   if (op.kind.startsWith("task.")) return true;
   if (LIST_RE.test(t) || DONE_RE.test(t) || DELETE_RE.test(t) || EDIT_RE.test(t)) return true;
+  if (TITLE_UPDATE_RE.test(t) || TITLE_UPDATE_SHORT_RE.test(t) || NOTE_UPDATE_RE.test(t)) return true;
   if (ALL_DELETE_RE.test(t) || ALL_DONE_RE.test(t)) return true;
   // タスク一覧の直後なら「削除して」「両方消して」「2番」だけの発言も受け付ける
   if (recentAssistantMessages && hadRecentTaskListReply(recentAssistantMessages)) {
@@ -209,6 +216,53 @@ export async function tryHandleTaskLine(input: {
     } catch (e) {
       log.error({ err: e }, "task add failed");
       return { handled: true, reply: "タスクの追加中にエラーが発生しました。" };
+    }
+  }
+
+  // ─ 編集（明示的な更新文）─
+  const noteMatch = t.match(NOTE_UPDATE_RE);
+  if (noteMatch) {
+    const idx = toHalfNum(noteMatch[1] ?? "") - 1;
+    const newNote = (noteMatch[2] ?? "").trim();
+    if (!newNote) {
+      return { handled: true, reply: "新しいメモ内容を指定してください。" };
+    }
+    try {
+      const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
+      const target = tasks[idx];
+      if (!target) {
+        return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
+      }
+      await db.query(`UPDATE tasks SET notes = $1, updated_at = now() WHERE id = $2`, [newNote, target.id]);
+      return { handled: true, reply: `✏️ 「${target.title}」のメモを更新しました。` };
+    } catch (e) {
+      log.error({ err: e }, "task note update failed");
+      return { handled: true, reply: "タスクの編集中にエラーが発生しました。" };
+    }
+  }
+
+  const titleMatch = t.match(TITLE_UPDATE_RE) ?? t.match(TITLE_UPDATE_SHORT_RE);
+  if (titleMatch) {
+    const idx = toHalfNum(titleMatch[1] ?? "") - 1;
+    const newTitle = (titleMatch[2] ?? "").trim();
+    if (!newTitle || /(完了|削除|消して|全部|全て)/u.test(newTitle)) {
+      return { handled: true, reply: "新しいタスク名を具体的に教えてください。\n例: 「1番の名前を見積書作成に変更」" };
+    }
+    try {
+      const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
+      const target = tasks[idx];
+      if (!target) {
+        return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
+      }
+      await db.query(
+        `UPDATE tasks SET title = $1, updated_at = now() WHERE id = $2`,
+        [newTitle, target.id]
+      );
+      log.info({ taskId: target.id, actorUserId }, "task title updated");
+      return { handled: true, reply: `✏️ 「${target.title}」→「${newTitle}」に変更しました。` };
+    } catch (e) {
+      log.error({ err: e }, "task title update failed");
+      return { handled: true, reply: "タスクの編集中にエラーが発生しました。" };
     }
   }
 

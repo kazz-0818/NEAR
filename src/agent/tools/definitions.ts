@@ -60,7 +60,7 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
     name: "near_read_task_sheet",
     strict: true,
     description:
-      "スプレッドシート上の**タスク管理シート専用**読み取り。『タスク一覧』『タスク見せて』『今日の指示』『未完了タスク』『進行中のタスク』などを取得するときに使う。『タスクを追加して』『これをタスクにして』の保存は near_save_task を使う。",
+      "スプレッドシート上の**タスク管理シート専用**読み取り。『タスク一覧』『タスクリスト見せて』『今日の指示』『未完了タスク』『進行中のタスク』『優先度高いタスク』などの参照要求で使う。『タスクを追加して』『これをタスクにして』『保存して』は near_save_task を使う。",
     parameters: {
       type: "object",
       additionalProperties: false,
@@ -101,7 +101,7 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
     type: "function",
     name: "near_save_task",
     strict: true,
-    description: "ユーザーが**やること・タスク**を記録してほしいとき。短いタイトルで保存する。",
+    description: "NEAR内部DBへ**タスク保存**する。『タスクを追加して』『これをタスクにして』『TODOに入れて』など追加要求で使う。『タスク一覧』『未完了タスク』など参照要求は near_read_task_sheet を使う。",
     parameters: {
       type: "object",
       additionalProperties: false,

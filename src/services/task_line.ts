@@ -16,6 +16,7 @@
 
 import type { Db } from "../db/client.js";
 import { getLogger } from "../lib/logger.js";
+import { classifyTaskUtterance } from "../lib/taskUtteranceClassifier.js";
 
 const log = getLogger();
 
@@ -86,6 +87,8 @@ export function isTaskManagementCommand(
   recentAssistantMessages?: string[]
 ): boolean {
   const t = text.normalize("NFKC").replace(/\s+/g, " ").trim();
+  const cls = classifyTaskUtterance(text);
+  if (cls.kind !== "not_task") return true;
   if (LIST_RE.test(t) || DONE_RE.test(t) || DELETE_RE.test(t) || EDIT_RE.test(t)) return true;
   if (ALL_DELETE_RE.test(t) || ALL_DONE_RE.test(t)) return true;
   // タスク一覧の直後なら「削除して」「両方消して」「2番」だけの発言も受け付ける
@@ -170,6 +173,22 @@ export async function tryHandleTaskLine(input: {
   const { db, channelUserId, actorUserId, groupId, recentAssistantMessages = [] } = input;
   const t = input.text.normalize("NFKC").replace(/\s+/g, " ").trim();
   const inTaskContext = hadRecentTaskListReply(recentAssistantMessages);
+  const taskClass = classifyTaskUtterance(input.text);
+
+  // タスク読み取りは near_read_task_sheet / sheets 側に任せる
+  if (taskClass.kind === "read_task_sheet") {
+    return { handled: false, reply: "" };
+  }
+  if (taskClass.kind === "ambiguous_task") {
+    return { handled: true, reply: "タスクの追加・一覧確認・削除・更新のどれを行いますか？" };
+  }
+
+  const deleteNeedConfirm =
+    taskClass.kind === "delete_task" &&
+    (taskClass.reason === "delete_target_ambiguous" || !taskClass.targetNumber);
+  const updateNeedConfirm =
+    taskClass.kind === "update_task" &&
+    taskClass.reason === "update_target_ambiguous";
 
   // ─ タスク追加 ─
   const addMatch = t.match(ADD_RE);
@@ -191,6 +210,25 @@ export async function tryHandleTaskLine(input: {
       log.error({ err: e }, "task add failed");
       return { handled: true, reply: "タスクの追加中にエラーが発生しました。" };
     }
+  }
+
+  if (deleteNeedConfirm) {
+    return {
+      handled: true,
+      reply: "どのタスクを削除するか確認したいです。削除したいタスク番号、またはタスク名を教えてください。",
+    };
+  }
+  if (updateNeedConfirm) {
+    return {
+      handled: true,
+      reply: "どのタスクを更新するか確認したいです。対象のタスク番号、またはタスク名を教えてください。",
+    };
+  }
+  if (taskClass.kind === "delete_task" && /[1-9][0-9]?(?:番)?も\s*(?:消して|削除|消去)/u.test(t) && !inTaskContext) {
+    return {
+      handled: true,
+      reply: "どのタスクを削除するか確認したいです。削除したいタスク番号、またはタスク名を教えてください。",
+    };
   }
 
   // ─ 削除（番号なし）─ タスクが1件なら即削除、複数なら一覧で確認（一括削除より先）

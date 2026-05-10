@@ -46,6 +46,7 @@ const MIGRATION_FILES = [
   "037_rename_slave_to_restricted_role.sql",
   "038_pending_clarifications.sql",
   "039_line_quote_message_refs.sql",
+  "040_growth_github_issue.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

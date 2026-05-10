@@ -1,0 +1,40 @@
+# NEAR Growth Automation v2:
+# near-growth + cursor-agent ラベル付き Issue を Cursor CLI（headless）で実装し、PR を作成する。
+#
+# 必要な Secrets:
+#   CURSOR_API_KEY … Cursor CLI 用（ https://cursor.com/docs/cli/github-actions ）
+# GITHUB_TOKEN は既定の github.token を利用（contents / issues / pull-requests 権限）。
+
+name: NEAR Growth Cursor Agent
+
+on:
+  issues:
+    types: [opened, labeled]
+
+concurrency:
+  group: near-growth-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  cursor-agent:
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      GH_TOKEN: ${{ github.token }}
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: NEAR Growth — Cursor Agent & PR
+        shell: bash
+        run: bash scripts/near-growth-cursor-agent.sh

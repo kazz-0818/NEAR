@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
+import { parseGithubRepo } from "../lib/githubRepo.js";
+import { ensureGithubIssueForSuggestion } from "./growth_github_issue.js";
 
 export type CodingRunnerMode = "manual" | "auto";
 
@@ -19,17 +21,6 @@ export interface CodingRunner {
   onCodingPhaseEntered(input: { db: Db; suggestionId: number; cursorPrompt: string }): Promise<CodingRunnerResult>;
 }
 
-const GITHUB_ISSUE_BODY_MAX = 65000;
-
-function parseGithubRepo(raw: string | undefined): { owner: string; repo: string } | null {
-  if (!raw) return null;
-  const parts = raw.split("/").map((s) => s.trim()).filter(Boolean);
-  if (parts.length !== 2) return null;
-  const [owner, repo] = parts;
-  if (!owner || !repo) return null;
-  return { owner, repo };
-}
-
 class ManualCodingRunner implements CodingRunner {
   readonly mode = "manual" as const;
   async onCodingPhaseEntered(_input: {
@@ -45,68 +36,28 @@ class ManualCodingRunner implements CodingRunner {
   }
 }
 
-/** GitHub Issues API でタスク用 Issue を作成 */
+/** GitHub Issues API で Growth 用 Issue を作成（本文フォーマット・DB 保存は growth_github_issue に集約） */
 class GitHubIssueCodingRunner implements CodingRunner {
   readonly mode = "auto" as const;
-
-  constructor(
-    private readonly token: string,
-    private readonly owner: string,
-    private readonly repo: string
-  ) {}
 
   async onCodingPhaseEntered(input: {
     db: Db;
     suggestionId: number;
     cursorPrompt: string;
   }): Promise<CodingRunnerResult> {
-    const log = getLogger();
-    let body = `<!-- near-growth-task suggestion_id=${input.suggestionId} -->\n\n${input.cursorPrompt}`;
-    if (body.length > GITHUB_ISSUE_BODY_MAX) {
-      body =
-        body.slice(0, GITHUB_ISSUE_BODY_MAX - 120) +
-        "\n\n…(truncated for GitHub issue body limit; use admin API cursor-prompt for full text)";
-    }
-    const title = `[NEAR growth] suggestion #${input.suggestionId}`;
-    try {
-      const res = await fetch(`https://api.github.com/repos/${this.owner}/${this.repo}/issues`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title, body }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        log.warn({ status: res.status, body: text.slice(0, 500) }, "github issue create failed");
-        return {
-          ok: false,
-          message: `GitHub Issue 作成に失敗しました (${res.status})。手動で cursor-prompt を取得して Cursor に貼ってください。`,
-        };
-      }
-      let htmlUrl: string | undefined;
-      try {
-        const j = JSON.parse(text) as { html_url?: string };
-        htmlUrl = j.html_url;
-      } catch {
-        /* ignore */
-      }
+    const r = await ensureGithubIssueForSuggestion(input.db, input.suggestionId);
+    if (r.ok) {
       return {
         ok: true,
-        message: htmlUrl
-          ? `GitHub Issue を作成しました: ${htmlUrl}（Cursor で開いて実装を進めてください）`
-          : "GitHub Issue を作成しました。リポジトリの Issues を確認してください。",
-      };
-    } catch (e) {
-      log.warn({ err: e, suggestionId: input.suggestionId }, "github issue create exception");
-      return {
-        ok: false,
-        message: "GitHub API への接続に失敗しました。ネットワークと GITHUB_TOKEN を確認するか、手動で cursor-prompt を取得してください。",
+        message: r.created
+          ? `GitHub Issue を作成しました: ${r.issueUrl}（Cursor で開いて実装を進めてください）`
+          : `既に GitHub Issue があります: ${r.issueUrl}（Cursor で開いて実装を進めてください）`,
       };
     }
+    return {
+      ok: false,
+      message: `GitHub Issue の自動作成に失敗しました: ${r.message}。手動で cursor-prompt を取得して Cursor に貼ってください。`,
+    };
   }
 }
 
@@ -205,7 +156,7 @@ export function createCodingRunner(): CodingRunner {
   }
   const gh = parseGithubRepo(env.GROWTH_GITHUB_REPO);
   if (env.GITHUB_TOKEN && gh) {
-    return new GitHubIssueCodingRunner(env.GITHUB_TOKEN, gh.owner, gh.repo);
+    return new GitHubIssueCodingRunner();
   }
   if (env.GROWTH_CODING_AGENT_URL) {
     return new AgentWebhookCodingRunner(

@@ -75,6 +75,16 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** カンマ区切り。NEAR Growth Issue に付与するラベル名（存在しないと GitHub が 422 になる場合あり） */
+  GROWTH_GITHUB_ISSUE_LABELS: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** true / 1 で有効。未設定はオフ。管理者 LINE からの Issue 作成コマンド */
+  GROWTH_AUTO_ISSUE_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
   /** 社内コーディングエージェントの Webhook URL（GitHub 未設定時のフォールバック） */
   GROWTH_CODING_AGENT_URL: z
     .string()

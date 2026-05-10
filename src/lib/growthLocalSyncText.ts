@@ -1,5 +1,7 @@
 import { getEnv } from "../config/env.js";
 
+const MARKER_NEAR_AUTOMATION_PR = "<!-- NEAR_GROWTH_AUTOMATION_PR -->";
+
 /** Issue/PR 本文・LINE 用のローカル同期ブロック（パスは環境で上書き可） */
 export function growthLocalSyncMarkdownSection(): string {
   const dir = getEnv().NEAR_LOCAL_SYNC_PATH_HINT.replace(/\/$/, "");
@@ -18,9 +20,12 @@ export function growthLocalSyncMarkdownSection(): string {
     "git status",
     "```",
     "",
+    "ローカルに未コミットの変更がある場合は、先に `git commit` するか `git stash` してから pull してください。",
+    "",
   ].join("\n");
 }
 
+/** LINE 用: 同期コマンド＋注意（進化完了通知で使用） */
 export function growthLocalSyncLineBlock(): string {
   const dir = getEnv().NEAR_LOCAL_SYNC_PATH_HINT.replace(/\/$/, "");
   const branch = getEnv().GROWTH_MERGE_TARGET_BRANCH;
@@ -30,32 +35,30 @@ export function growthLocalSyncLineBlock(): string {
     `git pull origin ${branch}`,
     "git status",
     "",
-    "※ Mac 上のフォルダは GitHub の更新と自動では同期されません。",
-    "次にCursorでNEARを触る前に、上記を実行してください。",
+    "PCを閉じている間はローカルには自動反映されないため、次にCursorを開く前に上記コマンドを実行してください。",
+    "",
+    "ローカルに未コミットの変更がある場合は、先に commit するか stash してから pull してください。",
   ].join("\n");
 }
 
+/**
+ * 管理者 LINE: 進化完了＋ローカル同期案内（Issue URL は含めない。トークン類は呼び出し側でマスク済みであること）
+ */
 export function formatNearEvolutionCompleteLineMessage(input: {
   prUrl: string;
-  issueUrl: string | null;
   commitShaShort: string;
 }): string {
-  const issueBlock =
-    input.issueUrl && input.issueUrl.startsWith("http")
-      ? `Issue:\n${input.issueUrl}\n\n`
-      : "";
   return [
     "NEARの進化が完了しました。",
     "",
-    `GitHub ${getEnv().GROWTH_MERGE_TARGET_BRANCH} が更新されています。`,
-    "",
-    "PR:",
-    input.prUrl,
-    "",
-    issueBlock,
     "最新コミット:",
     input.commitShaShort,
+    "",
+    "GitHub:",
+    input.prUrl,
     "",
     growthLocalSyncLineBlock(),
   ].join("\n");
 }
+
+export { MARKER_NEAR_AUTOMATION_PR };

@@ -6,6 +6,8 @@ export type GithubPullView = {
   number: number;
   html_url: string;
   state: string;
+  merged?: boolean | null;
+  merge_commit_sha?: string | null;
   mergeable: boolean | null;
   mergeable_state: string | null;
   body: string | null;

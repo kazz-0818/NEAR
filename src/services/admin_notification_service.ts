@@ -94,7 +94,6 @@ export async function notifyUserGrowthConsent(input: {
 /** v4: Growth PR が main にマージされたあと、ローカル同期案内つきで管理者へ通知 */
 export async function notifyNearEvolutionComplete(input: {
   prUrl: string;
-  issueUrl: string | null;
   commitShaShort: string;
 }): Promise<void> {
   const log = getLogger();

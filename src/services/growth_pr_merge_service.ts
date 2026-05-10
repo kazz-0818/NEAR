@@ -1,5 +1,6 @@
 import { getEnv } from "../config/env.js";
 import type { Db } from "../db/client.js";
+import { MARKER_NEAR_AUTOMATION_PR } from "../lib/growthLocalSyncText.js";
 import { parseGithubRepo } from "../lib/githubRepo.js";
 import { GrowthGithubIssueError } from "./githubIssueService.js";
 import {
@@ -23,7 +24,7 @@ export function isGrowthMergeToMainCommand(text: string): boolean {
   ) {
     return false;
   }
-  return /(反映して|mainに反映|マージして|このPR反映|これ反映)/i.test(t);
+  return /(反映して|これ反映して|これ反映|mainに反映|本番に反映|マージして|このPR反映|進化反映)/i.test(t);
 }
 
 /** PR 番号を明示していれば返す（suggestion # との混同を避けるため PR # を優先） */
@@ -46,32 +47,40 @@ function prUrl(owner: string, repo: string, num: number): string {
   return `https://github.com/${owner}/${repo}/pull/${num}`;
 }
 
-function extractPrNumberFromTextBodies(bodies: string[], owner: string, repo: string): number | null {
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  let last: number | null = null;
-  for (const body of bodies) {
-    const re = new RegExp(`https://github\\.com/${esc(owner)}/${esc(repo)}/pull/(\\d+)`, "gi");
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(body)) != null) {
-      const n = Number(m[1]);
-      if (Number.isFinite(n) && n > 0) last = n;
-    }
-  }
-  return last;
+function escRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function extractIssueUrlFromBodies(bodies: string[], owner: string, repo: string): string | null {
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Issue コメント本文群から PR 番号を出現順で重複なく抽出 */
+function extractOrderedUniquePrNumbersFromBodies(
+  bodies: string[],
+  owner: string,
+  repo: string,
+  onlyWithNearMarker: boolean
+): number[] {
+  const re = new RegExp(`https://github\\.com/${escRe(owner)}/${escRe(repo)}/pull/(\\d+)`, "gi");
+  const out: number[] = [];
+  const seen = new Set<number>();
   for (const body of bodies) {
-    const re = new RegExp(`https://github\\.com/${esc(owner)}/${esc(repo)}/issues/(\\d+)`, "i");
-    const m = body.match(re);
-    if (m?.[0]) return m[0].replace(/[\s)>]+$/, "");
+    if (onlyWithNearMarker && !body.includes(MARKER_NEAR_AUTOMATION_PR)) continue;
+    const r = new RegExp(re.source, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = r.exec(body)) != null) {
+      const n = Number(m[1]);
+      if (Number.isFinite(n) && n > 0 && !seen.has(n)) {
+        seen.add(n);
+        out.push(n);
+      }
+    }
   }
-  return null;
+  return out;
 }
 
 function extractIssueUrlFromPrBody(body: string, owner: string, repo: string): string | null {
-  return extractIssueUrlFromBodies([body], owner, repo);
+  const re = new RegExp(`https://github\\.com/${escRe(owner)}/${escRe(repo)}/issues/(\\d+)`, "i");
+  const m = body.match(re);
+  if (m?.[0]) return m[0].replace(/[\s)>]+$/, "");
+  return null;
 }
 
 function headAllowed(headRef: string): boolean {
@@ -81,7 +90,7 @@ function headAllowed(headRef: string): boolean {
 
 async function refreshMergeable(prNumber: number): Promise<GithubPullView> {
   let pr = await githubGetPullRequest(prNumber);
-  for (let i = 0; i < 3 && pr.mergeable == null; i++) {
+  for (let i = 0; i < 3 && pr.mergeable == null && pr.state === "open"; i++) {
     await new Promise((r) => setTimeout(r, 1200));
     pr = await githubGetPullRequest(prNumber);
   }
@@ -110,6 +119,24 @@ async function persistGrowthPrMeta(db: Db, suggestionId: number, prNumber: numbe
 }
 
 export type MergeGrowthPrReply = { ok: true; reply: string } | { ok: false; reply: string };
+
+function ambiguousPrReply(nums: number[], owner: string, repo: string): string {
+  const lines = nums.map((n) => `- PR #${n}: ${prUrl(owner, repo, n)}`);
+  return [
+    "複数の PR が候補として見つかりました。どれを main に反映するか、番号を指定してください。",
+    "",
+    "候補:",
+    ...lines,
+    "",
+    "例: PR #" + nums[0] + " 反映して",
+  ].join("\n");
+}
+
+const pendingChecksReply =
+  "まだチェックが完了していません（GitHub Actions 実行中です）。\n完了してから、もう一度「反映して」と送ってください。";
+
+const failedChecksReply =
+  "チェックが失敗しているため、自動では main に反映できません。\nGitHub の Actions タブでログを確認してください。";
 
 /**
  * 管理者 LINE「反映して」系: 対象 PR を解決し、安全なら main へマージ後に完了通知。
@@ -147,27 +174,38 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
     if (suggestionId == null || !Number.isFinite(suggestionId)) {
       return {
         ok: false,
-        reply: "どのPRを反映しますか？\nPR番号またはURLを送ってください。\n例: PR #3 反映して",
+        reply: "どの PR を反映するか特定できませんでした。\nPR 番号または URL を送ってください。\n例: PR #3 反映して",
       };
     }
 
     const row = await input.db.query<{
       github_growth_pr_number: number | null;
-      github_growth_pr_url: string | null;
       github_issue_number: number | null;
     }>(
-      `SELECT github_growth_pr_number, github_growth_pr_url, github_issue_number
+      `SELECT github_growth_pr_number, github_issue_number
        FROM implementation_suggestions WHERE id = $1`,
       [suggestionId]
     );
     const r0 = row.rows[0];
+
     if (r0?.github_growth_pr_number != null && Number.isFinite(Number(r0.github_growth_pr_number))) {
       prNumber = Number(r0.github_growth_pr_number);
     } else if (r0?.github_issue_number != null) {
       try {
         const bodies = await githubListIssueComments(Number(r0.github_issue_number));
-        const fromComments = extractPrNumberFromTextBodies(bodies, owner, repo);
-        if (fromComments != null) prNumber = fromComments;
+        const fromMarker = extractOrderedUniquePrNumbersFromBodies(bodies, owner, repo, true);
+        if (fromMarker.length > 1) {
+          return { ok: false, reply: ambiguousPrReply(fromMarker, owner, repo) };
+        }
+        if (fromMarker.length === 1) {
+          prNumber = fromMarker[0]!;
+        } else {
+          const fromAny = extractOrderedUniquePrNumbersFromBodies(bodies, owner, repo, false);
+          if (fromAny.length > 1) {
+            return { ok: false, reply: ambiguousPrReply(fromAny, owner, repo) };
+          }
+          if (fromAny.length === 1) prNumber = fromAny[0]!;
+        }
       } catch {
         /* fall through */
       }
@@ -189,7 +227,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
       return {
         ok: false,
         reply:
-          "対象の PR を特定できませんでした。\n「PR #番号 反映して」で指定するか、Issue に PR URL がコメントされているか確認してください。",
+          "対象の PR を特定できませんでした。\nIssue に「NEAR Growth Automation PR」付きのコメントで PR URL が付いているか、\n「PR #番号 反映して」で指定してください。",
       };
     }
   } else {
@@ -204,21 +242,52 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
 
   const unsafeReply = (reasons: string[]) =>
     [
-      "このPRは自動反映できません。",
+      "この PR は自動反映の条件を満たしていません。",
       "",
       "理由:",
       ...reasons.map((x) => `- ${x}`),
       "",
-      "GitHub上で確認してください。",
+      "GitHub 上で確認してください。",
     ].join("\n");
 
   try {
     let pr = await refreshMergeable(prNumber);
-    if (pr.state !== "open") {
-      return { ok: false, reply: unsafeReply([`PR が open ではありません（state=${pr.state}）`]) };
+    const targetBase = getEnv().GROWTH_MERGE_TARGET_BRANCH;
+    const prUrlStr = pr.html_url || prUrl(owner, repo, prNumber);
+
+    if (pr.merged === true) {
+      const shaFull = pr.merge_commit_sha?.trim() || "";
+      let tip = shaFull ? shortSha(shaFull) : "";
+      if (!tip) {
+        try {
+          tip = shortSha(await githubGetBranchHeadSha(targetBase));
+        } catch {
+          tip = "（取得できませんでした）";
+        }
+      }
+      await notifyNearEvolutionComplete({
+        prUrl: prUrlStr,
+        commitShaShort: tip,
+      });
+      return {
+        ok: true,
+        reply: [
+          "この PR はすでにマージ済みでした。",
+          "進化完了の内容で LINE 通知を再度お送りしました（再マージはしていません）。",
+          "",
+          "PR:",
+          prUrlStr,
+        ].join("\n"),
+      };
     }
 
-    const targetBase = getEnv().GROWTH_MERGE_TARGET_BRANCH;
+    if (pr.state !== "open") {
+      return {
+        ok: false,
+        reply: unsafeReply([`PR が open ではありません（state=${pr.state}、未マージでクローズの可能性があります）`]),
+      };
+    }
+
     if (pr.base.ref !== targetBase) {
       return { ok: false, reply: unsafeReply([`base branch が ${targetBase} ではありません（${pr.base.ref}）`]) };
     }
@@ -248,26 +317,16 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
 
     const checks = await githubCheckRunSummary(pr.head.sha);
     if (checks.pending) {
-      return { ok: false, reply: unsafeReply(["GitHub Actions（チェック）が実行中です。完了してから再度お試しください"]) };
+      return { ok: false, reply: pendingChecksReply };
     }
     if (checks.failed) {
-      return { ok: false, reply: unsafeReply(["GitHub Actions（チェック）が失敗しています"]) };
+      return { ok: false, reply: failedChecksReply };
     }
 
     const rawMethod = getEnv().GROWTH_MERGE_METHOD;
     const method =
       rawMethod === "merge" || rawMethod === "rebase" ? rawMethod : ("squash" as const);
     const { sha: mergeSha } = await githubMergePullRequest(prNumber, method);
-
-    let issueUrl: string | null = null;
-    if (pr.body) issueUrl = extractIssueUrlFromPrBody(pr.body, owner, repo);
-    if (!issueUrl && suggestionId != null) {
-      const ir = await input.db.query<{ github_issue_url: string | null }>(
-        `SELECT github_issue_url FROM implementation_suggestions WHERE id = $1`,
-        [suggestionId]
-      );
-      issueUrl = ir.rows[0]?.github_issue_url?.trim() ?? null;
-    }
 
     const defaultBranch = await githubGetDefaultBranch();
     let tipSha = mergeSha;
@@ -278,14 +337,11 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
     }
 
     if (suggestionId != null) {
-      await persistGrowthPrMeta(input.db, suggestionId, prNumber, prUrl(owner, repo, prNumber));
+      await persistGrowthPrMeta(input.db, suggestionId, prNumber, prUrlStr);
     }
-
-    const prUrlStr = pr.html_url || prUrl(owner, repo, prNumber);
 
     await notifyNearEvolutionComplete({
       prUrl: prUrlStr,
-      issueUrl,
       commitShaShort: shortSha(tipSha),
     });
 
@@ -297,11 +353,17 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
         "PR:",
         prUrlStr,
         "",
-        "管理者向けに完了通知（LINE）も送りました。",
+        "進化完了とローカル同期の案内を LINE でお送りしました。",
       ].join("\n"),
     };
   } catch (e) {
     const msg = e instanceof GrowthGithubIssueError ? e.message : e instanceof Error ? e.message : String(e);
+    if (/404|Not\s*Found/i.test(msg)) {
+      return {
+        ok: false,
+        reply: "指定の PR が見つかりませんでした（存在しない番号の可能性があります）。\nGitHub で PR 番号を確認してください。",
+      };
+    }
     return {
       ok: false,
       reply: ["マージに失敗しました。", "", msg].join("\n"),

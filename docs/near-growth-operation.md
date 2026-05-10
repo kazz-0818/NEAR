@@ -13,13 +13,21 @@
 
 ## 推奨ローカル同期コマンド
 
+NEAR が自動で GitHub の `main` を更新しても、**赤井さんの Mac 上の NEAR フォルダは自動では更新されません。**
+
+PC を閉じている間は、ローカルへ `git pull` が走ることもありません。
+
+最新化するときは、まず作業ツリーに未コミットの変更がないか確認し、必要なら **先に commit するか `git stash`** してから pull してください。
+
 ```bash
 cd ~/Downloads/System/NEAR
 git pull origin main
 git status
 ```
 
-別パスで clone している場合は、`cd` だけ環境に合わせてください（サーバー側の環境変数 `NEAR_LOCAL_SYNC_PATH_HINT` で Issue/PR 本文の案内パスを変えられます）。
+**Cursor で NEAR を触る前に**、必ず `git status` と `git pull` の結果を確認してください。
+
+別パスで clone している場合は、`cd` だけ環境に合わせてください（サーバー側の環境変数 `NEAR_LOCAL_SYNC_PATH_HINT` で Issue/PR 本文・LINE 案内のパスを変えられます）。
 
 ## 管理者向け: PR を `main` に載せる
 

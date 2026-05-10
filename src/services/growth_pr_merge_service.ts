@@ -163,6 +163,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
   const explicitPr = parseExplicitPullRequestNumber(norm);
   let suggestionId: number | null = null;
   let prNumber: number | null = explicitPr;
+  let resolvedIssueUrl: string | null = null;
 
   if (prNumber == null) {
     const sess = await input.db.query<{ active_suggestion_id: string | null }>(
@@ -181,12 +182,14 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
     const row = await input.db.query<{
       github_growth_pr_number: number | null;
       github_issue_number: number | null;
+      github_issue_url: string | null;
     }>(
-      `SELECT github_growth_pr_number, github_issue_number
+      `SELECT github_growth_pr_number, github_issue_number, github_issue_url
        FROM implementation_suggestions WHERE id = $1`,
       [suggestionId]
     );
     const r0 = row.rows[0];
+    resolvedIssueUrl = r0?.github_issue_url ?? null;
 
     if (r0?.github_growth_pr_number != null && Number.isFinite(Number(r0.github_growth_pr_number))) {
       prNumber = Number(r0.github_growth_pr_number);
@@ -268,6 +271,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
       await notifyNearEvolutionComplete({
         prUrl: prUrlStr,
         commitShaShort: tip,
+        issueUrl: resolvedIssueUrl,
       });
       return {
         ok: true,
@@ -343,6 +347,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
     await notifyNearEvolutionComplete({
       prUrl: prUrlStr,
       commitShaShort: shortSha(tipSha),
+      issueUrl: resolvedIssueUrl,
     });
 
     return {

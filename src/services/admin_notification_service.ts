@@ -95,6 +95,8 @@ export async function notifyUserGrowthConsent(input: {
 export async function notifyNearEvolutionComplete(input: {
   prUrl: string;
   commitShaShort: string;
+  /** Issue URL（あれば表示） */
+  issueUrl?: string | null;
 }): Promise<void> {
   const log = getLogger();
   const body = formatNearEvolutionCompleteLineMessage(input);

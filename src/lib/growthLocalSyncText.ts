@@ -42,23 +42,31 @@ export function growthLocalSyncLineBlock(): string {
 }
 
 /**
- * 管理者 LINE: 進化完了＋ローカル同期案内（Issue URL は含めない。トークン類は呼び出し側でマスク済みであること）
+ * 管理者 LINE: 進化完了＋ローカル同期案内（トークン類は呼び出し側でマスク済みであること）
  */
 export function formatNearEvolutionCompleteLineMessage(input: {
   prUrl: string;
   commitShaShort: string;
+  /** Issue URL（あれば表示） */
+  issueUrl?: string | null;
 }): string {
-  return [
+  const parts: string[] = [
     "NEARの進化が完了しました。",
+    "",
+    "PR:",
+    input.prUrl,
+  ];
+  if (input.issueUrl) {
+    parts.push("", "Issue:", input.issueUrl);
+  }
+  parts.push(
     "",
     "最新コミット:",
     input.commitShaShort,
     "",
-    "GitHub:",
-    input.prUrl,
-    "",
-    growthLocalSyncLineBlock(),
-  ].join("\n");
+    growthLocalSyncLineBlock()
+  );
+  return parts.join("\n");
 }
 
 export { MARKER_NEAR_AUTOMATION_PR };

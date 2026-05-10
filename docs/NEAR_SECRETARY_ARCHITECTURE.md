@@ -13,7 +13,17 @@ NEAR を「intent ルーター」ではなく、**物理行動以外はできる
 ```
 LINE Webhook
     → 受信保存（inbound）
-    → 特別経路（管理者成長 / ユーザー成長 / Google OAuth / デプロイ時刻 / What's new）
+    → 特別経路（優先順）:
+        1. 権限保留操作（はい/番号/キャンセル）
+        2. 権限管理コマンド
+        3. シート候補選択（保留 pick）
+        4. タスク参照・リマインダー・タスク管理コマンド
+        5. 管理者: 改善カプセルコマンド（tryHandleImprovementCapsuleAdminLine）
+        6. 管理者: Growth コマンド（tryHandleAdminGrowthLine）
+        7. ユーザー Growth ステータス・回答（tryHandleGrowthRequestingUserLine）
+        8. Google OAuth 系
+        9. semantic 補助解釈
+       10. デプロイ時刻 / What's new
     → 【秘書レイヤー】会話文脈を入力に、request_mode を解釈
          ├─ edit_previous_output     → 直前 NEAR 出力の汎用編集（LLM）
          ├─ clarify_missing_info     → 不足情報の自然な確認（LLM）
@@ -207,6 +217,13 @@ LINE Webhook
 4. 提案 → 管理者承認 → 成長候補  
 
 「未対応を減らす」は **誤成功ではなく、編集・文脈・確認の強化**で実現する。
+
+## Improvement Capsule との接続
+
+NEAR の返答品質・ルーティングの自己改善は **Improvement Capsule System** が担います。  
+秘書レイヤー・orchestrator が返信を行った**後**、軽量ルールで `improvement_candidates` に候補を記録し、**日次バッチでまとめて LLM 分析**します。毎会話の LLM 呼び出しは行いません。
+
+詳細は [`docs/near-improvement-capsules.md`](near-improvement-capsules.md) を参照してください。
 
 ---
 

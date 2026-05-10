@@ -34,7 +34,7 @@ test("growth v4 source files contain canonical Japanese phrases (UTF-8)", () => 
     );
   }
 
-  for (const needle of ["NEARの進化が完了しました。", "ローカル同期コマンド:", "最新コミット:", "GitHub:"]) {
+  for (const needle of ["NEARの進化が完了しました。", "ローカル同期コマンド:", "最新コミット:", "PR:", "Issue:"]) {
     assert.ok(sync.includes(needle), `growthLocalSyncText.ts should include ${JSON.stringify(needle)}`);
   }
 

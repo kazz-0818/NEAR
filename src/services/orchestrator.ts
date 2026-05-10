@@ -594,7 +594,7 @@ export async function handleLineTextMessage(input: {
       "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
     let draft = draftBase;
     if (env.NEAR_GROWTH_USER_ACK_ENABLED && gate.allow) {
-      draft = `${draftBase}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+      draft = `${draftBase}\n\n※ このご要望は、成長候補として記録し、開発側で検討できるよう控えました。`;
     }
     let finalText = draft;
     try {
@@ -722,7 +722,7 @@ export async function handleLineTextMessage(input: {
           "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
         let draft = draftBase;
         if (env.NEAR_GROWTH_USER_ACK_ENABLED && gate.allow) {
-          draft = `${draftBase}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+          draft = `${draftBase}\n\n※ このご要望は、成長候補として記録し、開発側で検討できるよう控えました。`;
         }
         let finalText = draft;
         try {
@@ -837,7 +837,7 @@ export async function handleLineTextMessage(input: {
           "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
         let draft = draftBase;
         if (env.NEAR_GROWTH_USER_ACK_ENABLED && gate.allow) {
-          draft = `${draftBase}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+          draft = `${draftBase}\n\n※ このご要望は、成長候補として記録し、開発側で検討できるよう控えました。`;
         }
         let finalText = draft;
         try {
@@ -1051,7 +1051,7 @@ export async function handleLineTextMessage(input: {
 
     let finalText = faqRetryFallbackDraft ?? modResult.draft;
     if (env.NEAR_GROWTH_USER_ACK_ENABLED && growthGateForAck?.allow) {
-      finalText = `${finalText}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+      finalText = `${finalText}\n\n※ このご要望は、成長候補として記録し、開発側で検討できるよう控えました。`;
     }
     try {
       finalText = await composeNearReplyUnified({ actorDisplayName,

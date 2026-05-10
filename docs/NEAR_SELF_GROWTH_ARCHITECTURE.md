@@ -242,12 +242,46 @@
 
 ---
 
+---
+
+## 11. Growth と Improvement Capsule の責務分離
+
+**Growth（成長システム）** と **Improvement Capsule（改善カプセル）** は入口と目的が異なります。
+
+### Growth System
+
+- **起点**: ユーザーまたは管理者が**明示的に**機能追加を依頼したとき。  
+  例: 「NEARで〇〇できるようにして」「毎朝通知して」「外部APIと連携して」「Issue作って」「Cursorに投げて」
+- **フロー**: 依頼 → Growth 候補として整理 → 管理者承認 → GitHub Issue → Cursor Agent / PR → 管理者「反映して」→ main マージ → 進化完了通知（PR URL + Issue URL + commit SHA + ローカル同期コマンド）
+- **DB**: `unsupported_requests` → `implementation_suggestions`（承認・ヒアリング・cursor_prompt）
+
+### Improvement Capsule System
+
+- **起点**: NEAR が会話ログを振り返り、**自分の返答品質・ルーティング・文脈理解**に改善余地を検知したとき。  
+  例: ユーザーが「違う」「文脈見て」と言った / 指示詞（「それ」「1番」）を拾えなかった / LLM で返すべきものを Growth に流した
+- **重要**: **毎会話でLLM分析しない**。軽量ルールで `improvement_candidates` に候補を記録し、1日1回（JST 23:00 既定）または手動でまとめて LLM 分析する。  
+- **フロー**: 会話 → 軽量ルール検知 → 候補保存 → 日次バッチ LLM 分析 → 改善カプセル生成 → confidence ≥ 0.7 のみ管理者通知 → 管理者が Issue 化を承認 → 既存の near-growth / cursor-agent フローへ
+- **DB**: `improvement_candidates`（pending → analyzed）/ `improvement_capsules`（proposed → issue_created 等）
+
+### 混同しないために
+
+| 観点 | Growth | Improvement Capsule |
+|------|--------|---------------------|
+| 起点 | **ユーザー/管理者の明示的な依頼** | **NEAR 自身の品質分析** |
+| LLM 分析タイミング | 依頼時（feature_suggester） | **日次バッチのみ** |
+| ユーザー向けACK | 「成長候補として記録しました」 | ユーザーへの返信はしない |
+| 管理者通知 | 提案直後（notifyGrowthCandidateV3） | 日次まとめ通知（confidence 閾値以上のみ） |
+| Issue ラベル | `near-growth` `cursor-agent` | `near-growth` `cursor-agent` `improvement-capsule` |
+
+---
+
 ## 非目標（再掲）
 
 - モデル重みの継続学習  
 - 無承認の本番自動デプロイ  
 - 危険な権限変更の自動化  
 - 全未対応の即時自動実装  
+- **会話ごとの LLM 改善分析**（API コスト・遅延の観点から禁止）
 
 ---
 

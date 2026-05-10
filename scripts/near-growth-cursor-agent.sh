@@ -653,20 +653,19 @@ fi
 git push -u origin "$BRANCH"
 
 ISSUE_URL="https://github.com/${REPO}/issues/${ISSUE_NUMBER}"
-# IMPL_BULLET / SUGGESTION_LINE にバッククォートが含まれても unquoted heredoc でコマンド置換されないよう分割する
+# unquoted heredoc は ** やバッククォートでグロブ／コマンド置換が起きうるため、変数はすべて printf で追記する
 {
-  cat <<EOF
+  cat <<'NEAR_GROWTH_PR_HEAD'
 ## NEAR Growth Automation PR
 
 元Issue:
-- #${ISSUE_NUMBER}
-
-suggestion_id:
-EOF
+NEAR_GROWTH_PR_HEAD
+  printf -- '- #%s\n\n' "${ISSUE_NUMBER}"
+  printf '%s\n' "suggestion_id:"
   printf -- '- %s\n\n' "${SUGGESTION_LINE}"
   printf '%s\n\n' "## 実装内容"
   printf '%s\n\n' "${IMPL_BULLET}"
-  cat <<EOF
+  cat <<'NEAR_GROWTH_PR_TAIL'
 ## 確認事項
 - [ ] npm run build 通過
 - [ ] main直接pushなし
@@ -677,8 +676,8 @@ EOF
 ## 管理者確認
 LINEで「反映して」と言われるまではmainにマージしない。
 
-（元Issue: ${ISSUE_URL}）
-EOF
+NEAR_GROWTH_PR_TAIL
+  printf '%s\n' "（元Issue: ${ISSUE_URL}）"
 } >"$PR_BODY_FILE"
 
 set +e

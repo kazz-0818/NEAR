@@ -54,7 +54,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      GH_TOKEN: ${{ secrets.NEAR_GROWTH_ACTIONS_GH_TOKEN || github.token }}
+      GH_TOKEN: ${{ secrets.NEAR_GROWTH_ACTIONS_GH_TOKEN != '' && secrets.NEAR_GROWTH_ACTIONS_GH_TOKEN || github.token }}
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
 
     steps:

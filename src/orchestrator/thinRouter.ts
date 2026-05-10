@@ -26,6 +26,11 @@ import { resolveSemanticOperation } from "../services/semantic_operation_resolve
 import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_line.js";
 import { tryResolveReminderFromRecentTaskList } from "../services/task_reminder_router.js";
 import { extractTaskItemsFromAssistantMessages, parseTaskTargetNumber } from "../lib/taskListContext.js";
+import {
+  isExplicitGrowthDevelopmentRequest,
+  isForcedGrowthOrIssueCommand,
+  isUserConfusionOrNegationSignal,
+} from "../lib/growthExplicitRequest.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
@@ -79,131 +84,150 @@ export async function runThinRouterPhase(input: {
     return { handled: true, finalText: permResult.reply };
   }
 
+  const textNorm = text.normalize("NFKC").trim();
+
+  // ----------------------------------------------------------------
+  // Growth 明示要望 / 混乱シグナル: stale pending を一切バイパスする
+  // ----------------------------------------------------------------
+  const isGrowthRequest = isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
+  const isConfusion = isUserConfusionOrNegationSignal(text);
+  if (isGrowthRequest) {
+    log.info({ channelUserId, textLen: textNorm.length }, "explicit growth request — bypassing stale pending states in thinRouter");
+  }
+  if (isConfusion) {
+    log.info({ channelUserId, textLen: textNorm.length }, "user confusion signal — bypassing stale pending states in thinRouter");
+  }
+
   // スプレッドシート候補選択の保留チェック（タスク管理より先に実行）
   // 「5」「2番」などがタスク文脈に誤爆しないようにするため最優先で確認する
-  const textNorm = text.normalize("NFKC").trim();
-  const looksLikePick =
-    isPendingSheetPickIndexMessage(text) ||
-    (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
-  const hasPick = looksLikePick
-    ? await hasPendingSheetPick(db, channelUserId).catch(() => false)
-    : false;
-  if (hasPick) {
-    log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
-    return { handled: false, forceIntent: "google_sheets_query" };
+  // Growth 要望・混乱シグナルは pending pick をバイパスする（misroute 防止）
+  if (!isGrowthRequest && !isConfusion) {
+    const looksLikePick =
+      isPendingSheetPickIndexMessage(text) ||
+      (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
+    const hasPick = looksLikePick
+      ? await hasPendingSheetPick(db, channelUserId).catch(() => false)
+      : false;
+    if (hasPick) {
+      log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
+      return { handled: false, forceIntent: "google_sheets_query" };
+    }
   }
 
-  const directRefNumber = parseTaskTargetNumber(textNorm);
-  const looksLikeOnlyReference = directRefNumber != null && /^(?:[1-9][0-9]*\s*(?:番|ばん|つ目|個目)?|一番|いちばん|一つ目|ひとつめ|最初|上のやつ)$/u.test(textNorm);
-  if (looksLikeOnlyReference) {
-    const items = extractTaskItemsFromAssistantMessages(
-      quotedAssistantMessage ? [...(recentAssistantMessages ?? []), quotedAssistantMessage] : (recentAssistantMessages ?? [])
-    );
-    const item = items.find((x) => x.number === directRefNumber);
-    if (item) {
+  // タスク参照・リマインダー・タスク管理コマンドも Growth 要望・混乱シグナル時はスキップ
+  if (!isGrowthRequest && !isConfusion) {
+    const directRefNumber = parseTaskTargetNumber(textNorm);
+    const looksLikeOnlyReference = directRefNumber != null && /^(?:[1-9][0-9]*\s*(?:番|ばん|つ目|個目)?|一番|いちばん|一つ目|ひとつめ|最初|上のやつ)$/u.test(textNorm);
+    if (looksLikeOnlyReference) {
+      const items = extractTaskItemsFromAssistantMessages(
+        quotedAssistantMessage ? [...(recentAssistantMessages ?? []), quotedAssistantMessage] : (recentAssistantMessages ?? [])
+      );
+      const item = items.find((x) => x.number === directRefNumber);
+      if (item) {
+        return {
+          handled: true,
+          finalText: `${item.number}番の「${item.title}」ですね。完了・削除・リマインドなど、どうしますか？`,
+        };
+      }
       return {
         handled: true,
-        finalText: `${item.number}番の「${item.title}」ですね。完了・削除・リマインドなど、どうしますか？`,
+        finalText: "どの一覧の1番か分かりませんでした。",
       };
     }
-    return {
-      handled: true,
-      finalText: "どの一覧の1番か分かりませんでした。",
-    };
-  }
 
-  const reminderByList = await tryResolveReminderFromRecentTaskList({
-    db,
-    channelUserId,
-    actorUserId: effectiveActorId,
-    groupId,
-    text,
-    recentAssistantMessages,
-    quotedAssistantMessage: quotedAssistantMessage ?? undefined,
-    inboundMessageId,
-  });
-  if (reminderByList.matched) {
-    if (reminderByList.mode === "resolved") {
+    const reminderByList = await tryResolveReminderFromRecentTaskList({
+      db,
+      channelUserId,
+      actorUserId: effectiveActorId,
+      groupId,
+      text,
+      recentAssistantMessages,
+      quotedAssistantMessage: quotedAssistantMessage ?? undefined,
+      inboundMessageId,
+    });
+    if (reminderByList.matched) {
+      if (reminderByList.mode === "resolved") {
+        return {
+          handled: false,
+          forceIntent: "reminder_request",
+          forceRequiredParams: {
+            message: reminderByList.title,
+            when_description: reminderByList.whenDescription,
+            target_number: reminderByList.targetNumber,
+          },
+        };
+      }
+      return {
+        handled: true,
+        finalText: `どのタスクを${reminderByList.whenDescription}にリマインドしますか？番号で教えてください。`,
+      };
+    }
+
+    const norm = normalizeUserUtterance(text);
+    const op = resolveUserOperation({
+      text,
+      recentUserMessages,
+      recentAssistantMessages,
+    });
+    log.info(
+      { rawText: text, normalizedText: norm.compact, resolvedKind: op.kind, confidence: op.confidence, reason: op.reason },
+      "utterance resolved"
+    );
+
+    if (op.kind === "task.list.sheet") {
+      log.info({ channelUserId, reason: op.reason }, "task utterance resolved as task.list.sheet");
+      return { handled: false, forceIntent: "google_sheets_query" };
+    }
+    if (op.kind === "task.add" && op.extractedText && op.extractedText.length >= 2 && op.confidence >= 0.9) {
       return {
         handled: false,
-        forceIntent: "reminder_request",
+        forceIntent: "task_create",
         forceRequiredParams: {
-          message: reminderByList.title,
-          when_description: reminderByList.whenDescription,
-          target_number: reminderByList.targetNumber,
+          title: op.extractedText,
+          semantic_operation: op,
         },
       };
     }
-    return {
-      handled: true,
-      finalText: `どのタスクを${reminderByList.whenDescription}にリマインドしますか？番号で教えてください。`,
-    };
-  }
-
-  const norm = normalizeUserUtterance(text);
-  const op = resolveUserOperation({
-    text,
-    recentUserMessages,
-    recentAssistantMessages,
-  });
-  log.info(
-    { rawText: text, normalizedText: norm.compact, resolvedKind: op.kind, confidence: op.confidence, reason: op.reason },
-    "utterance resolved"
-  );
-
-  if (op.kind === "task.list.sheet") {
-    log.info({ channelUserId, reason: op.reason }, "task utterance resolved as task.list.sheet");
-    return { handled: false, forceIntent: "google_sheets_query" };
-  }
-  if (op.kind === "task.add" && op.extractedText && op.extractedText.length >= 2 && op.confidence >= 0.9) {
-    return {
-      handled: false,
-      forceIntent: "task_create",
-      forceRequiredParams: {
-        title: op.extractedText,
-        semantic_operation: op,
-      },
-    };
-  }
-  if (op.kind === "task.list.local") {
-    const taskResult = await tryHandleTaskLine({
-      db,
-      text,
-      channelUserId,
-      actorUserId: effectiveActorId,
-      groupId,
-      recentAssistantMessages,
-      quotedAssistantMessage: quotedAssistantMessage ?? undefined,
-    });
-    if (taskResult.handled) {
-      return { handled: true, finalText: taskResult.reply };
+    if (op.kind === "task.list.local") {
+      const taskResult = await tryHandleTaskLine({
+        db,
+        text,
+        channelUserId,
+        actorUserId: effectiveActorId,
+        groupId,
+        recentAssistantMessages,
+        quotedAssistantMessage: quotedAssistantMessage ?? undefined,
+      });
+      if (taskResult.handled) {
+        return { handled: true, finalText: taskResult.reply };
+      }
     }
-  }
-  if (op.kind === "task.clarify") {
-    if (!env.SEMANTIC_ROUTER_ENABLED) {
-      return {
-        handled: true,
-        finalText: "タスクの追加・一覧確認・削除・更新のどれを行いますか？",
-      };
+    if (op.kind === "task.clarify") {
+      if (!env.SEMANTIC_ROUTER_ENABLED) {
+        return {
+          handled: true,
+          finalText: "タスクの追加・一覧確認・削除・更新のどれを行いますか？",
+        };
+      }
     }
-  }
 
-  // タスク管理コマンド（一覧・完了・削除・編集）
-  // sheet pick がない場合のみ実行する（数字がシート候補番号に誤爆しないよう）
-  if (isTaskManagementCommand(text, recentAssistantMessages)) {
-    const taskResult = await tryHandleTaskLine({
-      db,
-      text,
-      channelUserId,
-      actorUserId: effectiveActorId,
-      groupId,
-      recentAssistantMessages,
-      quotedAssistantMessage: quotedAssistantMessage ?? undefined,
-    });
-    if (taskResult.handled) {
-      return { handled: true, finalText: taskResult.reply };
+    // タスク管理コマンド（一覧・完了・削除・編集）
+    // sheet pick がない場合のみ実行する（数字がシート候補番号に誤爆しないよう）
+    if (isTaskManagementCommand(text, recentAssistantMessages)) {
+      const taskResult = await tryHandleTaskLine({
+        db,
+        text,
+        channelUserId,
+        actorUserId: effectiveActorId,
+        groupId,
+        recentAssistantMessages,
+        quotedAssistantMessage: quotedAssistantMessage ?? undefined,
+      });
+      if (taskResult.handled) {
+        return { handled: true, finalText: taskResult.reply };
+      }
     }
-  }
+  } // end !isGrowthRequest && !isConfusion (task/sheet routing)
 
   if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
     const cap = await tryHandleImprovementCapsuleAdminLine({ db, adminUserId: channelUserId, text });
@@ -236,25 +260,34 @@ export async function runThinRouterPhase(input: {
     return { handled: true, finalText: googleAcct.reply };
   }
 
+  // Growth 要望・混乱シグナルの場合は semantic router もスキップ（LLM に直接渡す）
+  // op は !isGrowthRequest && !isConfusion ブロック内でのみ定義されるため、
+  // ここでは type assertion で安全に参照できるよう undefined guard を用意する
+  const opForSemantic = (!isGrowthRequest && !isConfusion)
+    ? resolveUserOperation({ text, recentUserMessages, recentAssistantMessages })
+    : null;
+
   // semantic router は fallback ではなく補助判定として利用する。
   // deterministic が低信頼/曖昧/文脈依存のときに意味解釈を追加する。
   const shouldRunSemanticAssist =
+    !isGrowthRequest &&
+    !isConfusion &&
+    opForSemantic != null &&
     env.SEMANTIC_ROUTER_ENABLED &&
     (
-      op.kind === "general.chat" ||
-      op.kind === "unknown" ||
-      op.kind === "task.clarify" ||
-      op.confidence < 0.9 ||
-      (op.kind === "task.add" && (!op.extractedText || op.extractedText.trim().length < 2)) ||
-      ((op.kind === "task.delete" || op.kind === "task.update") && op.requiresConfirmation === true) ||
+      opForSemantic.kind === "general.chat" ||
+      opForSemantic.kind === "unknown" ||
+      opForSemantic.kind === "task.clarify" ||
+      opForSemantic.confidence < 0.9 ||
+      (opForSemantic.kind === "task.add" && (!opForSemantic.extractedText || opForSemantic.extractedText.trim().length < 2)) ||
+      ((opForSemantic.kind === "task.delete" || opForSemantic.kind === "task.update") && opForSemantic.requiresConfirmation === true) ||
       looksLikeContextDependentShortTaskText(text) ||
       isMostlyHiraganaText(text)
     );
 
   // deterministic で拾い切れない曖昧表現は semantic router で意味解釈する（envで段階的にON）
-  if (
-    shouldRunSemanticAssist
-  ) {
+  if (shouldRunSemanticAssist && opForSemantic != null) {
+    const op = opForSemantic;
     const sem = await resolveSemanticOperation({
       db,
       userText: text,

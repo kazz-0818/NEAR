@@ -1,4 +1,9 @@
 import type { ParsedIntent } from "../models/intent.js";
+import {
+  isExplicitGrowthDevelopmentRequest,
+  isForcedGrowthOrIssueCommand,
+  isUserConfusionOrNegationSignal,
+} from "../lib/growthExplicitRequest.js";
 
 export type ImprovementRoutingSnapshot = {
   userText: string;
@@ -93,5 +98,45 @@ export function collectLocalRuleHits(text: string, snap: ImprovementRoutingSnaps
   for (const r of detectRoutingSuspicions(snap)) {
     hits.push({ triggerReason: `routing:${r}`, label: `ルーティング:${r}` });
   }
+
+  // ミスルート検知: Growth 要望が Growth パイプライン以外に流れた
+  const isGrowthRequest = isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
+  if (
+    isGrowthRequest &&
+    !snap.usedGrowthPipeline &&
+    snap.routeTaken !== "thin_router" &&
+    snap.routeTaken !== "agent" &&
+    snap.routeTaken !== "growth_handled_intent_extension"
+  ) {
+    hits.push({
+      triggerReason: "growth_request_blocked_by_stale_pending",
+      label: "Growth要望がstale pendingに阻まれた可能性",
+    });
+  }
+
+  // ミスルート検知: 混乱シグナルで旧 pending が継続した
+  if (
+    isUserConfusionOrNegationSignal(text) &&
+    (snap.routeTaken === "pending_clarification" || snap.routeTaken === "pending_tool_confirmation")
+  ) {
+    hits.push({
+      triggerReason: "user_confusion_after_bad_route",
+      label: "混乱シグナルで旧pending続行",
+    });
+  }
+
+  // ミスルート検知: pending follow-up が Growth 要望を上書きした可能性
+  if (
+    isGrowthRequest &&
+    (snap.routeTaken === "pending_clarification" ||
+      snap.routeTaken === "pending_tool_confirmation" ||
+      snap.moduleName === "google_sheets_query")
+  ) {
+    hits.push({
+      triggerReason: "pending_followup_misroute",
+      label: "pending follow-up が Growth 要望を誤ルーティング",
+    });
+  }
+
   return hits;
 }

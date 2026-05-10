@@ -56,6 +56,11 @@ import {
   classifyPreGrowthRequest,
   isStandaloneGithubIssueCreatePhrase,
 } from "../lib/nearPreGrowthRouter.js";
+import {
+  isExplicitGrowthDevelopmentRequest,
+  isForcedGrowthOrIssueCommand,
+  isUserConfusionOrNegationSignal,
+} from "../lib/growthExplicitRequest.js";
 import { runLlmFallbackAnswer } from "./llm_fallback_answer.js";
 import { recordImprovementCandidatesIfEligible } from "./improvement_capsule_record.js";
 import type { ImprovementRoutingSnapshot } from "./improvement_capsule_rules.js";
@@ -240,45 +245,62 @@ export async function handleLineTextMessage(input: {
   let thinForceIntent = !thin.handled ? thin.forceIntent : undefined;
   let thinForceRequiredParams = !thin.handled ? thin.forceRequiredParams : undefined;
 
-  const pendingClarification = await tryHandlePendingClarification({
-    db,
-    channel,
-    channelUserId,
-    actorUserId,
-    groupId,
-    text,
-  });
-  if (pendingClarification.handled) {
-    capSnap.routeTaken = "pending_clarification";
-    capSnap.moduleName = null;
-    capSnap.usedLlmFallback = false;
-    capSnap.usedGrowthPipeline = false;
-    capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap);
-    return;
-  }
-  if ("forceIntent" in pendingClarification && pendingClarification.forceIntent) {
-    thinForceIntent = pendingClarification.forceIntent;
-    thinForceRequiredParams = pendingClarification.forceRequiredParams;
+  // ----------------------------------------------------------------
+  // Growth 明示要望・混乱シグナルの判定
+  // これより下の pending 系・Sheets 昇格をバイパスするためにここで計算する
+  // ----------------------------------------------------------------
+  const isExplicitGrowth = isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
+  const isConfusion = isUserConfusionOrNegationSignal(text);
+
+  // pending clarification は Growth 要望・混乱シグナルでスキップ
+  if (!isExplicitGrowth && !isConfusion) {
+    const pendingClarification = await tryHandlePendingClarification({
+      db,
+      channel,
+      channelUserId,
+      actorUserId,
+      groupId,
+      text,
+    });
+    if (pendingClarification.handled) {
+      capSnap.routeTaken = "pending_clarification";
+      capSnap.moduleName = null;
+      capSnap.usedLlmFallback = false;
+      capSnap.usedGrowthPipeline = false;
+      capSnap.preGrowthCategory = null;
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap);
+      return;
+    }
+    if ("forceIntent" in pendingClarification && pendingClarification.forceIntent) {
+      thinForceIntent = pendingClarification.forceIntent;
+      thinForceRequiredParams = pendingClarification.forceRequiredParams;
+    }
+  } else {
+    log.info({ isExplicitGrowth, isConfusion }, "skipping pending_clarification: growth request or confusion signal");
   }
 
-  const pendingHit = await tryHandlePendingToolConfirmation({
-    db,
-    channel,
-    channelUserId,
-    text,
-    inboundMessageId,
-    recentUserMessages,
-    recentAssistantMessages,
-  });
-  if (pendingHit.handled && pendingHit.finalText != null) {
-    capSnap.routeTaken = "pending_tool_confirmation";
-    capSnap.moduleName = null;
-    capSnap.usedLlmFallback = false;
-    capSnap.usedGrowthPipeline = false;
-    capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap);
-    return;
+  // pending tool confirmation は Growth 要望・混乱シグナルでスキップ
+  if (!isExplicitGrowth && !isConfusion) {
+    const pendingHit = await tryHandlePendingToolConfirmation({
+      db,
+      channel,
+      channelUserId,
+      text,
+      inboundMessageId,
+      recentUserMessages,
+      recentAssistantMessages,
+    });
+    if (pendingHit.handled && pendingHit.finalText != null) {
+      capSnap.routeTaken = "pending_tool_confirmation";
+      capSnap.moduleName = null;
+      capSnap.usedLlmFallback = false;
+      capSnap.usedGrowthPipeline = false;
+      capSnap.preGrowthCategory = null;
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap);
+      return;
+    }
+  } else {
+    log.info({ isExplicitGrowth, isConfusion }, "skipping pending_tool_confirmation: growth request or confusion signal");
   }
 
   if (!env.NEAR_SECRETARY_LAYER_DISABLED && !thinForceIntent) {
@@ -427,12 +449,17 @@ export async function handleLineTextMessage(input: {
     }
   }
 
-  try {
-    parsed = await promoteSheetsPendingPick(text, parsed, db, channelUserId);
-    parsed = await promoteSheetsPendingAffirmative(text, parsed, db, channelUserId);
-    parsed = await promoteGoogleSheetsFollowUp(text, parsed, recentUserMessages, db, channelUserId);
-  } catch (promoErr) {
-    log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");
+  // Growth 明示要望・混乱シグナルは Sheets 昇格をすべてスキップ（misroute 防止）
+  if (!isExplicitGrowth && !isConfusion) {
+    try {
+      parsed = await promoteSheetsPendingPick(text, parsed, db, channelUserId);
+      parsed = await promoteSheetsPendingAffirmative(text, parsed, db, channelUserId);
+      parsed = await promoteGoogleSheetsFollowUp(text, parsed, recentUserMessages, db, channelUserId);
+    } catch (promoErr) {
+      log.warn({ err: promoErr }, "promoteGoogleSheetsFollowUp failed; using classifyIntent result");
+    }
+  } else {
+    log.info({ isExplicitGrowth, isConfusion }, "skipping Sheets promotion: growth request or confusion signal");
   }
 
   // 「何ができる」「使い方」系が unknown に落ちたら help_capabilities へ救済する

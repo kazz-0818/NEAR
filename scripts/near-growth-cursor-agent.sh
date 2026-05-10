@@ -1,5 +1,21 @@
 #!/usr/bin/env bash
 # NEAR Growth Automation (v2): Issue をトリガーに Cursor CLI で実装し、PR まで作成する。
+#
+# 実装チェックリスト（監査用・処理順）:
+# [x] CURSOR_API_KEY 未設定 → 失敗コメント・near-growth-agent-failed・exit 1（running 未付与）
+# [x] secrets をログ/Issue/PR に出さない（echo しない・redact_snippet でログ断片をマスク）
+# [x] Issue 本文取得（gh issue view body → BODY_FILE）
+# [x] suggestion_id 抽出（extract_suggestion_id／未抽出時は near-growth/issue-{issue_number}）
+# [x] 重複防止（紐づき open PR・同名 head の PR・リモートのみブランチ）
+# [x] 作業ブランチ作成（git checkout -B … origin/${DEFAULT_BRANCH} ※ main へは push しない）
+# [x] near-growth-agent-running 付与（実処理開始直前）
+# [x] Cursor CLI インストール（curl …）※実行バイナリは公式どおり `agent`
+# [x] Headless 実行: agent -p --force --trust --workspace …
+# [x] npm run build
+# [x] 差分なし → Issue コメントして exit 0（EXIT トラップで running 除去）
+# [x] 差分あり → commit / push 作業ブランチ / gh pr create / Issue に PR URL / near-growth-pr-created
+# [x] 成功・失敗・差分なしいずれも EXIT トラップで near-growth-agent-running を除去（付与後のみ）
+#
 # - CURSOR_API_KEY はログに出さない
 # - gh は GH_TOKEN（github.token）を使用
 

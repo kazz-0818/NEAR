@@ -8,7 +8,7 @@
 # [x] suggestion_id 抽出（extract_suggestion_id／未抽出時は near-growth/issue-{issue_number}）
 # [x] 重複防止（紐づき open PR・同名 head の PR・リモートのみブランチ）
 # [x] 作業ブランチ作成（git checkout -B … origin/${DEFAULT_BRANCH} ※ main へは push しない）
-# [x] near-growth-agent-running 付与（実処理開始直前）
+# [x] near-growth-agent-running 付与（CURSOR_API_KEY 確認後・git fetch より前）
 # [x] Cursor CLI インストール（curl …）※実行バイナリは公式どおり `agent`
 # [x] Headless 実行: agent（workspace 付き → workspace なし → -p のみでフォールバック）
 # [x] npm run build
@@ -479,6 +479,21 @@ fi
 
 git add -A
 git commit -m "$COMMIT_MSG"
+
+if [[ "$BRANCH" == "$DEFAULT_BRANCH" ]]; then
+  log "error: 作業ブランチがデフォルトブランチと同一です。main 等への直接 push は行いません。"
+  try_create_label "near-growth-agent-failed" "D93F0B"
+  if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
+    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
+
+ブランチ名がデフォルトブランチと同一になる異常を検出したため、push を中止しました。
+
+確認してください:
+- suggestion_id 抽出やブランチ命名ロジックが意図どおりか
+"
+  fi
+  exit 1
+fi
 
 git push -u origin "$BRANCH"
 

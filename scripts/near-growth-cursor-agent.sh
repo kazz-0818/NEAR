@@ -392,7 +392,8 @@ fi
 DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q .defaultBranchRef.name)"
 git fetch origin "$DEFAULT_BRANCH"
 
-EXISTING_ROW="$(gh pr list -R "$REPO" --head "$BRANCH" --state all --json number,url -q 'if length > 0 then "\(.[0].number)\t\(.[0].url)" else empty end' 2>/dev/null || true)"
+# マージ済み／クローズ済み PR は再実行の妨げにしない（head が一致していても open のみブロック）
+EXISTING_ROW="$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,url -q 'if length > 0 then "\(.[0].number)\t\(.[0].url)" else empty end' 2>/dev/null || true)"
 if [[ -n "${EXISTING_ROW:-}" ]]; then
   EX_PR_NUM="${EXISTING_ROW%%$'\t'*}"
   EX_PR_URL="${EXISTING_ROW#*$'\t'}"

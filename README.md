@@ -52,3 +52,5 @@ curl -s -H "Authorization: Bearer $ADMIN_API_KEY" "http://localhost:3000/admin/s
 - `src/modules/` … 実行モジュールと `registry.ts`
 - `prompts/` … 意図判定・人格・実装提案プロンプト
 - `src/db/migrations/` … PostgreSQL スキーマ
+
+GitHub Issue自動作成に対応しました。

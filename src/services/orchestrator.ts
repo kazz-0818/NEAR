@@ -57,6 +57,8 @@ import {
   isStandaloneGithubIssueCreatePhrase,
 } from "../lib/nearPreGrowthRouter.js";
 import { runLlmFallbackAnswer } from "./llm_fallback_answer.js";
+import { recordImprovementCandidatesIfEligible } from "./improvement_capsule_record.js";
+import type { ImprovementRoutingSnapshot } from "./improvement_capsule_rules.js";
 
 async function saveIntentRun(
   db: Db,
@@ -77,7 +79,8 @@ async function replyLineAndRememberOutbound(
   replyToken: string,
   lineUserId: string,
   finalText: string,
-  log: ReturnType<typeof getLogger>
+  log: ReturnType<typeof getLogger>,
+  capsuleSnap?: ImprovementRoutingSnapshot | null
 ): Promise<void> {
   const sent = await replyOrPush(replyToken, lineUserId, finalText);
   try {
@@ -91,6 +94,16 @@ async function replyLineAndRememberOutbound(
     });
   } catch (e) {
     log.warn({ err: e }, "saveOutboundAssistantText failed");
+  }
+  if (capsuleSnap) {
+    void recordImprovementCandidatesIfEligible({
+      db,
+      channelUserId: ctx.channelUserId,
+      inboundMessageId: ctx.inboundMessageId,
+      userText: capsuleSnap.userText,
+      nearReply: finalText,
+      snap: capsuleSnap,
+    }).catch((e) => log.warn({ err: e }, "recordImprovementCandidatesIfEligible failed"));
   }
 }
 
@@ -166,6 +179,15 @@ export async function handleLineTextMessage(input: {
   const env = getEnv();
   // groupId をコンテキストに含め、返答保存時にも紐付ける
   const outboundCtx = { channel, channelUserId, groupId, inboundMessageId };
+  const capSnap: ImprovementRoutingSnapshot = {
+    userText: text,
+    parsed: null,
+    routeTaken: "unknown",
+    moduleName: null,
+    usedLlmFallback: false,
+    usedGrowthPipeline: false,
+    preGrowthCategory: null,
+  };
 
   // 会話コンテキストを thinRouter より先に取得（タスク続き発言の判定に必要）
   // groupId スコープでフィルタリングして個人/グループの会話混在を防ぐ
@@ -204,7 +226,13 @@ export async function handleLineTextMessage(input: {
     quotedAssistantMessage: quotedAssistantMessage ?? undefined,
   });
   if (thin.handled) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log);
+    capSnap.parsed = null;
+    capSnap.routeTaken = "thin_router";
+    capSnap.moduleName = null;
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = false;
+    capSnap.preGrowthCategory = null;
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log, capSnap);
     return;
   }
 
@@ -221,7 +249,12 @@ export async function handleLineTextMessage(input: {
     text,
   });
   if (pendingClarification.handled) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log);
+    capSnap.routeTaken = "pending_clarification";
+    capSnap.moduleName = null;
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = false;
+    capSnap.preGrowthCategory = null;
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap);
     return;
   }
   if ("forceIntent" in pendingClarification && pendingClarification.forceIntent) {
@@ -239,7 +272,12 @@ export async function handleLineTextMessage(input: {
     recentAssistantMessages,
   });
   if (pendingHit.handled && pendingHit.finalText != null) {
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log);
+    capSnap.routeTaken = "pending_tool_confirmation";
+    capSnap.moduleName = null;
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = false;
+    capSnap.preGrowthCategory = null;
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap);
     return;
   }
 
@@ -276,7 +314,12 @@ export async function handleLineTextMessage(input: {
               secretary_interpretation: interpretation,
               shortcut: "edit_previous_output",
             });
-            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+            capSnap.routeTaken = "secretary_edit_previous_output";
+            capSnap.moduleName = null;
+            capSnap.usedLlmFallback = false;
+            capSnap.usedGrowthPipeline = false;
+            capSnap.preGrowthCategory = null;
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
             return;
           } catch (e) {
             log.warn({ err: e }, "secretary edit_previous_output failed; continuing to intent routing");
@@ -334,7 +377,12 @@ export async function handleLineTextMessage(input: {
               secretary_interpretation: interpretation,
               shortcut: "clarify_missing_info",
             });
-            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+            capSnap.routeTaken = "secretary_clarify_missing_info";
+            capSnap.moduleName = null;
+            capSnap.usedLlmFallback = false;
+            capSnap.usedGrowthPipeline = false;
+            capSnap.preGrowthCategory = null;
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
             return;
           } catch (e) {
             log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
@@ -460,6 +508,7 @@ export async function handleLineTextMessage(input: {
     ok: true,
     routing_meta: { phase: "post_promote" },
   });
+  capSnap.parsed = parsed;
 
   if (env.NEAR_GROWTH_SHORT_FOLLOWUP_MINUTES > 0 && env.NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED) {
     try {
@@ -500,7 +549,12 @@ export async function handleLineTextMessage(input: {
     const denyText = actorRole === "restricted"
       ? RESTRICTED_DENY_REPLIES[Math.floor(Math.random() * RESTRICTED_DENY_REPLIES.length)]!
       : insufficientRoleMessage(requiredRole);
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log);
+    capSnap.routeTaken = "insufficient_role";
+    capSnap.moduleName = parsed.intent;
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = false;
+    capSnap.preGrowthCategory = null;
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log, capSnap);
     return;
   }
 
@@ -555,7 +609,12 @@ export async function handleLineTextMessage(input: {
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReplyUnified failed (growth extension path)");
     }
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+    capSnap.routeTaken = "growth_handled_intent_extension";
+    capSnap.moduleName = parsed.intent;
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = true;
+    capSnap.preGrowthCategory = "growth_explicit";
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
     return;
   }
 
@@ -601,7 +660,12 @@ export async function handleLineTextMessage(input: {
             log.warn({ err: ce }, "composeNearReplyUnified failed (near agent path)");
           }
         }
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        capSnap.routeTaken = "agent";
+        capSnap.moduleName = null;
+        capSnap.usedLlmFallback = false;
+        capSnap.usedGrowthPipeline = false;
+        capSnap.preGrowthCategory = null;
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
         await maybeRecordAgentPathGrowthSignals({
           db,
           channel,
@@ -673,7 +737,12 @@ export async function handleLineTextMessage(input: {
         } catch (ce) {
           log.warn({ err: ce }, "composeNearReplyUnified failed (unsupported growth path)");
         }
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        capSnap.routeTaken = "growth_pre_router_explicit";
+        capSnap.moduleName = null;
+        capSnap.usedLlmFallback = false;
+        capSnap.usedGrowthPipeline = true;
+        capSnap.preGrowthCategory = preGrowth.category;
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
         return;
       }
 
@@ -702,7 +771,12 @@ export async function handleLineTextMessage(input: {
         } catch (ce) {
           log.warn({ err: ce }, "composeNearReplyUnified failed (external tool needed path)");
         }
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        capSnap.routeTaken = "external_tool_short_reply";
+        capSnap.moduleName = null;
+        capSnap.usedLlmFallback = false;
+        capSnap.usedGrowthPipeline = false;
+        capSnap.preGrowthCategory = preGrowth.category;
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
         return;
       }
 
@@ -726,7 +800,12 @@ export async function handleLineTextMessage(input: {
           } catch (ce) {
             log.warn({ err: ce }, "composeNearReplyUnified failed (llm fallback path)");
           }
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+          capSnap.routeTaken = "llm_fallback";
+          capSnap.moduleName = null;
+          capSnap.usedLlmFallback = true;
+          capSnap.usedGrowthPipeline = false;
+          capSnap.preGrowthCategory = preGrowth.category;
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
           return;
         } catch (fe) {
           log.warn({ err: fe }, "llm fallback path failed; falling back to growth or clarify");
@@ -773,7 +852,12 @@ export async function handleLineTextMessage(input: {
         } catch (ce) {
           log.warn({ err: ce }, "composeNearReplyUnified failed (post-llm growth path)");
         }
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        capSnap.routeTaken = "growth_after_llm_failure";
+        capSnap.moduleName = null;
+        capSnap.usedLlmFallback = true;
+        capSnap.usedGrowthPipeline = true;
+        capSnap.preGrowthCategory = preGrowth.category;
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
         return;
       }
 
@@ -811,7 +895,12 @@ export async function handleLineTextMessage(input: {
       } catch (ce) {
         log.warn({ err: ce }, "composeNearReplyUnified failed (unknown clarify path)");
       }
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+      capSnap.routeTaken = "unknown_clarify_with_growth_signal";
+      capSnap.moduleName = null;
+      capSnap.usedLlmFallback = false;
+      capSnap.usedGrowthPipeline = true;
+      capSnap.preGrowthCategory = preGrowth.category;
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
       return;
     }
 
@@ -919,7 +1008,12 @@ export async function handleLineTextMessage(input: {
               log.warn({ err: ce }, "composeNearReplyUnified failed (faq deflection retry path)");
             }
           }
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+          capSnap.routeTaken = "agent_faq_retry";
+          capSnap.moduleName = parsed.intent;
+          capSnap.usedLlmFallback = false;
+          capSnap.usedGrowthPipeline = false;
+          capSnap.preGrowthCategory = null;
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
           await maybeRecordAgentPathGrowthSignals({
             db,
             channel,
@@ -970,7 +1064,12 @@ export async function handleLineTextMessage(input: {
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReplyUnified failed, sending draft as-is");
     }
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+    capSnap.routeTaken = "legacy_module";
+    capSnap.moduleName = parsed.intent;
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = Boolean(growthGateForAck);
+    capSnap.preGrowthCategory = null;
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
   } catch (e) {
     log.error({ err: e }, "orchestrator pipeline error");
     const draft =
@@ -987,6 +1086,10 @@ export async function handleLineTextMessage(input: {
     } catch {
       /* draft のまま */
     }
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+    capSnap.routeTaken = "orchestrator_error";
+    capSnap.usedLlmFallback = false;
+    capSnap.usedGrowthPipeline = false;
+    capSnap.preGrowthCategory = null;
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
   }
 }

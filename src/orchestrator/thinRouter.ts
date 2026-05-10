@@ -7,6 +7,7 @@ import {
 } from "../lib/buildInfo.js";
 import { buildWhatsNewDraft, isWhatsNewCapabilityQuestion } from "../lib/whatsNew.js";
 import { tryHandleAdminGrowthLine } from "../services/growth_admin_line.js";
+import { tryHandleImprovementCapsuleAdminLine } from "../services/improvement_capsule_admin_line.js";
 import { tryHandleGrowthRequestingUserLine } from "../services/growth_user_line.js";
 import {
   tryHandleGoogleAccountListOrSwitch,
@@ -205,6 +206,10 @@ export async function runThinRouterPhase(input: {
   }
 
   if (env.ADMIN_LINE_USER_ID && channelUserId === env.ADMIN_LINE_USER_ID) {
+    const cap = await tryHandleImprovementCapsuleAdminLine({ db, adminUserId: channelUserId, text });
+    if (cap.handled) {
+      return { handled: true, finalText: cap.reply };
+    }
     const growth = await tryHandleAdminGrowthLine({ db, adminUserId: channelUserId, text });
     if (growth.handled) {
       return { handled: true, finalText: growth.reply };

@@ -49,6 +49,7 @@ const MIGRATION_FILES = [
   "040_growth_github_issue.sql",
   "041_growth_pr_tracking.sql",
   "042_unsupported_routing_category.sql",
+  "043_improvement_capsules.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

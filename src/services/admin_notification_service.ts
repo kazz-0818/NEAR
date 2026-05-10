@@ -390,6 +390,54 @@ export async function notifyGrowthComplete(input: {
   }
 }
 
+/** 改善カプセル日次まとめ（confidence 閾値以上のみ capsuleIds が渡る想定） */
+export async function notifyImprovementCapsuleDigest(input: { db: Db; capsuleIds: number[] }): Promise<void> {
+  const log = getLogger();
+  if (input.capsuleIds.length === 0) return;
+  const r = await input.db.query<{
+    capsule_id: string;
+    priority: string;
+    problem_type: string;
+    problem_summary: string;
+    improvement_proposal: string;
+  }>(
+    `SELECT capsule_id::text, priority, problem_type, problem_summary, improvement_proposal
+     FROM improvement_capsules WHERE capsule_id = ANY($1::bigint[]) ORDER BY capsule_id ASC`,
+    [input.capsuleIds]
+  );
+  const lines: string[] = [
+    "【NEAR改善カプセルまとめ】",
+    "",
+    "本日の会話から、改善できそうなポイントを検知しました。",
+    "",
+    `改善カプセル：${r.rows.length}件`,
+    "",
+  ];
+  let n = 1;
+  for (const row of r.rows) {
+    lines.push(
+      `${n}. [${row.priority}] ${row.problem_type}`,
+      row.problem_summary,
+      "改善案：",
+      row.improvement_proposal,
+      `カプセルID：${row.capsule_id}`,
+      ""
+    );
+    n++;
+  }
+  lines.push(
+    "操作：",
+    "詳細を見る → 「カプセル （番号） 詳細」",
+    "Issue化 → 「カプセル （番号） Issue化して」",
+    "却下 → 「カプセル （番号） 却下」"
+  );
+  try {
+    await sendGrowthAdminChannel(lines.join("\n"));
+  } catch (e) {
+    log.warn({ err: e }, "notifyImprovementCapsuleDigest failed");
+  }
+}
+
 export async function notifyGrowthRejected(input: {
   db: Db;
   adminUserId: string;

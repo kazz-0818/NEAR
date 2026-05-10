@@ -563,6 +563,46 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /**
+   * false / 0 でオフ。未設定はオン。
+   * 会話後の軽量ルールで improvement_candidates に記録し、日次/手動バッチで LLM 分析する。
+   */
+  NEAR_IMPROVEMENT_CAPSULES_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /** node-cron 式（既定: 毎日 23:00）。タイムゾーンは NEAR_IMPROVEMENT_CAPSULE_CRON_TZ */
+  NEAR_IMPROVEMENT_CAPSULE_CRON_EXPR: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : "0 23 * * *")),
+  NEAR_IMPROVEMENT_CAPSULE_CRON_TZ: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : "Asia/Tokyo")),
+  /** 未設定時は OPENAI_INTENT_MODEL */
+  NEAR_IMPROVEMENT_CAPSULE_MODEL: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : undefined)),
+  /** 管理者通知に載せる最低 confidence（既定 0.7） */
+  NEAR_IMPROVEMENT_CAPSULE_NOTIFY_MIN_CONFIDENCE: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 0.7;
+      const n = Number(s);
+      return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.7;
+    }),
+  /** 短時間言い直し検知の窓（分）。既定 10 */
+  NEAR_IMPROVEMENT_CAPSULE_RAPID_WINDOW_MINUTES: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 10;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 120 ? n : 10;
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

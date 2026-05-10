@@ -12,6 +12,7 @@ import {
   handleAdminGrowthComplete,
   startHearingFlow,
 } from "../services/growth_orchestrator.js";
+import { runImprovementCapsuleAnalysisJob } from "../services/improvement_capsule_service.js";
 
 const patchSuggestionBody = z
   .object({
@@ -372,6 +373,13 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(`SELECT * FROM reminders ORDER BY id DESC LIMIT $1`, [limit]);
     return c.json({ items: r.rows });
+  });
+
+  /** pending の改善候補をまとめて LLM 分析（手動トリガー） */
+  app.post("/improvement-capsules/analyze", async (c) => {
+    const pool = getPool();
+    const r = await runImprovementCapsuleAnalysisJob(pool, { manual: true });
+    return c.json({ ok: true, ...r });
   });
 
   return app;

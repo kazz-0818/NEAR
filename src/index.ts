@@ -11,6 +11,8 @@ import { handleLineTextMessage } from "./services/orchestrator.js";
 import { replyOrPush } from "./channels/line/client.js";
 import { createAdminApp } from "./admin/routes.js";
 import { startReminderCron, dispatchDueReminders } from "./jobs/reminder_dispatcher.js";
+import { startImprovementCapsuleCron } from "./jobs/improvement_capsule_cron.js";
+import { runImprovementCapsuleAnalysisJob } from "./services/improvement_capsule_service.js";
 import {
   getLineGroupOrRoomId,
   isConfiguredGrowthApprovalGroup,
@@ -104,6 +106,20 @@ app.post("/internal/reminders/dispatch", async (c) => {
   }
   await dispatchDueReminders();
   return c.json({ ok: true });
+});
+
+app.post("/internal/improvement-capsules/analyze", async (c) => {
+  const env = getEnv();
+  if (env.CRON_SECRET) {
+    const auth = c.req.header("authorization");
+    const expected = `Bearer ${env.CRON_SECRET}`;
+    if (auth !== expected) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+  }
+  const pool = getPool();
+  const r = await runImprovementCapsuleAnalysisJob(pool, { manual: false });
+  return c.json({ ok: true, ...r });
 });
 
 const admin = createAdminApp();
@@ -252,6 +268,7 @@ async function main() {
   }
 
   startReminderCron();
+  startImprovementCapsuleCron();
 
   serve(
     {

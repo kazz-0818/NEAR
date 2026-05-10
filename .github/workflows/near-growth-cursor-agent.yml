@@ -1,9 +1,15 @@
-# NEAR Growth Automation v2:
-# near-growth + cursor-agent ラベル付き Issue を Cursor CLI（headless）で実装し、PR を作成する。
+# NEAR Growth Automation v2（STEP2）
+#
+# 確認用チェックリスト（実装内容は scripts/near-growth-cursor-agent.sh に集約）:
+# - 本ファイルがリポジトリに存在する
+# - トリガー: issues.opened / issues.labeled
+# - Secrets: CURSOR_API_KEY を env 経由で渡す（ログに出さない）
+# - Cursor CLI: curl install + agent -p --force --trust（公式ドキュメント準拠）
+# - 作業ブランチ作成・commit・push・PR 作成・Issue コメント・ラベル付与
 #
 # 必要な Secrets:
-#   CURSOR_API_KEY … Cursor CLI 用（ https://cursor.com/docs/cli/github-actions ）
-# GITHUB_TOKEN は既定の github.token を利用（contents / issues / pull-requests 権限）。
+#   CURSOR_API_KEY … https://cursor.com/docs/cli/github-actions
+# GITHUB_TOKEN は github.token（permissions 参照）
 
 name: NEAR Growth Cursor Agent
 
@@ -17,7 +23,9 @@ concurrency:
 
 jobs:
   cursor-agent:
-    if: ${{ !github.event.repository.fork }}
+    # pull_request イベントでは動かさない（本 workflow は issues のみ登録）
+    # Pull Request に紐づく Issue は payload に pull_request が入るため除外
+    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,6 +42,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
       - name: NEAR Growth — Cursor Agent & PR
         shell: bash

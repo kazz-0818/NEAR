@@ -1,7 +1,7 @@
-# NEAR Growth Automation v2（STEP2）
+# NEAR Growth Automation v2.1（STEP2）
 #
 # 確認用チェックリスト（実装は scripts/near-growth-cursor-agent.sh）:
-# - トリガー: issues.labeled のみ（opened との二重起動を避ける）
+# - トリガー: issues.labeled のみ（opened との二重起動を避ける）※v2.1
 # - 実行ラベル: near-growth + cursor-agent / スキップ: near-growth-pr-created / near-growth-agent-running
 # - 処理中: near-growth-agent-running を付与し、終了時（成功・失敗・差分なし）に必ず除去
 # - Secrets: CURSOR_API_KEY（ログに出さない）

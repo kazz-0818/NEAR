@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# NEAR Growth Automation (v2): Issue をトリガーに Cursor CLI で実装し、PR まで作成する。
+# NEAR Growth Automation (v2.1): Issue をトリガーに Cursor CLI で実装し、PR まで作成する。
 #
 # 実装チェックリスト（監査用・処理順）:
-# [x] CURSOR_API_KEY 未設定 → 失敗コメント・near-growth-agent-failed・exit 1（running 未付与）
+# [x] CURSOR_API_KEY 未設定 → 失敗コメント・near-growth-agent-failed・exit 1（running 付与後なら EXIT で除去）
 # [x] secrets をログ/Issue/PR に出さない（echo しない・redact_stream / redact_snippet でマスク）
 # [x] Issue 本文取得（gh issue view body → BODY_FILE）
-# [x] suggestion_id 抽出（extract_suggestion_id／未抽出時は near-growth/issue-{issue_number}）
+# [x] suggestion_id: 数値 → suggestion-{n} / 英数字・ハイフン → slug 化 / 無し → issue-{issue_number}
 # [x] 重複防止（紐づき open PR・同名 head の PR・リモートのみブランチ）
 # [x] 作業ブランチ作成（git checkout -B … origin/${DEFAULT_BRANCH} ※ main へは push しない）
-# [x] near-growth-agent-running 付与（CURSOR_API_KEY 確認後・git fetch より前）
+# [x] near-growth-agent-running 付与（重複 PR チェック通過直後・本文取得より前）
 # [x] Cursor CLI インストール（curl …）※実行バイナリは公式どおり `agent`
 # [x] Headless 実行: agent（workspace 付き → workspace なし → -p のみでフォールバック）
 # [x] npm run build
@@ -165,24 +165,96 @@ remove_running_label() {
   fi
 }
 
-extract_suggestion_id() {
+# 本文から suggestion トークンを 1 つ抽出（空の場合あり）。改行直後の ## suggestion_id 優先。
+extract_suggestion_token_from_body() {
   local body_file="$1"
-  local sid=""
+  local line sid
 
   if grep -qE '^## suggestion_id[[:space:]]*$' "$body_file"; then
-    sid="$(grep -A1 -E '^## suggestion_id[[:space:]]*$' "$body_file" | tail -n1 | tr -d ' \t\r')"
-  fi
-  if ! [[ "$sid" =~ ^[0-9]+$ ]]; then
-    sid="$(grep -oiE 'suggestion[[:space:]]*#[[:space:]]*[0-9]{1,12}\>' "$body_file" | head -1 | grep -oE '[0-9]{1,12}$' || true)"
-  fi
-  if ! [[ "$sid" =~ ^[0-9]+$ ]]; then
-    sid="$(grep -oiE 'suggestion_id[[:space:]]*=[[:space:]]*[0-9]{1,12}' "$body_file" | grep -oE '[0-9]{1,12}$' | head -1 || true)"
-  fi
-  if ! [[ "$sid" =~ ^[0-9]+$ ]]; then
-    sid="$(grep -oiE 'suggestion_id[D:=[:space:]]+[0-9]{1,12}' "$body_file" | grep -oE '[0-9]{1,12}$' | head -1 || true)"
+    line="$(grep -A1 -E '^## suggestion_id[[:space:]]*$' "$body_file" | tail -n1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [[ -n "$line" ]]; then
+      printf '%s' "$line"
+      return 0
+    fi
   fi
 
-  printf '%s' "$sid"
+  sid="$(grep -oiE 'suggestion[[:space:]]*#[[:space:]]*[0-9]{1,12}\>' "$body_file" | head -1 | grep -oE '[0-9]{1,12}$' || true)"
+  if [[ "$sid" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$sid"
+    return 0
+  fi
+
+  line="$(grep -oiE 'suggestion_id[[:space:]]*=[[:space:]]*[a-zA-Z0-9_][a-zA-Z0-9_-]{0,62}' "$body_file" | head -1 | sed -E 's/^[^=]*=[[:space:]]*//')"
+  if [[ -n "$line" ]]; then
+    printf '%s' "$line"
+    return 0
+  fi
+
+  line="$(grep -oiE 'suggestion_id[D:=[:space:]]+[a-zA-Z0-9_][a-zA-Z0-9_-]{0,62}' "$body_file" | head -1 | sed -E 's/^[^:=D]*[D:=[:space:]]+//')"
+  if [[ -n "$line" ]]; then
+    printf '%s' "$line"
+    return 0
+  fi
+
+  sid="$(grep -oiE 'suggestion_id[[:space:]]*=[[:space:]]*[0-9]{1,12}' "$body_file" | grep -oE '[0-9]{1,12}$' | head -1 || true)"
+  if [[ "$sid" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$sid"
+    return 0
+  fi
+
+  sid="$(grep -oiE 'suggestion_id[D:=[:space:]]+[0-9]{1,12}' "$body_file" | grep -oE '[0-9]{1,12}$' | head -1 || true)"
+  if [[ "$sid" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$sid"
+    return 0
+  fi
+
+  printf ''
+}
+
+# 英数字・ハイフン以外を除去し Git ブランチセグメント向けに短縮（空なら空）。
+slugify_suggestion_token() {
+  local raw="$1"
+  local s
+  [[ -z "$raw" ]] && return 0
+  s="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | sed -E 's/[^a-z0-9-]+/-/g' | sed -E 's/^-+|-+$//g' | sed -E 's/-{2,}/-/g')"
+  if [[ ${#s} -gt 60 ]]; then
+    s="${s:0:60}"
+    s="${s%-}"
+  fi
+  printf '%s' "$s"
+}
+
+# refs/heads/{branch} を GitHub REST 用にエンコード（スラッシュのみ %2F）。
+encode_git_refs_branch_for_api() {
+  printf '%s' "$1" | sed 's|/|%2F|g'
+}
+
+# リモートに branch があり PR が無く先端が default と同一なら削除。0=削除した 1=しなかった。
+try_delete_remote_branch_if_orphan_same_tip() {
+  local branch="$1"
+  local enc remote_sha base_sha pr_n
+
+  if ! git ls-remote --heads origin "refs/heads/${branch}" | grep -q .; then
+    return 1
+  fi
+
+  pr_n="$(gh pr list -R "$REPO" --head "$branch" --state all --json number -q 'length' 2>/dev/null || echo 999)"
+  if [[ "${pr_n:-999}" != "0" ]]; then
+    return 1
+  fi
+
+  remote_sha="$(git ls-remote origin "refs/heads/${branch}" | awk '{print $1; exit}')"
+  base_sha="$(git rev-parse "origin/${DEFAULT_BRANCH}" 2>/dev/null || true)"
+  if [[ -z "$remote_sha" || -z "$base_sha" || "$remote_sha" != "$base_sha" ]]; then
+    return 1
+  fi
+
+  enc="$(encode_git_refs_branch_for_api "$branch")"
+  if gh api --method DELETE "repos/${REPO}/git/refs/heads/${enc}" >/dev/null 2>&1; then
+    log "removed orphan remote branch ${branch} (tip matches origin/${DEFAULT_BRANCH})"
+    return 0
+  fi
+  return 1
 }
 
 find_open_pr_for_this_issue() {
@@ -248,25 +320,38 @@ ${PR_URL_EXISTING}
   exit 0
 fi
 
+# labeled 再発火抑止: workflow の if と合わせ、本文取得より前に running を付与
+add_running_label
+
 BODY_FILE="$(mktemp)"
 PROMPT_FILE="$(mktemp)"
 PR_BODY_FILE="$(mktemp)"
 
 gh issue view "$ISSUE_NUMBER" -R "$REPO" --json body -q .body >"$BODY_FILE"
 
-SUGGESTION_ID="$(extract_suggestion_id "$BODY_FILE")"
-if [[ "$SUGGESTION_ID" =~ ^[0-9]+$ ]]; then
-  BRANCH="near-growth/suggestion-${SUGGESTION_ID}"
-  SUGGESTION_LINE="${SUGGESTION_ID}"
-  PR_TITLE="feat(growth): suggestion #${SUGGESTION_ID}"
-  COMMIT_MSG="feat(growth): suggestion #${SUGGESTION_ID} (issue #${ISSUE_NUMBER})"
+SUGGESTION_TOKEN="$(extract_suggestion_token_from_body "$BODY_FILE")"
+if [[ "$SUGGESTION_TOKEN" =~ ^[0-9]+$ ]]; then
+  BRANCH="near-growth/suggestion-${SUGGESTION_TOKEN}"
+  SUGGESTION_LINE="${SUGGESTION_TOKEN}（数値）"
+  PR_TITLE="feat(growth): suggestion #${SUGGESTION_TOKEN}"
+  COMMIT_MSG="feat(growth): suggestion #${SUGGESTION_TOKEN} (issue #${ISSUE_NUMBER})"
 else
-  SUGGESTION_ID=""
-  BRANCH="near-growth/issue-${ISSUE_NUMBER}"
-  SUGGESTION_LINE="（抽出不可） issue-${ISSUE_NUMBER} をブランチ名に使用"
-  PR_TITLE="feat(growth): issue #${ISSUE_NUMBER}"
-  COMMIT_MSG="feat(growth): issue #${ISSUE_NUMBER} (suggestion_id 未抽出)"
+  SUGGESTION_SLUG="$(slugify_suggestion_token "$SUGGESTION_TOKEN")"
+  if [[ -n "$SUGGESTION_SLUG" ]]; then
+    BRANCH="near-growth/suggestion-${SUGGESTION_SLUG}"
+    SUGGESTION_LINE="${SUGGESTION_TOKEN}（slug: ${SUGGESTION_SLUG}）"
+    PR_TITLE="feat(growth): suggestion ${SUGGESTION_SLUG}"
+    COMMIT_MSG="feat(growth): suggestion ${SUGGESTION_SLUG} (issue #${ISSUE_NUMBER})"
+  else
+    BRANCH="near-growth/issue-${ISSUE_NUMBER}"
+    SUGGESTION_LINE="（suggestion_id なし） issue-${ISSUE_NUMBER} をブランチ名に使用"
+    PR_TITLE="feat(growth): issue #${ISSUE_NUMBER}"
+    COMMIT_MSG="feat(growth): issue #${ISSUE_NUMBER} (suggestion_id なし)"
+  fi
 fi
+
+DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q .defaultBranchRef.name)"
+git fetch origin "$DEFAULT_BRANCH"
 
 EXISTING_ROW="$(gh pr list -R "$REPO" --head "$BRANCH" --state all --json number,url -q 'if length > 0 then "\(.[0].number)\t\(.[0].url)" else empty end' 2>/dev/null || true)"
 if [[ -n "${EXISTING_ROW:-}" ]]; then
@@ -286,15 +371,21 @@ ${EX_PR_URL}
 fi
 
 if git ls-remote --heads origin "refs/heads/${BRANCH}" | grep -q .; then
-  log "skip: リモートにブランチ ${BRANCH} が既にあります（PR なし）"
-  try_create_label "near-growth-agent-failed" "D93F0B"
-  if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
-    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
+  if try_delete_remote_branch_if_orphan_same_tip "$BRANCH"; then
+    log "cleared orphan remote ${BRANCH} (same tip as default, no PR)"
+  else
+    log "skip: リモートにブランチ ${BRANCH} が既にあります（PR なし）"
+    try_create_label "near-growth-agent-failed" "D93F0B"
+    if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
+      gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
 
 同名ブランチ \`${BRANCH}\` がリモートに既に存在し、対応する PR を特定できませんでした。重複を避けるため中止しました。ブランチと PR を確認してください。
+
+先端がデフォルトブランチと同一の空の追跡ブランチなら自動削除されます。それ以外は GitHub の Branches から削除するか、\`git push origin --delete ${BRANCH}\` で削除してから再実行してください。
 "
+    fi
+    exit 0
   fi
-  exit 0
 fi
 
 if [[ -z "${CURSOR_API_KEY:-}" ]]; then
@@ -318,11 +409,6 @@ CURSOR_API_KEY が GitHub Secrets に設定されていないか、ワークフ�
   exit 1
 fi
 
-# 重複実行抑止: 以降の処理に入る直前に running を付与（labeled 再発火は workflow の if でスキップ）
-add_running_label
-
-DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q .defaultBranchRef.name)"
-git fetch origin "$DEFAULT_BRANCH"
 git checkout -B "$BRANCH" "origin/${DEFAULT_BRANCH}"
 
 git config user.name "github-actions[bot]"
@@ -384,6 +470,10 @@ fi
 - npm run build が通る状態にしてください
 - 実装内容が曖昧な場合は破壊的変更を避け、安全なフォールバックを入れてください
 - mainへのマージは行わず、PR作成までで止めてください
+- Issue に記載された変更対象ファイルは必ず編集してください（ファイル名が明示されていれば、そのファイルに差分を出してください）
+- 実装要件にファイル名がある場合、そのファイルに必ず変更を加えてください。差分なしで終了しないでください
+- 不要な大規模リファクタリングはしないでください
+- git push / gh pr create は自動化スクリプト側が行うため、あなた自身で git push や PR 作成コマンドを実行しないでください
 
 【実装対象（Issue 本文）】
 
@@ -468,10 +558,32 @@ fi
 
 if git diff --quiet && git diff --cached --quiet; then
   log "no file changes"
+  ORPHAN_TAIL=""
+  if git ls-remote --heads origin "refs/heads/${BRANCH}" | grep -q .; then
+    if try_delete_remote_branch_if_orphan_same_tip "$BRANCH"; then
+      ORPHAN_TAIL=$'\n\n※リモートに同名ブランチがありましたが、先端がデフォルトブランチと同一かつ PR が無かったため、空の追跡ブランチとして削除しました。'
+    else
+      PR_ORPHAN_N="$(gh pr list -R "$REPO" --head "$BRANCH" --state all --json number -q 'length' 2>/dev/null || echo 1)"
+      if [[ "${PR_ORPHAN_N:-1}" == "0" ]]; then
+        ORPHAN_TAIL="$(printf '\n\n※リモートブランチ `%s` が残っています（PR なし）。再実行で衝突する場合は GitHub の Branches から削除するか、`git push origin --delete %s` で削除してください。' "$BRANCH" "$BRANCH")"
+      fi
+    fi
+  fi
   if ! issue_comment_bodies | grep -Fq "$MARKER_NO_DIFF"; then
     gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_NO_DIFF}
 
 実装の結果、リポジトリに差分はありませんでした（PR は作成していません）。
+
+考えられる原因:
+- Issue本文が曖昧で、変更対象ファイルを特定できなかった
+- Agentが計画のみで終了した
+- 指定された変更が既に反映済みだった
+
+対策:
+- 変更対象ファイルを明示してください
+- 「必ず README.md を編集してください」のように具体化してください
+- suggestion_id は数字のみを推奨します
+${ORPHAN_TAIL}
 "
   fi
   exit 0

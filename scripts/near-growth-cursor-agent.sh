@@ -100,6 +100,7 @@ log_agent_preflight() {
 }
 
 # 戻り値 0=成功。ログは AGENT_LOG に追記。
+# プロンプトは必ず `--` の後に渡す（本文が `---` で始まると CLI がオプション誤認するため）。
 run_agent_with_fallback() {
   export CURSOR_API_KEY="${CURSOR_API_KEY:-}"
   local prompt
@@ -108,25 +109,25 @@ run_agent_with_fallback() {
   : >"$AGENT_LOG"
   AGENT_TRIES_DESC=$'試行したコマンド（順・プロンプト本文は省略）:\n'
 
-  log "try agent: (-p --force --trust --workspace)"
-  AGENT_TRIES_DESC+='1) agent -p --force --trust --workspace <WORKDIR> <prompt>'$'\n'
-  if agent -p --force --trust --workspace "$WORKDIR" "$prompt" >"$AGENT_LOG" 2>&1; then
+  log "try agent: (-p --force --trust --workspace … -- <prompt>)"
+  AGENT_TRIES_DESC+='1) agent -p --force --trust --workspace <WORKDIR> -- <prompt>'$'\n'
+  if agent -p --force --trust --workspace "$WORKDIR" -- "$prompt" >"$AGENT_LOG" 2>&1; then
     return 0
   fi
 
-  log "try agent: (-p --force --trust, without --workspace)"
-  AGENT_TRIES_DESC+='2) agent -p --force --trust <prompt>'$'\n'
+  log "try agent: (-p --force --trust … -- <prompt>)"
+  AGENT_TRIES_DESC+='2) agent -p --force --trust -- <prompt>'$'\n'
   echo "" >>"$AGENT_LOG"
   echo "=== fallback: without --workspace ===" >>"$AGENT_LOG"
-  if agent -p --force --trust "$prompt" >>"$AGENT_LOG" 2>&1; then
+  if agent -p --force --trust -- "$prompt" >>"$AGENT_LOG" 2>&1; then
     return 0
   fi
 
-  log "try agent: (minimal: -p only)"
-  AGENT_TRIES_DESC+='3) agent -p <prompt>'$'\n'
+  log "try agent: (minimal: -p -- <prompt>)"
+  AGENT_TRIES_DESC+='3) agent -p -- <prompt>'$'\n'
   echo "" >>"$AGENT_LOG"
   echo "=== fallback: minimal -p ===" >>"$AGENT_LOG"
-  if agent -p "$prompt" >>"$AGENT_LOG" 2>&1; then
+  if agent -p -- "$prompt" >>"$AGENT_LOG" 2>&1; then
     return 0
   fi
 
@@ -370,7 +371,6 @@ fi
 
 {
   cat <<'PREAMBLE'
----
 あなたはNEAR Growth Automationの実装Agentです。
 
 ルール：
@@ -383,7 +383,6 @@ fi
 - npm run build が通る状態にしてください
 - 実装内容が曖昧な場合は破壊的変更を避け、安全なフォールバックを入れてください
 - mainへのマージは行わず、PR作成までで止めてください
----
 
 【実装対象（Issue 本文）】
 

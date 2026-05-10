@@ -1,5 +1,8 @@
 node_modules/
 dist/
+
+# 確認用に結合したソースダンプ（生成物・コミットしない）
+near_all_src*.txt
 .env
 *.log
 .DS_Store

@@ -1,11 +1,11 @@
 # NEAR Growth Automation v2（STEP2）
 #
-# 確認用チェックリスト（実装内容は scripts/near-growth-cursor-agent.sh に集約）:
-# - 本ファイルがリポジトリに存在する
+# 確認用チェックリスト（実装は scripts/near-growth-cursor-agent.sh）:
 # - トリガー: issues.opened / issues.labeled
-# - Secrets: CURSOR_API_KEY を env 経由で渡す（ログに出さない）
-# - Cursor CLI: curl install + agent -p --force --trust（公式ドキュメント準拠）
-# - 作業ブランチ作成・commit・push・PR 作成・Issue コメント・ラベル付与
+# - 実行ラベル: near-growth + cursor-agent / スキップ: near-growth-pr-created / near-growth-agent-running
+# - 処理中: near-growth-agent-running を付与し、終了時（成功・失敗・差分なし）に必ず除去
+# - Secrets: CURSOR_API_KEY（ログに出さない）
+# - Cursor CLI: install + agent -p --force --trust
 #
 # 必要な Secrets:
 #   CURSOR_API_KEY … https://cursor.com/docs/cli/github-actions

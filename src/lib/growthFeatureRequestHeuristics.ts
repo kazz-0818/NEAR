@@ -1,4 +1,5 @@
 import type { IntentName } from "../models/intent.js";
+import { isExplicitGrowthDevelopmentRequest } from "./growthExplicitRequest.js";
 
 /**
  * LINE 上の「機能追加・改善 wish」っぽさ（ルールベース）。通常会話を広く成長候補にしないよう最小文字数あり。
@@ -52,5 +53,5 @@ const EXTENSION_OVERRIDE_INTENTS = new Set<IntentName>([
  */
 export function shouldTreatHandledIntentAsGrowthExtension(text: string, intent: IntentName): boolean {
   if (!EXTENSION_OVERRIDE_INTENTS.has(intent)) return false;
-  return looksLikeGrowthFeatureRequest(text);
+  return isExplicitGrowthDevelopmentRequest(text);
 }

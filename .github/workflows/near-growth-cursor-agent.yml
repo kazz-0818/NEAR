@@ -10,6 +10,10 @@
 # 必要な Secrets:
 #   CURSOR_API_KEY … https://cursor.com/docs/cli/github-actions
 # GITHUB_TOKEN は github.token（permissions 参照）
+#
+# 同一 Issue で再テストするとき:
+# - near-growth-agent-running / near-growth-agent-failed を外す
+# - cursor-agent ラベルを外して付け直す（labeled で再実行）
 
 name: NEAR Growth Cursor Agent
 
@@ -34,6 +38,7 @@ jobs:
       pull-requests: write
 
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       ISSUE_NUMBER: ${{ github.event.issue.number }}
       GH_TOKEN: ${{ github.token }}
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}

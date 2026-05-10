@@ -3,14 +3,14 @@
 #
 # 実装チェックリスト（監査用・処理順）:
 # [x] CURSOR_API_KEY 未設定 → 失敗コメント・near-growth-agent-failed・exit 1（running 未付与）
-# [x] secrets をログ/Issue/PR に出さない（echo しない・redact_snippet でログ断片をマスク）
+# [x] secrets をログ/Issue/PR に出さない（echo しない・redact_stream / redact_snippet でマスク）
 # [x] Issue 本文取得（gh issue view body → BODY_FILE）
 # [x] suggestion_id 抽出（extract_suggestion_id／未抽出時は near-growth/issue-{issue_number}）
 # [x] 重複防止（紐づき open PR・同名 head の PR・リモートのみブランチ）
 # [x] 作業ブランチ作成（git checkout -B … origin/${DEFAULT_BRANCH} ※ main へは push しない）
 # [x] near-growth-agent-running 付与（実処理開始直前）
 # [x] Cursor CLI インストール（curl …）※実行バイナリは公式どおり `agent`
-# [x] Headless 実行: agent -p --force --trust --workspace …
+# [x] Headless 実行: agent（workspace 付き → workspace なし → -p のみでフォールバック）
 # [x] npm run build
 # [x] 差分なし → Issue コメントして exit 0（EXIT トラップで running 除去）
 # [x] 差分あり → commit / push 作業ブランチ / gh pr create / Issue に PR URL / near-growth-pr-created
@@ -18,6 +18,11 @@
 #
 # - CURSOR_API_KEY はログに出さない
 # - gh は GH_TOKEN（github.token）を使用
+#
+# 再テスト手順（同一 Issue でやり直すとき）:
+# 1. Issue から near-growth-agent-running を外す
+# 2. near-growth-agent-failed を外す（付いていれば）
+# 3. cursor-agent ラベルを一度外して付け直す（labeled でワークフロー再実行）
 
 set -euo pipefail
 
@@ -33,19 +38,99 @@ MARKER_LINKED_PR='<!-- NEAR_GROWTH_SKIP_LINKED_PR -->'
 cd "$WORKDIR"
 
 RUNNING_ADDED=0
+AGENT_PATH_STR=""
+AGENT_HELP_STATUS_STR=""
+AGENT_TRIES_DESC=""
 
 log() {
   echo "[near-growth] $*" >&2
 }
 
-redact_snippet() {
+# stdin をマスク（末尾トリムなし）。長いログは呼び出し側で tail する。
+redact_stream() {
   sed -E \
     -e 's/(CURSOR_API_KEY|GITHUB_TOKEN|GH_TOKEN|OPENAI_API_KEY|SECRET|PASSWORD|BEARER)\s*[=:]\s*\S+/[REDACTED]/Ig' \
     -e 's/sk-[a-zA-Z0-9]{10,}/[REDACTED]/g' \
     -e 's/ghp_[a-zA-Z0-9]{10,}/[REDACTED]/g' \
     -e 's/gho_[a-zA-Z0-9]{10,}/[REDACTED]/g' \
-    -e 's/postgresql:\/\/[^ ]+/[REDACTED_DB]/Ig' \
-    | tail -n 40
+    -e 's/postgresql:\/\/[^ ]+/[REDACTED_DB]/Ig'
+}
+
+redact_snippet() {
+  redact_stream | tail -n 40
+}
+
+log_agent_sanitized_tail() {
+  local file="$1"
+  local n="${2:-80}"
+  log "Cursor Agent sanitized log tail (last ${n} lines):"
+  tail -n "$n" "$file" 2>/dev/null | redact_stream >&2 || true
+}
+
+log_agent_preflight() {
+  export CURSOR_API_KEY="${CURSOR_API_KEY:-}"
+  if [[ -n "${CURSOR_API_KEY:-}" ]]; then
+    log "CURSOR_API_KEY is set: yes"
+  else
+    log "CURSOR_API_KEY is set: no"
+  fi
+  log "pwd: $(pwd)"
+  log "git branch --show-current: $(git branch --show-current 2>/dev/null || echo '(none)')"
+
+  AGENT_PATH_STR="$(command -v agent 2>/dev/null || true)"
+  log "agent path: ${AGENT_PATH_STR:-'(not found)'}"
+
+  if [[ -n "$AGENT_PATH_STR" ]]; then
+    log "agent --version:"
+    agent --version 2>&1 | head -n 20 >&2 || log "(agent --version failed)"
+
+    log "agent --help (first 50 lines):"
+    local help_out
+    help_out="$(agent --help 2>&1 | head -n 50 || true)"
+    if [[ -n "$help_out" ]]; then
+      AGENT_HELP_STATUS_STR="yes ($(printf '%s\n' "$help_out" | wc -l | tr -d ' ') lines)"
+      printf '%s\n' "$help_out" >&2
+    else
+      AGENT_HELP_STATUS_STR="empty or failed"
+      log "(agent --help produced no output)"
+    fi
+  else
+    AGENT_HELP_STATUS_STR="skipped (agent not in PATH)"
+  fi
+}
+
+# 戻り値 0=成功。ログは AGENT_LOG に追記。
+run_agent_with_fallback() {
+  export CURSOR_API_KEY="${CURSOR_API_KEY:-}"
+  local prompt
+  prompt="$(cat "$PROMPT_FILE")"
+
+  : >"$AGENT_LOG"
+  AGENT_TRIES_DESC=$'試行したコマンド（順・プロンプト本文は省略）:\n'
+
+  log "try agent: (-p --force --trust --workspace)"
+  AGENT_TRIES_DESC+='1) agent -p --force --trust --workspace <WORKDIR> <prompt>'$'\n'
+  if agent -p --force --trust --workspace "$WORKDIR" "$prompt" >"$AGENT_LOG" 2>&1; then
+    return 0
+  fi
+
+  log "try agent: (-p --force --trust, without --workspace)"
+  AGENT_TRIES_DESC+='2) agent -p --force --trust <prompt>'$'\n'
+  echo "" >>"$AGENT_LOG"
+  echo "=== fallback: without --workspace ===" >>"$AGENT_LOG"
+  if agent -p --force --trust "$prompt" >>"$AGENT_LOG" 2>&1; then
+    return 0
+  fi
+
+  log "try agent: (minimal: -p only)"
+  AGENT_TRIES_DESC+='3) agent -p <prompt>'$'\n'
+  echo "" >>"$AGENT_LOG"
+  echo "=== fallback: minimal -p ===" >>"$AGENT_LOG"
+  if agent -p "$prompt" >>"$AGENT_LOG" 2>&1; then
+    return 0
+  fi
+
+  return 1
 }
 
 issue_labels_json() {
@@ -306,34 +391,45 @@ PREAMBLE
   cat "$BODY_FILE"
 } >"$PROMPT_FILE"
 
+AGENT_LOG="$(mktemp)"
+log_agent_preflight
+
 log "run Cursor Agent (headless)"
 set +e
-AGENT_LOG="$(mktemp)"
-agent -p --force --trust --workspace "$WORKDIR" --output-format text "$(cat "$PROMPT_FILE")" >"$AGENT_LOG" 2>&1
+run_agent_with_fallback
 AGENT_EXIT=$?
 set -e
 if [[ "$AGENT_EXIT" -ne 0 ]]; then
-  log "agent exited with $AGENT_EXIT"
+  log "Cursor Agent: all invocation patterns failed (last exit code ${AGENT_EXIT})"
+  log_agent_sanitized_tail "$AGENT_LOG" 80
   try_create_label "near-growth-agent-failed" "D93F0B"
-  SAFE_TAIL="$(redact_snippet <"$AGENT_LOG" || true)"
+  SAFE_TAIL="$(tail -n 80 "$AGENT_LOG" | redact_stream || true)"
   if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
     gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
 
 Cursor Agent実行に失敗しました。
 
 原因:
-Cursor CLI が異常終了しました（終了コード ${AGENT_EXIT}）。詳細は Actions のログを確認してください。
+Cursor CLI（agent）がすべての実行パターンで異常終了しました（フォールバック後も失敗）。
 
-サニタイズ済み出力末尾:
+診断:
+- agent path: \`${AGENT_PATH_STR:-unknown}\`
+- agent --help 取得: ${AGENT_HELP_STATUS_STR:-unknown}
+
+${AGENT_TRIES_DESC}
+
+サニタイズ済みログ末尾（最大80行）:
 \`\`\`
 ${SAFE_TAIL:-（なし）}
 \`\`\`
 
 確認してください:
 - CURSOR_API_KEY がGitHub Secretsに設定されているか
-- Cursor CLIの利用権限があるか
+- Cursor CLIの利用権限・サブスクリプションがあるか
 - GitHub Actionsのpermissionsが足りているか
-- npm run build がローカルで通るか
+- npm run build がローカルで通るか（ここまで未到達の場合は agent 側の失敗です）
+
+※再実行する場合: Issue から \`near-growth-agent-running\` と \`near-growth-agent-failed\` を外し、\`cursor-agent\` ラベルを付け直してください。
 "
   fi
   exit 1

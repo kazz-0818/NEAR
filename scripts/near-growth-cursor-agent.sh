@@ -36,6 +36,7 @@ WORKDIR="${GITHUB_WORKSPACE:?GITHUB_WORKSPACE required}"
 MARKER_PR='<!-- NEAR_GROWTH_AUTOMATION_PR -->'
 MARKER_NO_DIFF='<!-- NEAR_GROWTH_AUTOMATION_NO_DIFF -->'
 MARKER_FAIL='<!-- NEAR_GROWTH_AUTOMATION_FAIL -->'
+MARKER_FAIL_PR='<!-- NEAR_GROWTH_AUTOMATION_FAIL_PR -->'
 MARKER_LINKED_PR='<!-- NEAR_GROWTH_SKIP_LINKED_PR -->'
 
 cd "$WORKDIR"
@@ -652,6 +653,9 @@ fi
 
 git push -u origin "$BRANCH"
 
+# gh pr create は同一リポジトリでも head を owner:branch にするとスラッシュ入りブランチで誤判定されにくい
+REPO_OWNER="${REPO%%/*}"
+
 ISSUE_URL="https://github.com/${REPO}/issues/${ISSUE_NUMBER}"
 # unquoted heredoc は ** やバッククォートでグロブ／コマンド置換が起きうるため、変数はすべて printf で追記する
 {
@@ -683,7 +687,7 @@ NEAR_GROWTH_PR_TAIL
 set +e
 PR_RAW="$(gh pr create -R "$REPO" \
   --base "$DEFAULT_BRANCH" \
-  --head "$BRANCH" \
+  --head "${REPO_OWNER}:${BRANCH}" \
   --title "$PR_TITLE" \
   --body-file "$PR_BODY_FILE" 2>&1)"
 PR_EC=$?
@@ -693,16 +697,22 @@ set +e
 PR_URL="$(printf '%s\n' "$PR_RAW" | grep -Eo 'https://[^[:space:]]+/pull/[0-9]+' | tail -n1 | tr -d '\r')"
 set -e
 if [[ "$PR_EC" -ne 0 ]] || [[ -z "$PR_URL" ]] || [[ "$PR_URL" != https://* ]]; then
-  log "error: gh pr create failed"
-  try_create_label "near-growth-agent-failed" "D93F0B"
+  log "error: gh pr create failed (exit=${PR_EC}, head=${REPO_OWNER}:${BRANCH})"
   SAFE_TAIL="$(redact_snippet <<<"$PR_RAW" || true)"
-  if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
-    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
+  log "gh pr create sanitized output tail:"
+  if [[ -n "$SAFE_TAIL" ]]; then
+    printf '%s\n' "$SAFE_TAIL" >&2
+  else
+    log "（なし）"
+  fi
+  try_create_label "near-growth-agent-failed" "D93F0B"
+  if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL_PR"; then
+    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL_PR}
 
-Cursor Agent実行に失敗しました。
+\`gh pr create\` が失敗しました（Actions 内の GITHUB_TOKEN / 権限・head 指定を確認）。
 
-原因:
-PR の作成に失敗しました（gh pr create）。スモークテストの場合も同じです。
+head:
+\`${REPO_OWNER}:${BRANCH}\`
 
 サニタイズ済み出力:
 \`\`\`
@@ -710,8 +720,9 @@ ${SAFE_TAIL:-（なし）}
 \`\`\`
 
 確認してください:
-- GitHub Actionsのpermissionsが足りているか
-- 同名ブランチや Draft の競合がないか
+- workflow の \`permissions\`（contents / pull-requests / issues）
+- 同名の開いている PR がないか
+- ブランチ \`${BRANCH}\` がリモートに存在するか
 "
   fi
   exit 1

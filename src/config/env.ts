@@ -85,6 +85,39 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
+  /** true / 1 で有効。未設定はオン。管理者 LINE からの Growth PR → main マージ */
+  GROWTH_LINE_MERGE_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
+  /** squash | merge | rebase。未設定は squash */
+  GROWTH_MERGE_METHOD: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const t = (s ?? "").trim().toLowerCase();
+      if (t === "merge" || t === "rebase") return t;
+      return "squash";
+    }),
+  /** マージ先ブランチ名（既定 main） */
+  GROWTH_MERGE_TARGET_BRANCH: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : "main")),
+  /** カンマ区切り。許可する head ref の接頭辞（既定 near-growth/） */
+  GROWTH_MERGE_ALLOWED_HEAD_PREFIXES: z
+    .string()
+    .optional()
+    .transform((s) => {
+      const raw = (s?.trim() || "near-growth/").split(",");
+      const p = raw.map((x) => x.trim()).filter(Boolean);
+      return p.length ? p : ["near-growth/"];
+    }),
+  /** LINE / Issue 本文に載せるローカル同期用 cd パス（既定は赤井さん環境想定） */
+  NEAR_LOCAL_SYNC_PATH_HINT: z
+    .string()
+    .optional()
+    .transform((s) => (s?.trim() ? s.trim() : "~/Downloads/System/NEAR")),
   /** 社内コーディングエージェントの Webhook URL（GitHub 未設定時のフォールバック） */
   GROWTH_CODING_AGENT_URL: z
     .string()
@@ -276,14 +309,20 @@ const envSchema = z.object({
     }),
   /**
    * true / 1 でオン。未設定はオフ。
-   * 旧フロー互換: 提案レコード作成直後に notifyGrowthFirstApproval で管理者へ第一段階案内を送る
-   * （宛先は GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）。
-   * 既定では、ユーザー個人LINEヒアリング完了後にのみ管理者へ共有する。
+   * レガシー設定（コード上は参照のみ）。提案直後の管理者 LINE は `NEAR_GROWTH_V3_CANDIDATE_LINE_NOTIFY` と `notifyGrowthCandidateV3` に統合。
    */
   NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION: z
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
+  /**
+   * false / 0 でオフ。未設定はオン。
+   * 成長案レコード作成直後に管理者（GROWTH_APPROVAL_GROUP_ID または ADMIN_LINE_USER_ID）へ v3 形式の「成長候補」LINE を送る。
+   */
+  NEAR_GROWTH_V3_CANDIDATE_LINE_NOTIFY: z
+    .string()
+    .optional()
+    .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /** Google Sheets API 用サービスアカウント鍵（JSON 文字列。改行を含む場合は B64 推奨） */
   GOOGLE_SERVICE_ACCOUNT_JSON: z
     .string()

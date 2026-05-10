@@ -1,6 +1,7 @@
 import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
+import { growthLocalSyncMarkdownSection } from "../lib/growthLocalSyncText.js";
 import { buildFinalCursorPrompt } from "./cursor_prompt_builder.js";
 import { createGrowthIssue, GrowthGithubIssueError } from "./githubIssueService.js";
 
@@ -88,48 +89,47 @@ export async function buildGrowthGithubIssueMarkdown(db: Db, suggestionId: numbe
   const cursorPromptRaw = await buildFinalCursorPrompt(db, suggestionId);
   const cursorPrompt = redactSecretsForGithubIssueBody(cursorPromptRaw);
 
-  const header = [
-    "---",
-    "NEAR Growth Automation Issue",
-    "",
-    "このIssueはNEARの成長システムから自動作成されています。",
-    "Cursor CLI / Cursor Agent が実装対象として読むことを想定しています。",
-    "",
-    "重要：",
-    "- mainへ直接pushしないこと",
-    "- 作業ブランチを作ること",
-    "- build/testを確認すること",
-    "- secrets/env/APIキーを出力しないこと",
-    "- 完了後はPRを作成すること",
-    "---",
-    "",
-  ].join("\n");
+  const stepsBlock = formatSteps(row.steps);
+  const implReqBullets = [
+    "- 要望内容を満たす最小差分で実装する",
+    "- 既存のLINE返信、タスク管理、スプレッドシート連携、成長システムを壊さない",
+    "- 必要に応じて既存モジュールへ統合する",
+    "- 破壊的変更は避ける",
+    stepsBlock !== "（未設定）" ? `- （LLM が提案した実装ステップ）\n${stepsBlock}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const bodyParts = [
-    header,
-    `## suggestion_id`,
+    "# NEAR Growth Request",
+    "",
+    "_この Issue は NEAR 成長システムから自動作成されています。GitHub Actions の Cursor Agent が読みます。_",
+    "",
+    "## suggestion_id",
     String(suggestionId),
     "",
-    "## 目的",
-    summary,
-    "",
-    "## 背景",
+    "## 元の要望",
     original.slice(0, 4000) || "（ユーザー原文なし）",
     "",
-    "## 現在の問題",
-    "NEAR が当該ユーザー依頼を未対応として記録しており、意図分類・実装の拡張が必要な状態です。",
-    `（分類の起点 intent 案: \`${intent}\`）`,
+    "## 目的",
+    "この要望をNEARの機能として実装する。",
     "",
-    "## 実装要件",
-    formatSteps(row.steps),
+    "## 現状",
+    "現在のNEARでは、この要望に完全対応できていない。",
+    `（起点 intent 案: \`${intent}\`）`,
     "",
-    "## 修正対象ファイル候補",
-    "- `src/models/intent.ts`（intent / JSON schema）",
-    "- `src/modules/registry.ts`（ハンドラ登録）",
-    "- `src/modules/*.ts`（新規モジュール）",
-    "- `prompts/*.md`（分類・応答プロンプト）",
-    "- `src/db/migrations/*.sql`（永続化が必要な場合）",
-    "- `src/services/orchestrator.ts`（ルーティングが変わる場合）",
+    "## 実装要件（要約・ステップ）",
+    summary,
+    "",
+    implReqBullets,
+    "",
+    "## 変更対象ファイル候補",
+    "- `src/services/` …（該当ロジック・通知・オーケストレーション）",
+    "- `src/modules/` …（intent ハンドラ・ツール連携）",
+    "- `src/agent/` …（エージェント経路・ツール）",
+    "- `src/models/intent.ts` …（分類・JSON schema が変わる場合）",
+    "- `prompts/*.md` …（分類・応答プロンプト）",
+    "- `src/db/migrations/*.sql` …（永続化が必要な場合）",
     "",
     "### suggested_modules（JSON）",
     jString(row.suggested_modules) || "（なし）",
@@ -138,30 +138,29 @@ export async function buildGrowthGithubIssueMarkdown(db: Db, suggestionId: numbe
     jString(row.required_apis) || "（なし）",
     "",
     "## 禁止事項",
-    "- main ブランチへの直接 push",
-    "- API キー・トークン・パスワード・秘密鍵・接続文字列をログ・Issue・コメントに出力すること",
-    "- 本番 Render の環境変数値をコードや Issue に埋め込むこと",
+    "- mainへ直接pushしない",
+    "- secrets/env/APIキーを出力しない",
+    "- 不要な大規模リファクタリングをしない",
+    "- package-lock.json を不要に変更しない",
     "",
-    "## テストケース",
-    "- `npm run build` が通ること",
-    "- 変更した intent / モジュールの手動シナリオを最低 1 系統（LINE またはユニット想定）",
-    "- グループ会話時はメンション／NEAR 呼びかけルールを壊さないこと",
+    "## テスト",
+    "- `npm run build` を通す",
+    "- 既存の主要フローを壊さない（LINE・タスク・シート・グループメンションルール）",
     "",
     "## 完了条件",
-    "- ユーザー依頼を安全な範囲で満たす、または明確なフォローアップに落とす",
-    "- 秘密をログ・返信・Issue に含めない",
-    "- **npm run build を通すこと**",
-    "- **main 直接 push は禁止（必ず作業ブランチを作成すること）**",
-    "- **PR 作成まで行うこと**",
+    "- 要望に対する実装が入っている",
+    "- `npm run build` が通る",
+    "- PRが作成される",
     "",
-    "## Cursor用プロンプト全文",
+    growthLocalSyncMarkdownSection(),
+    "## Cursor用プロンプト全文（詳細）",
     "```markdown",
     cursorPrompt,
     "```",
     "",
     "## 作業メモ（自動生成）",
-    "- ブランチは `growth/suggestion-" + suggestionId + "` など分かる名前を推奨",
-    "- PR 説明に suggestion_id を記載すること",
+    "- Actions ラベル **near-growth** / **cursor-agent** が付与されていること",
+    "- PR・Issue に suggestion_id を記載すること",
   ];
 
   let body = bodyParts.join("\n");
@@ -207,7 +206,7 @@ async function persistGrowthIssueFailure(db: Db, suggestionId: number, reason: s
 }
 
 export type EnsureGrowthIssueResult =
-  | { ok: true; created: boolean; issueUrl: string }
+  | { ok: true; created: boolean; issueUrl: string; issueNumber?: number }
   | { ok: false; message: string };
 
 /**
@@ -224,31 +223,41 @@ export async function ensureGithubIssueForSuggestion(db: Db, suggestionId: numbe
   );
   const existingUrl = existing.rows[0]?.github_issue_url?.trim();
   if (existingUrl) {
+    const numRow = await db.query<{ n: string | null }>(
+      `SELECT github_issue_number::text AS n FROM implementation_suggestions WHERE id = $1`,
+      [suggestionId]
+    );
+    const issueNumRaw = numRow.rows[0]?.n;
+    const issueNumber =
+      issueNumRaw != null && issueNumRaw !== "" && Number.isFinite(Number(issueNumRaw))
+        ? Number(issueNumRaw)
+        : undefined;
     log.info(
       { suggestionId, repo, issueTitle: "(skipped)", success: true, issueUrl: existingUrl },
       "growth github issue: already exists"
     );
-    return { ok: true, created: false, issueUrl: existingUrl };
+    return { ok: true, created: false, issueUrl: existingUrl, issueNumber };
   }
 
   let title = "";
   try {
     const built = await buildGrowthGithubIssueMarkdown(db, suggestionId);
     title = built.title;
-    const labels = parseGrowthGithubIssueLabels(env.GROWTH_GITHUB_ISSUE_LABELS);
+    const parsedLabels = parseGrowthGithubIssueLabels(env.GROWTH_GITHUB_ISSUE_LABELS);
+    const labels = parsedLabels.length ? parsedLabels : ["near-growth", "cursor-agent"];
 
     const { issueNumber, issueUrl } = await createGrowthIssue({
       suggestionId,
       title: built.title,
       body: built.body,
-      labels: labels.length ? labels : undefined,
+      labels,
     });
 
     await persistGrowthIssueSuccess(db, suggestionId, issueNumber, issueUrl);
 
     log.info({ suggestionId, repo, issueTitle: title, success: true, issueUrl }, "growth github issue");
 
-    return { ok: true, created: true, issueUrl };
+    return { ok: true, created: true, issueUrl, issueNumber };
   } catch (e) {
     const msg = e instanceof GrowthGithubIssueError ? e.message : e instanceof Error ? e.message : String(e);
     await persistGrowthIssueFailure(db, suggestionId, msg);
@@ -262,16 +271,18 @@ export async function ensureGithubIssueForSuggestion(db: Db, suggestionId: numbe
   }
 }
 
-export function formatLineGrowthIssueSuccessReply(issueUrl: string): string {
-  return [
-    "GitHub Issueを作成しました。",
-    "",
-    "Issue:",
+export function formatLineGrowthIssueSuccessReply(issueUrl: string, issueNumber?: number): string {
+  const lines: string[] = ["GitHub Issueを作成しました。"];
+  if (issueNumber != null && Number.isFinite(issueNumber)) {
+    lines.push("", `Issue #${issueNumber}`, "");
+  }
+  lines.push(
     issueUrl,
     "",
-    "次のステップ：",
-    "Cursor Agent / GitHub Actions側でこのIssueを実装対象にします。",
-  ].join("\n");
+    "このあとGitHub Actionsが起動し、Cursor Agentが実装PRを作成します。",
+    "PRができたら確認してください。"
+  );
+  return lines.join("\n");
 }
 
 export function formatLineGrowthIssueFailureReply(reason: string): string {

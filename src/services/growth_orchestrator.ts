@@ -5,8 +5,8 @@ import type { Db } from "../db/client.js";
 import {
   notifyCodingReady,
   notifyFinalApproval,
+  notifyGrowthCandidateV3,
   notifyGrowthComplete,
-  notifyGrowthFirstApproval,
   notifyGrowthRejected,
   notifyProgress,
   notifyUserGrowthConsent,
@@ -254,11 +254,15 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
   }
 
   const adminDest = env.GROWTH_APPROVAL_GROUP_ID?.trim() || env.ADMIN_LINE_USER_ID?.trim() || "";
-  if (env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION && adminDest) {
+  const v3CandidateNotify = env.NEAR_GROWTH_V3_CANDIDATE_LINE_NOTIFY !== false;
+
+  if (env.ADMIN_LINE_USER_ID?.trim()) {
+    await upsertAdminSession(db, env.ADMIN_LINE_USER_ID.trim(), suggestionId);
+  }
+
+  if (v3CandidateNotify && adminDest) {
     try {
-      await notifyGrowthFirstApproval({
-        db,
-        adminUserId: env.ADMIN_LINE_USER_ID?.trim() ?? "",
+      await notifyGrowthCandidateV3({
         suggestionId,
         userSummary: String(row.summary ?? ""),
         userOriginalSnippet: String(row.original_message ?? ""),
@@ -270,10 +274,10 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
         channel: String(row.user_channel ?? "line"),
         channelUserId,
         reasonCode: "ok",
-        detail: { suggestion_id: suggestionId, has_admin_destination: true },
+        detail: { suggestion_id: suggestionId, has_admin_destination: true, template: "v3_candidate" },
       });
     } catch (e) {
-      log.warn({ err: e, suggestionId }, "notifyGrowthFirstApproval failed");
+      log.warn({ err: e, suggestionId }, "notifyGrowthCandidateV3 failed");
       await recordFunnelStep(db, {
         step: "admin_first_approval_push_failed",
         unsupportedRequestId,
@@ -285,9 +289,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
       });
     }
   } else {
-    const reasonCode = env.NEAR_GROWTH_ADMIN_NOTIFY_ON_SUGGESTION
-      ? "no_admin_line_or_group"
-      : "wait_user_hearing_done";
+    const reasonCode = !v3CandidateNotify ? "v3_candidate_notify_disabled" : "no_admin_line_or_group";
     await recordFunnelStep(db, {
       step: "admin_first_approval_skipped_no_destination",
       unsupportedRequestId,

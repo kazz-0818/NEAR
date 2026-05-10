@@ -46,6 +46,10 @@ import { runNearAgentTurn } from "../agent/runner.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
 import { tryHandlePendingToolConfirmation } from "./pending_tool_confirm_handler.js";
 import { tryHandlePendingClarification } from "./pending_clarification_handler.js";
+import {
+  looksLikeGrowthFeatureRequest,
+  shouldTreatHandledIntentAsGrowthExtension,
+} from "../lib/growthFeatureRequestHeuristics.js";
 
 async function saveIntentRun(
   db: Db,
@@ -274,6 +278,9 @@ export async function handleLineTextMessage(input: {
       }
 
       if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.65) {
+        if (looksLikeGrowthFeatureRequest(text)) {
+          log.info({ mode: interpretation.mode }, "secretary clarify skipped: growth-feature-like request");
+        } else {
         const shouldSkipClarifyForConsultation =
           looksLikeBroadConsultation(text) ||
           looksLikeBroadConsultationFollowup(text, recentUserMessages) ||
@@ -325,6 +332,7 @@ export async function handleLineTextMessage(input: {
           } catch (e) {
             log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
           }
+        }
         }
       }
     } catch (e) {
@@ -389,7 +397,11 @@ export async function handleLineTextMessage(input: {
   }
 
   // GPT寄り運用: 一般相談が unknown に落ちたら simple_question へ救済して会話で巻き取る。
-  if (parsed.intent === "unknown_custom_request" && looksLikeBroadConsultation(text)) {
+  if (
+    parsed.intent === "unknown_custom_request" &&
+    looksLikeBroadConsultation(text) &&
+    !looksLikeGrowthFeatureRequest(text)
+  ) {
     parsed = {
       ...parsed,
       intent: "simple_question",
@@ -403,7 +415,8 @@ export async function handleLineTextMessage(input: {
   if (
     parsed.intent === "unknown_custom_request" &&
     looksLikeShortEntityReply(text) &&
-    recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m))
+    recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m)) &&
+    !looksLikeGrowthFeatureRequest(text)
   ) {
     parsed = {
       ...parsed,
@@ -422,7 +435,8 @@ export async function handleLineTextMessage(input: {
     parsed.intent === "unknown_custom_request" &&
     recentAssistantMessages.length > 0 &&
     text.trim().length <= 30 &&
-    !/https?:\/\//i.test(text)
+    !/https?:\/\//i.test(text) &&
+    !looksLikeGrowthFeatureRequest(text)
   ) {
     parsed = {
       ...parsed,
@@ -486,6 +500,56 @@ export async function handleLineTextMessage(input: {
   const handler = getHandler(parsed.intent);
   const routable =
     parsed.can_handle === true && parsed.intent !== "unknown_custom_request" && handler !== undefined;
+
+  if (routable && shouldTreatHandledIntentAsGrowthExtension(text, parsed.intent)) {
+    const growthParsed: ParsedIntent = {
+      ...parsed,
+      intent: "unknown_custom_request",
+      can_handle: false,
+      needs_followup: false,
+      followup_question: null,
+      reason: `growth_v3_handled_intent_extension:${parsed.intent}`,
+      suggested_category: parsed.suggested_category ?? "機能拡張",
+    };
+    const unsupportedId = await logUnsupportedRequest({
+      db,
+      channel,
+      channelUserId,
+      originalMessage: text,
+      intent: growthParsed,
+      inboundMessageId,
+      whyOverride: `拡張要望として記録（分類は ${parsed.intent}）`,
+    });
+    const gate = await runGrowthPipelineAfterUnsupported(db, log, {
+      unsupportedId,
+      inboundMessageId,
+      channel,
+      channelUserId,
+      text,
+      parsed: growthParsed,
+    });
+    const draftBase =
+      "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
+    let draft = draftBase;
+    if (env.NEAR_GROWTH_USER_ACK_ENABLED && gate.allow) {
+      draft = `${draftBase}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+    }
+    let finalText = draft;
+    try {
+      finalText = await composeNearReplyUnified({
+        actorDisplayName,
+        draft,
+        situation: "unsupported",
+        userMessage: text,
+        recentUserMessages,
+        recentAssistantMessages,
+      });
+    } catch (ce) {
+      log.warn({ err: ce }, "composeNearReplyUnified failed (growth extension path)");
+    }
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+    return;
+  }
 
   if (shouldInvokeNearAgent(env, parsed.intent, routable, text)) {
     try {

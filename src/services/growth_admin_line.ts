@@ -14,6 +14,7 @@ import {
   formatLineGrowthIssueFailureReply,
   formatLineGrowthIssueSuccessReply,
 } from "./growth_github_issue.js";
+import { tryMergeGrowthPrFromAdminLine } from "./growth_pr_merge_service.js";
 
 const log = getLogger();
 
@@ -26,7 +27,8 @@ function parseExplicitSuggestionId(text: string): number | null {
   if (m1?.[1]) return Number(m1[1]);
   const m2 = text.match(/#(\d{1,12})\b/);
   if (m2?.[1]) return Number(m2[1]);
-  const mentionsIssueCmd = /実装依頼|issue|github/i.test(text);
+  const mentionsIssueCmd =
+    /実装依頼|issue|github|cursor|カーソル|投げて|issue化|v3進めて|実装して|進めて/i.test(text);
   if (mentionsIssueCmd) {
     const m3 = text.match(/(\d{1,12})\s*$/);
     if (m3?.[1]) return Number(m3[1]);
@@ -34,11 +36,21 @@ function parseExplicitSuggestionId(text: string): number | null {
   return null;
 }
 
+/** 管理者の自然文から GitHub Issue 作成意図を検出（対象 suggestion は別途 resolve） */
 function isGrowthGithubIssueCommand(text: string): boolean {
-  if (/実装依頼して/.test(text)) return true;
-  if (/この成長案を実装依頼して/.test(text)) return true;
-  if (/issue\s*作成して/i.test(text)) return true;
-  if (/github\s*issue\s*(を)?作って/i.test(text)) return true;
+  const t = norm(text);
+  if (!t) return false;
+  if (/v3進めて/.test(t)) return true;
+  if (/実装依頼/.test(t)) return true;
+  if (/この成長案を実装/.test(t)) return true;
+  if (/この要望を\s*issue\s*化|issue\s*化して/.test(t)) return true;
+  if (/issue\s*作って|issue\s*作成して/i.test(t)) return true;
+  if (/github\s*issue/i.test(t) && /(作って|作成して)/i.test(t)) return true;
+  if (/githubに投げて|githubへ投げて/i.test(t)) return true;
+  if (/カーソルに投げて|cursorに投げて/i.test(t)) return true;
+  if (/これ進めて|これで実装/.test(t)) return true;
+  if (/実装して/.test(t) && /(github|issue|cursor|カーソル|成長|要望|near)/i.test(t)) return true;
+  if (/^実装して[。．!！]?$/i.test(t)) return true;
   return false;
 }
 
@@ -70,6 +82,15 @@ export async function tryHandleAdminGrowthLine(input: {
   const text = norm(raw);
   if (!text) return { handled: false, reply: "" };
 
+  const mergeHit = await tryMergeGrowthPrFromAdminLine({
+    db: input.db,
+    adminUserId: input.adminUserId,
+    text: raw,
+  });
+  if (mergeHit) {
+    return { handled: true, reply: mergeHit.reply };
+  }
+
   if (isGrowthGithubIssueCommand(text)) {
     if (!env.GROWTH_AUTO_ISSUE_ENABLED) {
       return {
@@ -99,7 +120,10 @@ export async function tryHandleAdminGrowthLine(input: {
     }
     const issueResult = await ensureGithubIssueForSuggestion(input.db, issueSuggestionId);
     if (issueResult.ok) {
-      return { handled: true, reply: formatLineGrowthIssueSuccessReply(issueResult.issueUrl) };
+      return {
+        handled: true,
+        reply: formatLineGrowthIssueSuccessReply(issueResult.issueUrl, issueResult.issueNumber),
+      };
     }
     return { handled: true, reply: formatLineGrowthIssueFailureReply(issueResult.message) };
   }

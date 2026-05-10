@@ -47,6 +47,7 @@ const MIGRATION_FILES = [
   "038_pending_clarifications.sql",
   "039_line_quote_message_refs.sql",
   "040_growth_github_issue.sql",
+  "041_growth_pr_tracking.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

@@ -1,5 +1,6 @@
 import { getEnv } from "../config/env.js";
 import type { Db } from "../db/client.js";
+import { looksLikeGrowthFeatureRequest } from "../lib/growthFeatureRequestHeuristics.js";
 import {
   inferImprovementKind,
   messageFingerprint,
@@ -60,7 +61,8 @@ export async function evaluateGrowthSuggestionEligibility(input: {
     minConf > 0 &&
     input.parsed.intent === "unknown_custom_request" &&
     input.parsed.confidence > 0 &&
-    input.parsed.confidence < minConf
+    input.parsed.confidence < minConf &&
+    !looksLikeGrowthFeatureRequest(input.text)
   ) {
     return { allow: false, reason: "low_confidence_unknown" };
   }

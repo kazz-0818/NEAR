@@ -3,6 +3,8 @@ import { getEnv } from "../config/env.js";
 import { getEffectivePublicBaseUrl } from "../lib/renderRuntime.js";
 import { getLogger } from "../lib/logger.js";
 import type { Db } from "../db/client.js";
+import { inferGrowthCandidateCategory } from "../lib/growthFeatureRequestHeuristics.js";
+import { formatNearEvolutionCompleteLineMessage } from "../lib/growthLocalSyncText.js";
 import { formatGrowthDifficultyLines } from "../lib/growth_tiers.js";
 const LINE_TEXT_MAX = 4800;
 /** LINE に載せる cursor_prompt 断片の上限（超過分は管理 API で全文取得） */
@@ -86,6 +88,59 @@ export async function notifyUserGrowthConsent(input: {
     await pushText(input.lineUserId, text);
   } catch (e) {
     log.warn({ err: e }, "user notify growth consent failed");
+  }
+}
+
+/** v4: Growth PR が main にマージされたあと、ローカル同期案内つきで管理者へ通知 */
+export async function notifyNearEvolutionComplete(input: {
+  prUrl: string;
+  issueUrl: string | null;
+  commitShaShort: string;
+}): Promise<void> {
+  const log = getLogger();
+  const body = formatNearEvolutionCompleteLineMessage(input);
+  try {
+    await sendGrowthAdminChannel(body);
+  } catch (e) {
+    log.warn({ err: e }, "notifyNearEvolutionComplete failed");
+  }
+}
+
+/** v3: 成長候補検知直後に管理者（または成長カプセル）へ送る通知 */
+export async function notifyGrowthCandidateV3(input: {
+  suggestionId: number;
+  userOriginalSnippet: string;
+  userSummary: string;
+}): Promise<void> {
+  const log = getLogger();
+  const category = inferGrowthCandidateCategory(input.userOriginalSnippet);
+  const body = [
+    "【NEAR成長候補】",
+    "ユーザーから新しい要望を検知しました。",
+    "",
+    "要望：",
+    clip(input.userOriginalSnippet, 500),
+    "",
+    "推定カテゴリ：",
+    category,
+    "",
+    "NEARの現状：",
+    "現在の機能では完全対応できない可能性があります。",
+    "",
+    "対応案：",
+    "この要望を成長案として整理し、GitHub Issue化できます。",
+    "",
+    "操作：",
+    `「成長案 ${input.suggestionId} 実装依頼して」`,
+    "または",
+    "「この成長案を実装して」「Issue作って」「カーソルに投げて」など（直近の成長案が対象になります）",
+    "",
+    `（suggestion #${input.suggestionId}）`,
+  ].join("\n");
+  try {
+    await sendGrowthAdminChannel(body);
+  } catch (e) {
+    log.warn({ err: e }, "admin notify growth candidate v3 failed");
   }
 }
 

@@ -1,4 +1,4 @@
-# NEAR Growth Automation v2.2（STEP2）
+# NEAR Growth Automation v2.3（STEP2）
 #
 # 確認用チェックリスト（実装は scripts/near-growth-cursor-agent.sh）:
 # - トリガー: issues.labeled のみ（opened との二重起動を避ける）

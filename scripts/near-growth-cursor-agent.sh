@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# NEAR Growth Automation (v2.2): Issue をトリガーに Cursor CLI で実装し、PR まで作成する（スモーク分岐あり）。
+# NEAR Growth Automation (v2.3): Issue をトリガーに Cursor CLI で実装し、PR まで作成する（スモーク分岐あり）。
 #
 # 実装チェックリスト（監査用・処理順）:
 # [x] near-growth-smoke-test … README.md のみ更新・Agent なしで build→PR 経路を検証
 # [x] CURSOR_API_KEY 未設定 → 通常フローのみ失敗（スモークではキー不要）
 # [x] secrets をログ/Issue/PR に出さない（echo しない・redact_stream / redact_snippet でマスク）
 # [x] Issue 本文取得（gh issue view body → BODY_FILE）
+# [x] 変更対象ファイル候補を本文から抽出し Agent プロンプト先頭に挿入（通常ルート）
 # [x] suggestion_id: 数値 → suggestion-{n} / 英数字・ハイフン → slug 化 / 無し → issue-{issue_number}
 # [x] 重複防止（紐づき open PR・同名 head の PR・リモートのみブランチ）
 # [x] 作業ブランチ作成（git checkout -B … origin/${DEFAULT_BRANCH} ※ main へは push しない）
@@ -48,6 +49,8 @@ AGENT_HELP_STATUS_STR=""
 AGENT_TRIES_DESC=""
 IMPL_BULLET=""
 PR_SUCCESS_BLURB=""
+# 通常ルート: Issue 本文から抽出したパス（1行1パス、NO_DIFF コメントでも使用）
+EXTRACTED_FILE_CANDIDATES=""
 
 log() {
   echo "[near-growth] $*" >&2
@@ -282,6 +285,22 @@ apply_smoke_readme_patch() {
   log "smoke: appended marker (sentence already in README.md)"
 }
 
+# Issue 本文からリポジトリ相対のファイルパス候補を抽出（重複除去・ソート）。stdout に1行1パス。
+extract_candidate_files_from_body() {
+  local body_file="$1" acc
+  [[ -f "$body_file" ]] || return 0
+  acc="$(mktemp)"
+  grep -oE '\.github/workflows/[a-zA-Z0-9_.-]+\.(yml|yaml)\b' "$body_file" 2>/dev/null >>"$acc" || true
+  grep -oE 'scripts/[a-zA-Z0-9_.-]+\.(sh|mjs)\b' "$body_file" 2>/dev/null >>"$acc" || true
+  grep -oE 'src/[a-zA-Z0-9_./-]+\.(ts|tsx)\b' "$body_file" 2>/dev/null >>"$acc" || true
+  grep -oE '\bREADME\.md\b' "$body_file" 2>/dev/null >>"$acc" || true
+  grep -oE '\bpackage\.json\b' "$body_file" 2>/dev/null >>"$acc" || true
+  grep -oE '\bpackage-lock\.json\b' "$body_file" 2>/dev/null >>"$acc" || true
+  grep -oE '`[^`]{1,240}`' "$body_file" 2>/dev/null | tr -d '`' >>"$acc" || true
+  LC_ALL=C sort -u "$acc" | grep -E '^(README\.md|package\.json|package-lock\.json|src/|scripts/|\.github/workflows/)' | grep -Ev '://|^[[:space:]]*/'
+  rm -f "$acc"
+}
+
 find_open_pr_for_this_issue() {
   local n url b
   while IFS= read -r n; do
@@ -356,6 +375,7 @@ PROMPT_FILE="$(mktemp)"
 PR_BODY_FILE="$(mktemp)"
 
 gh issue view "$ISSUE_NUMBER" -R "$REPO" --json body -q .body >"$BODY_FILE"
+EXTRACTED_FILE_CANDIDATES="$(extract_candidate_files_from_body "$BODY_FILE")"
 
 if [[ "$SMOKE_MODE" == 1 ]]; then
   BRANCH="near-growth/smoke-issue-${ISSUE_NUMBER}"
@@ -500,24 +520,41 @@ Cursor CLI（agent）を PATH 上に見つけられませんでした。
     exit 1
   fi
 
+  FILE_CANDIDATE_SECTION=""
+  if [[ -n "$EXTRACTED_FILE_CANDIDATES" ]]; then
+    FILE_CANDIDATE_SECTION=$'変更対象ファイル候補（Issue 本文より自動抽出）:\n'
+    while IFS= read -r p; do
+      [[ -n "$p" ]] || continue
+      FILE_CANDIDATE_SECTION+="- ${p}"$'\n'
+    done <<<"$EXTRACTED_FILE_CANDIDATES"
+    FILE_CANDIDATE_SECTION+=$'\nこのファイルに差分を発生させる必要があります。\nIssue本文の実装要件に従って、必ず対象ファイルを確認・編集してください。\n\n'
+  else
+    FILE_CANDIDATE_SECTION=$'変更対象ファイル候補: Issue 本文から README.md / package.json / src/... / scripts/... / .github/workflows/... のパスを自動検出できませんでした。実装要件にファイル名を明示してください。\n\n'
+  fi
+
   {
+    printf '%s' "$FILE_CANDIDATE_SECTION"
     cat <<'PREAMBLE'
 あなたはNEAR Growth Automationの実装Agentです。
 
-ルール：
-- 既存設計を壊さず、最小差分で実装してください
-- mainへ直接pushしないでください
-- secrets/env/APIキーをログ・コード・Issue・PR本文に出さないでください
-- 既存のLINE返信、成長システム、タスク管理、スプレッドシート連携を壊さないでください
-- DB migrationを追加した場合は ensureSchema のMIGRATION_FILES に含めてください
-- TypeScriptの型エラーを残さないでください
-- npm run build が通る状態にしてください
+最重要ルール：
+- Issue本文に「必ず編集してください」「変更対象ファイル」「README.md」「src/xxx.ts」などのファイル名がある場合、そのファイルを必ず編集してください。
+- Issue本文に具体的な文言追加指示がある場合、その文言を指定ファイルへ追加してください。
+- 実装要件に明示された変更が未反映の場合、差分なしで終了しないでください。
+- ただし、指定内容がすでに完全に反映済みの場合のみ差分なしを許可します。
+- Agent自身は git push / gh pr create / branch操作を行わないでください。Git操作はスクリプト側が行います。
+- mainへ直接pushしないでください。
+- secrets/env/APIキーをコード・ログ・Issue・PR本文に出さないでください。
+- 不要な大規模リファクタリングはしないでください。
+- 最小差分で実装してください。
+- npm run build が通る状態にしてください。
+
+追加ルール（プロジェクト）：
+- 既存設計・LINE返信・成長システム・タスク管理・スプレッドシート連携を壊さないでください
+- DB migration を追加した場合は ensureSchema の MIGRATION_FILES に含めてください
+- TypeScript の型エラーを残さないでください
 - 実装内容が曖昧な場合は破壊的変更を避け、安全なフォールバックを入れてください
-- mainへのマージは行わず、PR作成までで止めてください
-- Issue に記載された変更対象ファイルは必ず編集してください（ファイル名が明示されていれば、そのファイルに差分を出してください）
-- 実装要件にファイル名がある場合、そのファイルに必ず変更を加えてください。差分なしで終了しないでください
-- 不要な大規模リファクタリングはしないでください
-- git push / gh pr create は自動化スクリプト側が行うため、あなた自身で git push や PR 作成コマンドを実行しないでください
+- main へのマージは行わず、PR 作成までで止めてください
 
 【実装対象（Issue 本文）】
 
@@ -615,21 +652,45 @@ if git diff --quiet && git diff --cached --quiet; then
     fi
   fi
   if ! issue_comment_bodies | grep -Fq "$MARKER_NO_DIFF"; then
-    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_NO_DIFF}
+    if [[ "$SMOKE_MODE" == 1 ]]; then
+      gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_NO_DIFF}
 
 実装の結果、リポジトリに差分はありませんでした（PR は作成していません）。
 
-考えられる原因:
-- Issue本文が曖昧で、変更対象ファイルを特定できなかった
-- Agentが計画のみで終了した
-- 指定された変更が既に反映済みだった
-
-対策:
-- 変更対象ファイルを明示してください
-- 「必ず README.md を編集してください」のように具体化してください
-- suggestion_id は数字のみを推奨します
+スモークテスト（**near-growth-smoke-test**）では README.md のみを更新します。Cursor Agent は使用していません。差分が無い場合、README が既に期待どおりか、パッチ適用に問題があった可能性があります。
 ${ORPHAN_TAIL}
 "
+    else
+      NO_DIFF_CAND=$'変更対象ファイル候補（Issue 本文より自動抽出）:\n'
+      if [[ -n "$EXTRACTED_FILE_CANDIDATES" ]]; then
+        while IFS= read -r p; do
+          [[ -n "$p" ]] || continue
+          NO_DIFF_CAND+="- ${p}"$'\n'
+        done <<<"$EXTRACTED_FILE_CANDIDATES"
+        NO_DIFF_HINT_FILE=$'\n明示されたファイルパスがあるのに差分が無い場合、Agent が編集に進まなかった可能性があります（または指定文言がすでに反映済みです）。\n'
+      else
+        NO_DIFF_CAND+=$'- （Issue 本文から検出できませんでした）\n'
+        NO_DIFF_HINT_FILE=$'\nIssue 本文に \`README.md\` や \`src/foo.ts\` のように変更対象ファイル名を明示してください。\n'
+      fi
+      gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_NO_DIFF}
+
+実装の結果、リポジトリに差分はありませんでした（PR は作成していません）。
+
+Cursor Agent は実行されましたが、ファイル変更が発生しませんでした。
+
+${NO_DIFF_CAND}
+考えられる原因:
+- Agent が編集に進まなかった
+- 指定文言がすでに反映済み
+- Issue 本文の指示がまだ曖昧
+${NO_DIFF_HINT_FILE}
+対策:
+- 「必ず README.md を編集してください」のように明示してください
+- 追加する文言をそのまま書いてください
+- suggestion_id は数字または slug 形式を推奨します
+${ORPHAN_TAIL}
+"
+    fi
   fi
   exit 0
 fi
@@ -677,6 +738,19 @@ NEAR_GROWTH_PR_HEAD
 - [ ] secrets出力なし
 - [ ] 既存LINE応答への影響確認
 - [ ] DB migrationがある場合 ensureSchema に追加済み
+
+## ローカル同期ルール
+
+このPRがmainへマージされた後、ローカル環境は自動更新されません。
+PCを閉じている間は git pull も実行されません。
+
+次にCursorでNEARを触る前に、以下を実行してください。
+
+```bash
+cd ~/Downloads/System/NEAR
+git pull origin main
+git status
+```
 
 ## 管理者確認
 LINEで「反映して」と言われるまではmainにマージしない。

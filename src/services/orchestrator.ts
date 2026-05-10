@@ -449,6 +449,26 @@ export async function handleLineTextMessage(input: {
     }
   }
 
+  // ----------------------------------------------------------------
+  // Growth 明示要望: LLM 意図分類結果を上書きして Growth パイプラインへ強制する
+  // 「毎朝9時に売上を通知できるようにして」がリマインダーに誤分類されるケースを防ぐ
+  // ----------------------------------------------------------------
+  if (isExplicitGrowth && parsed.intent !== "unknown_custom_request") {
+    log.info(
+      { classifiedIntent: parsed.intent, text },
+      "growth_explicit_override: forcing unknown_custom_request to route to Growth pipeline"
+    );
+    parsed = {
+      ...parsed,
+      intent: "unknown_custom_request",
+      can_handle: false,
+      needs_followup: false,
+      followup_question: null,
+      reason: `growth_explicit_override:was_${parsed.intent}`,
+      suggested_category: parsed.suggested_category ?? "機能追加",
+    };
+  }
+
   // Growth 明示要望・混乱シグナルは Sheets 昇格をすべてスキップ（misroute 防止）
   if (!isExplicitGrowth && !isConfusion) {
     try {

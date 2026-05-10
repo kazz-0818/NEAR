@@ -46,6 +46,8 @@ const EXTENSION_OVERRIDE_INTENTS = new Set<IntentName>([
   "google_sheets_query",
   "google_calendar_query",
   "task_create",
+  // Growth 明示要望が LLM によってリマインダーに分類されるケース（例: 毎朝9時に売上を通知できるようにして）を Growth へ戻す
+  "reminder_request",
 ]);
 
 /**

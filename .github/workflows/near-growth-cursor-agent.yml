@@ -1,7 +1,7 @@
 # NEAR Growth Automation v2（STEP2）
 #
 # 確認用チェックリスト（実装は scripts/near-growth-cursor-agent.sh）:
-# - トリガー: issues.opened / issues.labeled
+# - トリガー: issues.labeled のみ（opened との二重起動を避ける）
 # - 実行ラベル: near-growth + cursor-agent / スキップ: near-growth-pr-created / near-growth-agent-running
 # - 処理中: near-growth-agent-running を付与し、終了時（成功・失敗・差分なし）に必ず除去
 # - Secrets: CURSOR_API_KEY（ログに出さない）
@@ -19,18 +19,17 @@ name: NEAR Growth Cursor Agent
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [labeled]
 
+# 同一 Issue のワークフローは直列化（二重インストール・二重 agent を避ける）
 concurrency:
   group: near-growth-issue-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   cursor-agent:
-    # issues のみ・fork 除外・PR 連動 Issue 除外
-    # near-growth + cursor-agent が付いているときだけジョブ実行（runner 節約）
-    # near-growth-pr-created が付いている Issue はジョブ自体をスキップ（詳細は scripts/near-growth-cursor-agent.sh でも再確認）
-    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth|') && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|cursor-agent|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-pr-created|') }}
+    # fork 除外・PR 連動 Issue 除外・必須ラベルのみ・完了・実行中はジョブ自体をスキップ（running 付与で発火した labeled もここで除外）
+    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth|') && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|cursor-agent|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-pr-created|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-agent-running|') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

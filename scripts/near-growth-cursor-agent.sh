@@ -20,9 +20,8 @@
 # - gh は GH_TOKEN（github.token）を使用
 #
 # 再テスト手順（同一 Issue でやり直すとき）:
-# 1. Issue から near-growth-agent-running を外す
-# 2. near-growth-agent-failed を外す（付いていれば）
-# 3. cursor-agent ラベルを一度外して付け直す（labeled でワークフロー再実行）
+# 1. near-growth-pr-created / near-growth-agent-running / near-growth-agent-failed を必要に応じて外す
+# 2. ワークフローは issues.labeled のみのため、cursor-agent（または near-growth）を一度外して付け直す
 
 set -euo pipefail
 
@@ -232,6 +231,23 @@ if ! has_label "near-growth" || ! has_label "cursor-agent"; then
   exit 0
 fi
 
+# 本文・ブランチ名より前でもよい＝同一 Issue に紐づく Growth PR があれば即終了
+if LINKED="$(find_open_pr_for_this_issue)"; then
+  PR_NUM="${LINKED%%$'\t'*}"
+  PR_URL_EXISTING="${LINKED#*$'\t'}"
+  log "skip: この Issue に紐づく未マージ PR が既にあります (#${PR_NUM})"
+  if ! issue_comment_bodies | grep -Fq "$MARKER_LINKED_PR"; then
+    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_LINKED_PR}
+
+既に NEAR Growth 用の PR が開いています。新規 PR は作成しません。
+
+PR:
+${PR_URL_EXISTING}
+"
+  fi
+  exit 0
+fi
+
 BODY_FILE="$(mktemp)"
 PROMPT_FILE="$(mktemp)"
 PR_BODY_FILE="$(mktemp)"
@@ -250,22 +266,6 @@ else
   SUGGESTION_LINE="（抽出不可） issue-${ISSUE_NUMBER} をブランチ名に使用"
   PR_TITLE="feat(growth): issue #${ISSUE_NUMBER}"
   COMMIT_MSG="feat(growth): issue #${ISSUE_NUMBER} (suggestion_id 未抽出)"
-fi
-
-if LINKED="$(find_open_pr_for_this_issue)"; then
-  PR_NUM="${LINKED%%$'\t'*}"
-  PR_URL_EXISTING="${LINKED#*$'\t'}"
-  log "skip: この Issue に紐づく未マージ PR が既にあります (#${PR_NUM})"
-  if ! issue_comment_bodies | grep -Fq "$MARKER_LINKED_PR"; then
-    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_LINKED_PR}
-
-既に NEAR Growth 用の PR が開いています。新規 PR は作成しません。
-
-PR:
-${PR_URL_EXISTING}
-"
-  fi
-  exit 0
 fi
 
 EXISTING_ROW="$(gh pr list -R "$REPO" --head "$BRANCH" --state all --json number,url -q 'if length > 0 then "\(.[0].number)\t\(.[0].url)" else empty end' 2>/dev/null || true)"
@@ -318,14 +318,15 @@ CURSOR_API_KEY が GitHub Secrets に設定されていないか、ワークフ�
   exit 1
 fi
 
+# 重複実行抑止: 以降の処理に入る直前に running を付与（labeled 再発火は workflow の if でスキップ）
+add_running_label
+
 DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q .defaultBranchRef.name)"
 git fetch origin "$DEFAULT_BRANCH"
 git checkout -B "$BRANCH" "origin/${DEFAULT_BRANCH}"
 
 git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-add_running_label
 
 install_deps() {
   if [[ -f pnpm-lock.yaml ]]; then

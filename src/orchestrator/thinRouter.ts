@@ -260,21 +260,21 @@ export async function runThinRouterPhase(input: {
     return { handled: true, finalText: googleAcct.reply };
   }
 
-  // Growth 要望・混乱シグナルの場合は semantic router もスキップ（LLM に直接渡す）
-  // op は !isGrowthRequest && !isConfusion ブロック内でのみ定義されるため、
-  // ここでは type assertion で安全に参照できるよう undefined guard を用意する
-  const opForSemantic = (!isGrowthRequest && !isConfusion)
+  // semantic router は LLM ベースの補助判定。
+  // 混乱シグナルのみスキップ（Growth 要望は semantic router に通して LLM に判断させる）。
+  // Growth 時に semantic が reminder/task 等に誘導しても orchestrator 側でガードする。
+  const opForSemantic = !isConfusion
     ? resolveUserOperation({ text, recentUserMessages, recentAssistantMessages })
     : null;
 
   // semantic router は fallback ではなく補助判定として利用する。
   // deterministic が低信頼/曖昧/文脈依存のときに意味解釈を追加する。
   const shouldRunSemanticAssist =
-    !isGrowthRequest &&
     !isConfusion &&
     opForSemantic != null &&
     env.SEMANTIC_ROUTER_ENABLED &&
     (
+      isGrowthRequest || // Growth 要望は常に semantic にも通す（LLMよりに寄せる）
       opForSemantic.kind === "general.chat" ||
       opForSemantic.kind === "unknown" ||
       opForSemantic.kind === "task.clarify" ||
@@ -380,40 +380,44 @@ export async function runThinRouterPhase(input: {
           },
         };
       }
-      if (sem.kind === "clarify") {
-        logSemanticAdopt("clarify");
-        return {
-          handled: true,
-          finalText: "追加・一覧確認・削除・更新のどれを行いますか？",
-        };
-      }
-      if (sem.kind === "task.delete" && sem.needs_confirmation) {
-        logSemanticAdopt("confirm_task_delete");
-        return {
-          handled: true,
-          finalText: "削除対象を確認したいです。削除したいタスク番号、またはタスク名を教えてください。",
-        };
-      }
-      if (sem.kind === "task.update" && sem.needs_confirmation) {
-        logSemanticAdopt("confirm_task_update");
-        return {
-          handled: true,
-          finalText: "更新対象を確認したいです。対象のタスク番号、またはタスク名を教えてください。",
-        };
-      }
-      if (sem.kind === "task.add") {
-        logSemanticAdopt("task_create");
-        return {
-          handled: false,
-          forceIntent: "task_create",
-          forceRequiredParams: {
-            title: sem.extracted_text,
-            target_number: sem.target_number,
-            target_label: sem.target_label,
-            semantic_operation: sem,
-          },
-        };
-      }
+      // Growth 要望の場合は clarify/task 系の semantic 結果を受け取らない
+      // （orchestrator の Growth override が reminder/sheets/calendar をガード）
+      if (!isGrowthRequest) {
+        if (sem.kind === "clarify") {
+          logSemanticAdopt("clarify");
+          return {
+            handled: true,
+            finalText: "追加・一覧確認・削除・更新のどれを行いますか？",
+          };
+        }
+        if (sem.kind === "task.delete" && sem.needs_confirmation) {
+          logSemanticAdopt("confirm_task_delete");
+          return {
+            handled: true,
+            finalText: "削除対象を確認したいです。削除したいタスク番号、またはタスク名を教えてください。",
+          };
+        }
+        if (sem.kind === "task.update" && sem.needs_confirmation) {
+          logSemanticAdopt("confirm_task_update");
+          return {
+            handled: true,
+            finalText: "更新対象を確認したいです。対象のタスク番号、またはタスク名を教えてください。",
+          };
+        }
+        if (sem.kind === "task.add") {
+          logSemanticAdopt("task_create");
+          return {
+            handled: false,
+            forceIntent: "task_create",
+            forceRequiredParams: {
+              title: sem.extracted_text,
+              target_number: sem.target_number,
+              target_label: sem.target_label,
+              semantic_operation: sem,
+            },
+          };
+        }
+      } // end !isGrowthRequest task routes
       if (sem.kind === "task.list.local" || sem.kind === "task.delete" || sem.kind === "task.update") {
         const routedText = text;
         const taskResult = await tryHandleTaskLine({

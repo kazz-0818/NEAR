@@ -450,13 +450,16 @@ export async function handleLineTextMessage(input: {
   }
 
   // ----------------------------------------------------------------
-  // Growth 明示要望: LLM 意図分類結果を上書きして Growth パイプラインへ強制する
-  // 「毎朝9時に売上を通知できるようにして」がリマインダーに誤分類されるケースを防ぐ
+  // Growth 明示要望: LLM が reminder_request に誤分類したケースのみ上書きする
+  // 他の intent（simple_question 等）は LLM の判断を尊重する（LLMよりに寄せる）
+  // reminder_request への誤分類は「実際にリマインダーが作られる」危険があるため必須
+  // 注: google_sheets_query / task_create / google_calendar_query は
+  //     EXTENSION_OVERRIDE_INTENTS（shouldTreatHandledIntentAsGrowthExtension）が守る
   // ----------------------------------------------------------------
-  if (isExplicitGrowth && parsed.intent !== "unknown_custom_request") {
+  if (isExplicitGrowth && parsed.intent === "reminder_request") {
     log.info(
       { classifiedIntent: parsed.intent, text },
-      "growth_explicit_override: forcing unknown_custom_request to route to Growth pipeline"
+      "growth_explicit_override: reminder_request → unknown_custom_request (prevent accidental reminder)"
     );
     parsed = {
       ...parsed,

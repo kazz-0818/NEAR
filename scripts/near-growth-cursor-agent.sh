@@ -361,8 +361,8 @@ if [[ "$SMOKE_MODE" == 1 ]]; then
   SUGGESTION_LINE="smoke-test（near-growth-smoke-test・README のみ・Cursor Agent なし）"
   PR_TITLE="chore(growth): smoke test issue #${ISSUE_NUMBER}"
   COMMIT_MSG="chore(growth): smoke test (issue #${ISSUE_NUMBER})"
-  IMPL_BULLET='- NEAR Growth Automation **スモークテスト**（ラベル `near-growth-smoke-test`）。`README.md` のみ更新。Cursor Agent / Cursor CLI は未使用。'
-  PR_SUCCESS_BLURB="スモークテスト（\`near-growth-smoke-test\`・README のみ・Agent なし）で PR を作成しました。"
+  IMPL_BULLET='- NEAR Growth Automation **スモークテスト**（ラベル **near-growth-smoke-test**）。README.md のみ更新。Cursor Agent / Cursor CLI は未使用。'
+  PR_SUCCESS_BLURB='スモークテスト（near-growth-smoke-test・README のみ・Agent なし）で PR を作成しました。'
 else
   SUGGESTION_TOKEN="$(extract_suggestion_token_from_body "$BODY_FILE")"
   if [[ "$SUGGESTION_TOKEN" =~ ^[0-9]+$ ]]; then
@@ -653,18 +653,20 @@ fi
 git push -u origin "$BRANCH"
 
 ISSUE_URL="https://github.com/${REPO}/issues/${ISSUE_NUMBER}"
-cat >"$PR_BODY_FILE" <<EOF
+# IMPL_BULLET / SUGGESTION_LINE にバッククォートが含まれても unquoted heredoc でコマンド置換されないよう分割する
+{
+  cat <<EOF
 ## NEAR Growth Automation PR
 
 元Issue:
 - #${ISSUE_NUMBER}
 
 suggestion_id:
-- ${SUGGESTION_LINE}
-
-## 実装内容
-${IMPL_BULLET}
-
+EOF
+  printf -- '- %s\n\n' "${SUGGESTION_LINE}"
+  printf '%s\n\n' "## 実装内容"
+  printf '%s\n\n' "${IMPL_BULLET}"
+  cat <<EOF
 ## 確認事項
 - [ ] npm run build 通過
 - [ ] main直接pushなし
@@ -677,6 +679,7 @@ LINEで「反映して」と言われるまではmainにマージしない。
 
 （元Issue: ${ISSUE_URL}）
 EOF
+} >"$PR_BODY_FILE"
 
 set +e
 PR_RAW="$(gh pr create -R "$REPO" \

@@ -47,6 +47,7 @@ export function roughSheetsBusinessRequest(text: string): boolean {
   ) {
     return true;
   }
+  if (/(スプレッドシート|シート|スプシ).{0,50}タスク.{0,15}(一覧|出して|見せて|教えて|ください)/i.test(t)) return true;
   if (/(売上|売り上げ|件数|集計|一覧|実績|予算).{0,35}(シート|スプシ|表で|表の|タブ)/i.test(t)) return true;
   // 購入代行】管理シート のように記号・中黒が挟まっても代行〜シートを拾う
   if (/(POPUP|ポップアップ|購入代行|代行|在庫|受注|発注|売上|仕入).{0,40}(シート|表)/i.test(t)) return true;

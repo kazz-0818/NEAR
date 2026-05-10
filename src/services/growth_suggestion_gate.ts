@@ -1,6 +1,7 @@
 import { getEnv } from "../config/env.js";
 import type { Db } from "../db/client.js";
 import { looksLikeGrowthFeatureRequest } from "../lib/growthFeatureRequestHeuristics.js";
+import { shouldAllowGrowthSuggestionAfterPreRouter } from "../lib/nearPreGrowthRouter.js";
 import {
   inferImprovementKind,
   messageFingerprint,
@@ -38,6 +39,10 @@ export async function evaluateGrowthSuggestionEligibility(input: {
   ]);
   if (ALWAYS_HANDLED_INTENTS.has(input.parsed.intent)) {
     return { allow: false, reason: "always_handled_intent" };
+  }
+
+  if (!shouldAllowGrowthSuggestionAfterPreRouter(input.text, input.parsed)) {
+    return { allow: false, reason: "pre_growth_router" };
   }
 
   const trimmed = input.text.normalize("NFKC").trim();

@@ -50,6 +50,13 @@ import {
   looksLikeGrowthFeatureRequest,
   shouldTreatHandledIntentAsGrowthExtension,
 } from "../lib/growthFeatureRequestHeuristics.js";
+import {
+  buildExternalRealtimeNeededReply,
+  isCasualGithubIssueCreationUtterance,
+  isExplicitGrowthDevelopmentRequest,
+  requiresExternalRealtimeData,
+} from "../lib/nearPreGrowthRouter.js";
+import { runLlmFallbackAnswer } from "./llm_fallback_answer.js";
 
 async function saveIntentRun(
   db: Db,
@@ -519,6 +526,7 @@ export async function handleLineTextMessage(input: {
       intent: growthParsed,
       inboundMessageId,
       whyOverride: `拡張要望として記録（分類は ${parsed.intent}）`,
+      routingCategory: "growth_candidate",
     });
     const gate = await runGrowthPipelineAfterUnsupported(db, log, {
       unsupportedId,
@@ -615,6 +623,115 @@ export async function handleLineTextMessage(input: {
 
   try {
     if (!routable) {
+      const whyUnsupported =
+        parsed.intent === "unknown_custom_request"
+          ? "該当処理モジュールなし"
+          : !parsed.can_handle
+            ? parsed.reason ?? "can_handle が false"
+            : "ハンドラ未登録";
+
+      const wantsGrowthLogging =
+        (isExplicitGrowthDevelopmentRequest(text) || looksLikeGrowthFeatureRequest(text)) &&
+        !isCasualGithubIssueCreationUtterance(text);
+
+      if (wantsGrowthLogging) {
+        const unsupportedId = await logUnsupportedRequest({
+          db,
+          channel,
+          channelUserId,
+          originalMessage: text,
+          intent: parsed,
+          inboundMessageId,
+          whyOverride: `${whyUnsupported}（成長候補扱い）`,
+          routingCategory: "growth_candidate",
+        });
+
+        const gate = await runGrowthPipelineAfterUnsupported(db, log, {
+          unsupportedId,
+          inboundMessageId,
+          channel,
+          channelUserId,
+          text,
+          parsed,
+        });
+
+        const draftBase =
+          "そのお願いは、いまの私の定型機能だけではまだカバーしきれていません。内容は控えとして残し、近いうちに手が届くよう整えていきます。言い換えや、いま手伝える範囲に寄せた相談でも大丈夫です。";
+        let draft = draftBase;
+        if (env.NEAR_GROWTH_USER_ACK_ENABLED && gate.allow) {
+          draft = `${draftBase}\n\n※ このご要望は、改善候補として記録し、開発側で検討できるよう控えました。`;
+        }
+        let finalText = draft;
+        try {
+          finalText = await composeNearReplyUnified({
+            actorDisplayName,
+            draft,
+            situation: "unsupported",
+            userMessage: text,
+            recentUserMessages,
+            recentAssistantMessages,
+          });
+        } catch (ce) {
+          log.warn({ err: ce }, "composeNearReplyUnified failed (unsupported growth path)");
+        }
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        return;
+      }
+
+      if (requiresExternalRealtimeData(text)) {
+        await logUnsupportedRequest({
+          db,
+          channel,
+          channelUserId,
+          originalMessage: text,
+          intent: parsed,
+          inboundMessageId,
+          whyOverride: "リアルタイム外部データ取得が必要（NEAR未実装）",
+          routingCategory: "external_tool_needed",
+        });
+        const extDraft = buildExternalRealtimeNeededReply();
+        let finalText = extDraft;
+        try {
+          finalText = await composeNearReplyUnified({
+            actorDisplayName,
+            draft: extDraft,
+            situation: "success",
+            userMessage: text,
+            recentUserMessages,
+            recentAssistantMessages,
+          });
+        } catch (ce) {
+          log.warn({ err: ce }, "composeNearReplyUnified failed (external tool needed path)");
+        }
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        return;
+      }
+
+      try {
+        const fb = await runLlmFallbackAnswer({
+          userText: text,
+          recentUserMessages,
+          recentAssistantMessages,
+        });
+        let finalText = fb.draft;
+        try {
+          finalText = await composeNearReplyUnified({
+            actorDisplayName,
+            draft: fb.draft,
+            situation: "success",
+            userMessage: text,
+            recentUserMessages,
+            recentAssistantMessages,
+          });
+        } catch (ce) {
+          log.warn({ err: ce }, "composeNearReplyUnified failed (llm fallback path)");
+        }
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+        return;
+      } catch (fe) {
+        log.warn({ err: fe }, "llm fallback path failed; falling back to unsupported logging");
+      }
+
       const unsupportedId = await logUnsupportedRequest({
         db,
         channel,
@@ -622,12 +739,8 @@ export async function handleLineTextMessage(input: {
         originalMessage: text,
         intent: parsed,
         inboundMessageId,
-        whyOverride:
-          parsed.intent === "unknown_custom_request"
-            ? "該当処理モジュールなし"
-            : !parsed.can_handle
-              ? parsed.reason ?? "can_handle が false"
-              : "ハンドラ未登録",
+        whyOverride: whyUnsupported,
+        routingCategory: "unsupported_unknown",
       });
 
       const gate = await runGrowthPipelineAfterUnsupported(db, log, {
@@ -647,7 +760,8 @@ export async function handleLineTextMessage(input: {
       }
       let finalText = draft;
       try {
-        finalText = await composeNearReplyUnified({ actorDisplayName,
+        finalText = await composeNearReplyUnified({
+          actorDisplayName,
           draft,
           situation: "unsupported",
           userMessage: text,
@@ -694,6 +808,7 @@ export async function handleLineTextMessage(input: {
         intent: parsed,
         inboundMessageId,
         whyOverride: "モジュールが未対応と判断",
+        routingCategory: "existing_module_failed",
       });
       growthGateForAck = await runGrowthPipelineAfterUnsupported(db, log, {
         unsupportedId,

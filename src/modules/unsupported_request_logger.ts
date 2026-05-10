@@ -10,6 +10,8 @@ export type LogUnsupportedInput = {
   intent: ParsedIntent;
   inboundMessageId: number;
   whyOverride?: string;
+  /** DB `routing_category`（マイグレーション042）。分析用・NULL 可 */
+  routingCategory?: string | null;
 };
 
 export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise<number> {
@@ -28,8 +30,9 @@ export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise
     `INSERT INTO unsupported_requests (
        channel, channel_user_id, original_message, detected_intent, why_unsupported,
        suggested_implementation_category, priority, status, notes, confidence, inbound_message_id,
-       message_fingerprint, improvement_kind, normalized_message, intent_guess
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'logged', $8, $9, $10, $11, $12, $13, $14)
+       message_fingerprint, improvement_kind, normalized_message, intent_guess,
+       routing_category
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'logged', $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING id`,
     [
       input.channel,
@@ -46,6 +49,7 @@ export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise
       improvementKind,
       normalizedMessage,
       input.intent.intent,
+      input.routingCategory ?? null,
     ]
   );
   const id = res.rows[0]?.id;
@@ -67,8 +71,8 @@ export async function logUnsupportedFromGrowthBucket(input: LogUnsupportedInput 
        channel, channel_user_id, original_message, detected_intent, why_unsupported,
        suggested_implementation_category, priority, status, notes, confidence, inbound_message_id,
        message_fingerprint, improvement_kind, normalized_message, intent_guess,
-       entry_source, growth_signal_bucket_id
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'logged', $8, $9, $10, $11, $12, $13, $14, 'growth_signal_bucket', $15)
+       entry_source, growth_signal_bucket_id, routing_category
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'logged', $8, $9, $10, $11, $12, $13, $14, 'growth_signal_bucket', $15, $16)
      RETURNING id`,
     [
       input.channel,
@@ -86,6 +90,7 @@ export async function logUnsupportedFromGrowthBucket(input: LogUnsupportedInput 
       normalizedMessage,
       input.intent.intent,
       input.growthSignalBucketId,
+      input.routingCategory ?? null,
     ]
   );
   const id = res.rows[0]?.id;

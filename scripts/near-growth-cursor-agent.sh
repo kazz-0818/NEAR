@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# NEAR Growth Automation (v2.1): Issue をトリガーに Cursor CLI で実装し、PR まで作成する。
+# NEAR Growth Automation (v2.2): Issue をトリガーに Cursor CLI で実装し、PR まで作成する（スモーク分岐あり）。
 #
 # 実装チェックリスト（監査用・処理順）:
-# [x] CURSOR_API_KEY 未設定 → 失敗コメント・near-growth-agent-failed・exit 1（running 付与後なら EXIT で除去）
+# [x] near-growth-smoke-test … README.md のみ更新・Agent なしで build→PR 経路を検証
+# [x] CURSOR_API_KEY 未設定 → 通常フローのみ失敗（スモークではキー不要）
 # [x] secrets をログ/Issue/PR に出さない（echo しない・redact_stream / redact_snippet でマスク）
 # [x] Issue 本文取得（gh issue view body → BODY_FILE）
 # [x] suggestion_id: 数値 → suggestion-{n} / 英数字・ハイフン → slug 化 / 無し → issue-{issue_number}
@@ -21,7 +22,10 @@
 #
 # 再テスト手順（同一 Issue でやり直すとき）:
 # 1. near-growth-pr-created / near-growth-agent-running / near-growth-agent-failed を必要に応じて外す
-# 2. ワークフローは issues.labeled のみのため、cursor-agent（または near-growth）を一度外して付け直す
+# 2. ワークフローは issues.labeled のみのため、ラベルを一度外して付け直す（通常: near-growth/cursor-agent、スモーク: near-growth-smoke-test）
+#
+# スモークテスト手順（PR 経路のみ・Agent なし）:
+# - Issue に near-growth-smoke-test を付ける → Actions → README 更新 → PR → Issue に PR URL
 
 set -euo pipefail
 
@@ -37,9 +41,12 @@ MARKER_LINKED_PR='<!-- NEAR_GROWTH_SKIP_LINKED_PR -->'
 cd "$WORKDIR"
 
 RUNNING_ADDED=0
+SMOKE_MODE=0
 AGENT_PATH_STR=""
 AGENT_HELP_STATUS_STR=""
 AGENT_TRIES_DESC=""
+IMPL_BULLET=""
+PR_SUCCESS_BLURB=""
 
 log() {
   echo "[near-growth] $*" >&2
@@ -257,6 +264,23 @@ try_delete_remote_branch_if_orphan_same_tip() {
   return 1
 }
 
+# near-growth-smoke-test: README.md に指定文言を追加（無ければ # NEAR テンプレで作成）。再実行時はマーカー行で差分を確実に出す。
+apply_smoke_readme_patch() {
+  local sentence='GitHub Issue自動作成に対応しました。'
+  if [[ ! -f README.md ]]; then
+    printf '# NEAR\n\n%s\n' "$sentence" >README.md
+    log "smoke: created README.md"
+    return 0
+  fi
+  if ! grep -Fq "$sentence" README.md; then
+    printf '\n%s\n' "$sentence" >>README.md
+    log "smoke: appended sentence to README.md"
+    return 0
+  fi
+  printf '\n<!-- near-growth-smoke-issue-%s %s -->\n' "$ISSUE_NUMBER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>README.md
+  log "smoke: appended marker (sentence already in README.md)"
+}
+
 find_open_pr_for_this_issue() {
   local n url b
   while IFS= read -r n; do
@@ -298,8 +322,11 @@ if has_label "near-growth-agent-running"; then
   exit 0
 fi
 
-if ! has_label "near-growth" || ! has_label "cursor-agent"; then
-  log "skip: near-growth と cursor-agent の両方が必要です"
+if has_label "near-growth-smoke-test"; then
+  SMOKE_MODE=1
+  try_create_label "near-growth-smoke-test" "C5DEF5"
+elif ! has_label "near-growth" || ! has_label "cursor-agent"; then
+  log "skip: near-growth-smoke-test が無い場合は near-growth と cursor-agent の両方が必要です"
   exit 0
 fi
 
@@ -329,25 +356,36 @@ PR_BODY_FILE="$(mktemp)"
 
 gh issue view "$ISSUE_NUMBER" -R "$REPO" --json body -q .body >"$BODY_FILE"
 
-SUGGESTION_TOKEN="$(extract_suggestion_token_from_body "$BODY_FILE")"
-if [[ "$SUGGESTION_TOKEN" =~ ^[0-9]+$ ]]; then
-  BRANCH="near-growth/suggestion-${SUGGESTION_TOKEN}"
-  SUGGESTION_LINE="${SUGGESTION_TOKEN}（数値）"
-  PR_TITLE="feat(growth): suggestion #${SUGGESTION_TOKEN}"
-  COMMIT_MSG="feat(growth): suggestion #${SUGGESTION_TOKEN} (issue #${ISSUE_NUMBER})"
+if [[ "$SMOKE_MODE" == 1 ]]; then
+  BRANCH="near-growth/smoke-issue-${ISSUE_NUMBER}"
+  SUGGESTION_LINE="smoke-test（near-growth-smoke-test・README のみ・Cursor Agent なし）"
+  PR_TITLE="chore(growth): smoke test issue #${ISSUE_NUMBER}"
+  COMMIT_MSG="chore(growth): smoke test (issue #${ISSUE_NUMBER})"
+  IMPL_BULLET='- NEAR Growth Automation **スモークテスト**（ラベル `near-growth-smoke-test`）。`README.md` のみ更新。Cursor Agent / Cursor CLI は未使用。'
+  PR_SUCCESS_BLURB="スモークテスト（\`near-growth-smoke-test\`・README のみ・Agent なし）で PR を作成しました。"
 else
-  SUGGESTION_SLUG="$(slugify_suggestion_token "$SUGGESTION_TOKEN")"
-  if [[ -n "$SUGGESTION_SLUG" ]]; then
-    BRANCH="near-growth/suggestion-${SUGGESTION_SLUG}"
-    SUGGESTION_LINE="${SUGGESTION_TOKEN}（slug: ${SUGGESTION_SLUG}）"
-    PR_TITLE="feat(growth): suggestion ${SUGGESTION_SLUG}"
-    COMMIT_MSG="feat(growth): suggestion ${SUGGESTION_SLUG} (issue #${ISSUE_NUMBER})"
+  SUGGESTION_TOKEN="$(extract_suggestion_token_from_body "$BODY_FILE")"
+  if [[ "$SUGGESTION_TOKEN" =~ ^[0-9]+$ ]]; then
+    BRANCH="near-growth/suggestion-${SUGGESTION_TOKEN}"
+    SUGGESTION_LINE="${SUGGESTION_TOKEN}（数値）"
+    PR_TITLE="feat(growth): suggestion #${SUGGESTION_TOKEN}"
+    COMMIT_MSG="feat(growth): suggestion #${SUGGESTION_TOKEN} (issue #${ISSUE_NUMBER})"
   else
-    BRANCH="near-growth/issue-${ISSUE_NUMBER}"
-    SUGGESTION_LINE="（suggestion_id なし） issue-${ISSUE_NUMBER} をブランチ名に使用"
-    PR_TITLE="feat(growth): issue #${ISSUE_NUMBER}"
-    COMMIT_MSG="feat(growth): issue #${ISSUE_NUMBER} (suggestion_id なし)"
+    SUGGESTION_SLUG="$(slugify_suggestion_token "$SUGGESTION_TOKEN")"
+    if [[ -n "$SUGGESTION_SLUG" ]]; then
+      BRANCH="near-growth/suggestion-${SUGGESTION_SLUG}"
+      SUGGESTION_LINE="${SUGGESTION_TOKEN}（slug: ${SUGGESTION_SLUG}）"
+      PR_TITLE="feat(growth): suggestion ${SUGGESTION_SLUG}"
+      COMMIT_MSG="feat(growth): suggestion ${SUGGESTION_SLUG} (issue #${ISSUE_NUMBER})"
+    else
+      BRANCH="near-growth/issue-${ISSUE_NUMBER}"
+      SUGGESTION_LINE="（suggestion_id なし） issue-${ISSUE_NUMBER} をブランチ名に使用"
+      PR_TITLE="feat(growth): issue #${ISSUE_NUMBER}"
+      COMMIT_MSG="feat(growth): issue #${ISSUE_NUMBER} (suggestion_id なし)"
+    fi
   fi
+  IMPL_BULLET='- Cursor Agent が Issue の実装指示に基づきコードを更新しました（差分を参照してください）。'
+  PR_SUCCESS_BLURB="Cursor Agentによる実装PRを作成しました。"
 fi
 
 DEFAULT_BRANCH="$(gh repo view "$REPO" --json defaultBranchRef -q .defaultBranchRef.name)"
@@ -388,7 +426,7 @@ if git ls-remote --heads origin "refs/heads/${BRANCH}" | grep -q .; then
   fi
 fi
 
-if [[ -z "${CURSOR_API_KEY:-}" ]]; then
+if [[ "$SMOKE_MODE" != 1 ]] && [[ -z "${CURSOR_API_KEY:-}" ]]; then
   log "error: CURSOR_API_KEY が設定されていません"
   try_create_label "near-growth-agent-failed" "D93F0B"
   if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
@@ -430,16 +468,20 @@ install_deps() {
 log "install dependencies"
 install_deps
 
-log "install Cursor CLI"
-curl https://cursor.com/install -fsS | bash
-echo "$HOME/.cursor/bin" >>"$GITHUB_PATH"
-export PATH="$HOME/.cursor/bin:$PATH"
+if [[ "$SMOKE_MODE" == 1 ]]; then
+  log "smoke test mode: patch README.md (skip Cursor CLI / agent)"
+  apply_smoke_readme_patch
+else
+  log "install Cursor CLI"
+  curl https://cursor.com/install -fsS | bash
+  echo "$HOME/.cursor/bin" >>"$GITHUB_PATH"
+  export PATH="$HOME/.cursor/bin:$PATH"
 
-if ! command -v agent >/dev/null 2>&1; then
-  log "error: agent コマンドが見つかりません"
-  try_create_label "near-growth-agent-failed" "D93F0B"
-  if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
-    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
+  if ! command -v agent >/dev/null 2>&1; then
+    log "error: agent コマンドが見つかりません"
+    try_create_label "near-growth-agent-failed" "D93F0B"
+    if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
+      gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
 
 Cursor Agent実行に失敗しました。
 
@@ -452,12 +494,12 @@ Cursor CLI（agent）を PATH 上に見つけられませんでした。
 - GitHub Actionsのpermissionsが足りているか
 - npm run build がローカルで通るか
 "
+    fi
+    exit 1
   fi
-  exit 1
-fi
 
-{
-  cat <<'PREAMBLE'
+  {
+    cat <<'PREAMBLE'
 あなたはNEAR Growth Automationの実装Agentです。
 
 ルール：
@@ -478,24 +520,24 @@ fi
 【実装対象（Issue 本文）】
 
 PREAMBLE
-  cat "$BODY_FILE"
-} >"$PROMPT_FILE"
+    cat "$BODY_FILE"
+  } >"$PROMPT_FILE"
 
-AGENT_LOG="$(mktemp)"
-log_agent_preflight
+  AGENT_LOG="$(mktemp)"
+  log_agent_preflight
 
-log "run Cursor Agent (headless)"
-set +e
-run_agent_with_fallback
-AGENT_EXIT=$?
-set -e
-if [[ "$AGENT_EXIT" -ne 0 ]]; then
-  log "Cursor Agent: all invocation patterns failed (last exit code ${AGENT_EXIT})"
-  log_agent_sanitized_tail "$AGENT_LOG" 80
-  try_create_label "near-growth-agent-failed" "D93F0B"
-  SAFE_TAIL="$(tail -n 80 "$AGENT_LOG" | redact_stream || true)"
-  if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
-    gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
+  log "run Cursor Agent (headless)"
+  set +e
+  run_agent_with_fallback
+  AGENT_EXIT=$?
+  set -e
+  if [[ "$AGENT_EXIT" -ne 0 ]]; then
+    log "Cursor Agent: all invocation patterns failed (last exit code ${AGENT_EXIT})"
+    log_agent_sanitized_tail "$AGENT_LOG" 80
+    try_create_label "near-growth-agent-failed" "D93F0B"
+    SAFE_TAIL="$(tail -n 80 "$AGENT_LOG" | redact_stream || true)"
+    if ! issue_comment_bodies | grep -Fq "$MARKER_FAIL"; then
+      gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_FAIL}
 
 Cursor Agent実行に失敗しました。
 
@@ -521,8 +563,9 @@ ${SAFE_TAIL:-（なし）}
 
 ※再実行する場合: Issue から \`near-growth-agent-running\` と \`near-growth-agent-failed\` を外し、\`cursor-agent\` ラベルを付け直してください。
 "
+    fi
+    exit 1
   fi
-  exit 1
 fi
 
 log "npm run build"
@@ -620,7 +663,7 @@ suggestion_id:
 - ${SUGGESTION_LINE}
 
 ## 実装内容
-- Cursor Agent が Issue の実装指示に基づきコードを更新しました（差分を参照してください）。
+${IMPL_BULLET}
 
 ## 確認事項
 - [ ] npm run build 通過
@@ -654,7 +697,7 @@ if [[ "$PR_EC" -ne 0 ]] || [[ -z "$PR_URL" ]] || [[ "$PR_URL" != https://* ]]; t
 Cursor Agent実行に失敗しました。
 
 原因:
-PR の作成に失敗しました（gh pr create）。
+PR の作成に失敗しました（gh pr create）。スモークテストの場合も同じです。
 
 サニタイズ済み出力:
 \`\`\`
@@ -672,7 +715,7 @@ fi
 if ! issue_comment_bodies | grep -Fq "$MARKER_PR"; then
   gh issue comment "$ISSUE_NUMBER" -R "$REPO" --body "${MARKER_PR}
 
-Cursor Agentによる実装PRを作成しました。
+${PR_SUCCESS_BLURB}
 
 PR:
 ${PR_URL}

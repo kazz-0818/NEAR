@@ -1,11 +1,14 @@
-# NEAR Growth Automation v2.1（STEP2）
+# NEAR Growth Automation v2.2（STEP2）
 #
 # 確認用チェックリスト（実装は scripts/near-growth-cursor-agent.sh）:
-# - トリガー: issues.labeled のみ（opened との二重起動を避ける）※v2.1
-# - 実行ラベル: near-growth + cursor-agent / スキップ: near-growth-pr-created / near-growth-agent-running
+# - トリガー: issues.labeled のみ（opened との二重起動を避ける）
+# - 実行ラベル（いずれか）:
+#     · near-growth-smoke-test … README のみ変更・Cursor Agent なし（PR 経路のスモーク）
+#     · near-growth + cursor-agent … 通常（Cursor CLI / agent）
+# - スキップ: near-growth-pr-created / near-growth-agent-running
 # - 処理中: near-growth-agent-running を付与し、終了時（成功・失敗・差分なし）に必ず除去
-# - Secrets: CURSOR_API_KEY（ログに出さない）
-# - Cursor CLI: install + agent -p --force --trust
+# - Secrets: CURSOR_API_KEY（スモークでは未使用・通常フローのみ）
+# - Cursor CLI: 通常フローのみ install + agent -p --force --trust
 #
 # 必要な Secrets:
 #   CURSOR_API_KEY … https://cursor.com/docs/cli/github-actions
@@ -13,7 +16,12 @@
 #
 # 同一 Issue で再テストするとき（トリガーは labeled のみ）:
 # - pr-created / running / failed ラベルを必要に応じて外す
-# - near-growth または cursor-agent を外して付け直す
+# - 通常: near-growth または cursor-agent を一度外して付け直す
+# - スモーク: near-growth-smoke-test を一度外して付け直す
+#
+# スモークテスト手順（PR 経路のみ確認・Cursor Agent なし）:
+# - Issue に near-growth-smoke-test ラベルを付ける
+# - Actions が起動する → README.md が更新される → PR 作成 → Issue に PR URL コメント
 
 name: NEAR Growth Cursor Agent
 
@@ -28,8 +36,8 @@ concurrency:
 
 jobs:
   cursor-agent:
-    # fork 除外・PR 連動 Issue 除外・必須ラベルのみ・完了・実行中はジョブ自体をスキップ（running 付与で発火した labeled もここで除外）
-    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth|') && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|cursor-agent|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-pr-created|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-agent-running|') }}
+    # fork 除外・PR 連動 Issue 除外・スモーク OR (near-growth+cursor-agent)・完了/実行中ラベルでジョブスキップ
+    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-pr-created|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-agent-running|') && (contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-smoke-test|') || (contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth|') && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|cursor-agent|'))) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

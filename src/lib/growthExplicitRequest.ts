@@ -79,6 +79,18 @@ export function isUserConfusionOrNegationSignal(text: string): boolean {
   ) {
     return true;
   }
+  // 関西弁・口語の不満（「教えてるやん」「あかん」等）
+  if (
+    /(教えてるやん|言ってるやん|見てるやん|やってるやん|分かってるやん|わかってるやん|そうやん|だからやん|ちゃうやん|あかんわ|あかんやん|あかんて|なんでやねん|わかれへん)/u.test(t)
+  ) {
+    return true;
+  }
+  // 「ダメだ」「だめだ」単体の短い失望・却下表現
+  if ([...t].length <= 8 && /(ダメだ|だめだ|ダメ|あかん)[！!。]?$/u.test(t)) return true;
+  // 「うまくいってない」系 (NEAR の返答が機能していない旨)
+  if (/(うまくいってない|うまくいかない|うまくいかん|機能してない|機能しない|返答がおかしい|おかしい返答)/u.test(t)) return true;
+  // 短い嘆き（あー/もー + 感嘆符 or 単体で終わる）
+  if ([...t].length <= 6 && /^(あー|あーあ|あーだめ|もー|もーやだ|やだ|はあ|ふう)[！!。]?$/u.test(t)) return true;
   return false;
 }
 

@@ -352,6 +352,16 @@ export async function handleLineTextMessage(input: {
       if (interpretation.mode === "clarify_missing_info" && interpretation.confidence >= 0.65) {
         if (looksLikeGrowthFeatureRequest(text)) {
           log.info({ mode: interpretation.mode }, "secretary clarify skipped: growth-feature-like request");
+        } else if (isConfusion) {
+          // 混乱・フラストレーションシグナルは clarify を出さず LLM に渡す
+          log.info({ mode: interpretation.mode }, "secretary clarify skipped: user confusion signal — let LLM handle naturally");
+        } else if (
+          recentAssistantMessages.length > 0 &&
+          /^(これ|それ|あれ|この|その|あの)(は|が|を|に|で|の|って|どういう|どゆ|何|なに|どう)/u.test(text.trim())
+        ) {
+          // 「これどういう意味？」「それって何？」など、指示詞で直前発言を参照している場合
+          // clarify せず LLM に文脈ごと渡す
+          log.info({ mode: interpretation.mode }, "secretary clarify skipped: deictic reference to recent assistant output");
         } else {
         const shouldSkipClarifyForConsultation =
           looksLikeBroadConsultation(text) ||
@@ -483,6 +493,25 @@ export async function handleLineTextMessage(input: {
     }
   } else {
     log.info({ isExplicitGrowth, isConfusion }, "skipping Sheets promotion: growth request or confusion signal");
+  }
+
+  // 会話途中（直前の NEAR 発言がある）で greeting に分類されたら simple_question に救済する。
+  // 「お願いします」「ありがとう」などが greeting に誤分類されて挨拶返しするのを防ぐ。
+  if (
+    parsed.intent === "greeting" &&
+    recentAssistantMessages.length > 0 &&
+    !/(こんにちは|おはよう|こんばんは|はじめまして|久しぶり|久しぶりです|初めまして|お元気|よろしく(お願い)?[いし]?[まい]?す)/iu.test(text)
+  ) {
+    log.info({ text }, "orchestrator_mid_conversation_greeting_rescue: → simple_question");
+    parsed = {
+      ...parsed,
+      intent: "simple_question",
+      can_handle: true,
+      needs_followup: false,
+      followup_question: null,
+      reason: "orchestrator_mid_conversation_greeting_rescue",
+      suggested_category: null,
+    };
   }
 
   // 「何ができる」「使い方」系が unknown に落ちたら help_capabilities へ救済する

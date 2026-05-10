@@ -11,8 +11,15 @@
 # - Cursor CLI: 通常フローのみ install + agent -p --force --trust
 #
 # 必要な Secrets:
-#   CURSOR_API_KEY … https://cursor.com/docs/cli/github-actions
-# GITHUB_TOKEN は github.token（permissions 参照）
+#   CURSOR_API_KEY … https://cursor.com/docs/cli/github-actions（通常フロー）
+# PR 作成について:
+#   既定の github.token だけでは「GitHub Actions is not permitted to create pull requests」と拒否される
+#   リポジトリがあることがあります。その場合は次のいずれか。
+#   A) Settings → Actions → General → Workflow permissions で
+#      「Allow GitHub Actions to create and approve pull requests」を有効にする
+#   B)  classic PAT（repo スコープ）を Secrets に NEAR_GROWTH_ACTIONS_GH_TOKEN として登録する（下記 env）
+#
+# GH_TOKEN: 未設定なら github.token、設定時は PAT（gh / git push に利用）
 #
 # 同一 Issue で再テストするとき（トリガーは labeled のみ）:
 # - pr-created / running / failed ラベルを必要に応じて外す
@@ -47,7 +54,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       ISSUE_NUMBER: ${{ github.event.issue.number }}
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.NEAR_GROWTH_ACTIONS_GH_TOKEN || github.token }}
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
 
     steps:

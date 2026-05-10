@@ -113,3 +113,40 @@ test("管理者向け PR 反映は別系統（merge コマンド）", () => {
   assert.equal(isGrowthMergeToMainCommand("反映して"), true);
   assert.equal(classifyPreGrowthRequest("反映して", unknown()).category !== "growth_explicit", true);
 });
+
+test("大阪の天気教えて: 外部ワンショット（Growth にしない）", () => {
+  assertPreGrowth("大阪天気", "大阪の天気教えて", { growth: false, external: true, llm: false, allowGrowth: false });
+});
+
+test("この文章を柔らかくして: LLM（Growth にしない）", () => {
+  assertPreGrowth("柔らかく", "この文章を柔らかくして", { growth: false, external: false, llm: true, allowGrowth: false });
+});
+
+test("タスク一覧出して: 既存タスク一覧（pre-growth は LLM 既定だが実ルートは task）", () => {
+  assert.equal(resolveUserOperation({ text: "タスク一覧出して" }).kind, "task.list.local");
+  assertPreGrowth("タスク一覧出", "タスク一覧出して", { growth: false, llm: true, allowGrowth: false });
+});
+
+test("スプレッドシートの売上ランキングを毎朝LINE通知して: Growth", () => {
+  const t = "スプレッドシートの売上ランキングを毎朝LINE通知して";
+  assert.equal(isExplicitGrowthDevelopmentRequest(t), true);
+  assertPreGrowth("売上毎朝LINE", t, { growth: true });
+});
+
+test("NEARに〇〇機能を追加して: Growth", () => {
+  const t = "NEARに〇〇機能を追加して";
+  assert.equal(isExplicitGrowthDevelopmentRequest(t), true);
+  assertPreGrowth("NEAR機能追加", t, { growth: true });
+});
+
+test("NEARに新しい機能を追加して: Growth（別表記）", () => {
+  const t = "NEARに新しい機能を追加して";
+  assert.equal(isExplicitGrowthDevelopmentRequest(t), true);
+  assertPreGrowth("NEAR新機能", t, { growth: true });
+});
+
+test("管理できるようにして: Growth（継続機能の明示）", () => {
+  const t = "顧客リストをNEARで管理できるようにして";
+  assert.equal(isExplicitGrowthDevelopmentRequest(t), true);
+  assertPreGrowth("管理できる", t, { growth: true });
+});

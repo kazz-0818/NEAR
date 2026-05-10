@@ -31,8 +31,9 @@ export type PreGrowthClassification = {
 };
 
 /**
- * 「今この瞬間の外部世界の事実・数値」を一度きり聞いている目安。
- * ジャンル列挙は最小限。再現可能な実装依頼（できるように／自動化／保存…）が含まれるなら外す。
+ * 「今この瞬間の外部世界の事実・数値・調査結果」を一度きり聞いている目安（Growth にはしない）。
+ * Growth 判定は isExplicitGrowthDevelopmentRequest に任せ、ここは「照会」かどうかのみ見る。
+ * 列挙は最小限（天気・行情・ニュース等の代表語＋調査）。「できるように／自動化…」が混ざれば除外。
  */
 export function impliesLiveDataOrExternalOneShot(text: string): boolean {
   if (isExplicitGrowthDevelopmentRequest(text)) return false;
@@ -47,12 +48,16 @@ export function impliesLiveDataOrExternalOneShot(text: string): boolean {
   const asks = /(教えて|教えてください|調べて|を調べ|はどう|いくら|何％|降水|何℃)/i.test(t);
   const timeFresh = /(今|最新|リアルタイム|本日|今日|明日|現在)/i.test(t);
   // 外部確定値になりやすい話題の目安（網羅ではない）
-  const domainHint = /(天気|予報|台風|降水|株|為替|ニュース|速報|近くの|周辺の|店を探|営業中|イベント)/i.test(t);
+  const domainHint =
+    /(天気|予報|台風|降水|株|為替|ニュース|速報|近くの|周辺の|店を探|営業中|イベント|調査|出典|根拠)/i.test(t);
   return (asks && timeFresh) || (asks && domainHint);
 }
 
 /**
- * Growth に載せる前の一括判定。個別例はテストに寄せ、ここでは依頼タイプ中心。
+ * Growth に載せる前の一括判定。
+ * 順序: (1) 明示的なシステム実装・自動化依頼 → growth_explicit
+ *       (2) 一回きりの外部確定値っぽい照会 → external（短文。Growth にしない）
+ *       (3) それ以外は既定で LLM 優先（一般質問・作成・相談はここ。Growth にしない）
  */
 export function classifyPreGrowthRequest(text: string, parsed: ParsedIntent): PreGrowthClassification {
   if (isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text)) {

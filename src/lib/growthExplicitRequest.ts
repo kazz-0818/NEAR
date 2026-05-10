@@ -1,6 +1,8 @@
 /**
  * ユーザーが NEAR 本体への「再現可能な機能・永続連携・自動運用」を求めているか。
- * ワンショットの事実照会（天気を教えて等）は false。実装・自動化・連携・保存・通知の明示が中心。
+ *
+ * Growth に載せるのはここが true のときだけ（pre-growth の最優先）。
+ * 一般質問・文面作成・一回の天気/ニュース照会などは false にし、LLM / 外部短文側へ逃がす。
  */
 
 export function isExplicitGrowthDevelopmentRequest(text: string): boolean {
@@ -11,7 +13,9 @@ export function isExplicitGrowthDevelopmentRequest(text: string): boolean {
   ) {
     return true;
   }
-  if (/(できるようにして|できるように|機能を追加|機能追加|この機能を追加して|この機能を追加|API連携.*追加|連携.*追加して)/i.test(t)) {
+  if (
+    /(できるようにして|できるように|管理できるように|運用できるように|機能を追加|機能追加|この機能を追加して|この機能を追加|API連携.*追加|連携.*追加して)/i.test(t)
+  ) {
     return true;
   }
   if (/(外部API|Web\s*API).{0,24}(と.?連携|連携して|つないで|追加)/i.test(t)) return true;

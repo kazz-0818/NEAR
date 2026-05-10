@@ -622,6 +622,7 @@ export async function handleLineTextMessage(input: {
   }
 
   try {
+    // !routable: AI-first（pre-growth）— Growth は明示的システム依頼のみ先取り。それ以外は LLM → 失敗時のみ Growth ヒューリスティクス等。
     if (!routable) {
       const whyUnsupported =
         parsed.intent === "unknown_custom_request"

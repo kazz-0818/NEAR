@@ -23,9 +23,10 @@ concurrency:
 
 jobs:
   cursor-agent:
-    # pull_request イベントでは動かさない（本 workflow は issues のみ登録）
-    # Pull Request に紐づく Issue は payload に pull_request が入るため除外
-    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request }}
+    # issues のみ・fork 除外・PR 連動 Issue 除外
+    # near-growth + cursor-agent が付いているときだけジョブ実行（runner 節約）
+    # near-growth-pr-created が付いている Issue はジョブ自体をスキップ（詳細は scripts/near-growth-cursor-agent.sh でも再確認）
+    if: ${{ github.event_name == 'issues' && !github.event.repository.fork && !github.event.issue.pull_request && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth|') && contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|cursor-agent|') && !contains(format('|{0}|', join(github.event.issue.labels.*.name, '|')), '|near-growth-pr-created|') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

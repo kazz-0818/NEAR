@@ -688,7 +688,10 @@ PR_RAW="$(gh pr create -R "$REPO" \
   --body-file "$PR_BODY_FILE" 2>&1)"
 PR_EC=$?
 set -e
-PR_URL="$(printf '%s\n' "$PR_RAW" | grep -E '^https://[^ ]+/pull/[0-9]+' | tail -n1 | tr -d '\r')"
+# set -e 下で grep 非一致がパイプの終了コードになり誤終了するため、抽出だけ一時的に無視する
+set +e
+PR_URL="$(printf '%s\n' "$PR_RAW" | grep -Eo 'https://[^[:space:]]+/pull/[0-9]+' | tail -n1 | tr -d '\r')"
+set -e
 if [[ "$PR_EC" -ne 0 ]] || [[ -z "$PR_URL" ]] || [[ "$PR_URL" != https://* ]]; then
   log "error: gh pr create failed"
   try_create_label "near-growth-agent-failed" "D93F0B"

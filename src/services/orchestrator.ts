@@ -53,9 +53,8 @@ import {
 import {
   buildExternalCapabilityNeededReply,
   buildUnknownClarifyReply,
-  isExplicitGrowthDevelopmentRequest,
-  isForcedGrowthOrIssueCommand,
-  requiresExternalRealtimeData,
+  classifyPreGrowthRequest,
+  isStandaloneGithubIssueCreatePhrase,
 } from "../lib/nearPreGrowthRouter.js";
 import { runLlmFallbackAnswer } from "./llm_fallback_answer.js";
 
@@ -631,10 +630,9 @@ export async function handleLineTextMessage(input: {
             ? parsed.reason ?? "can_handle が false"
             : "ハンドラ未登録";
 
-      const wantsImmediateGrowthLogging =
-        isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
+      const preGrowth = classifyPreGrowthRequest(text, parsed);
 
-      if (wantsImmediateGrowthLogging) {
+      if (preGrowth.category === "growth_explicit" && preGrowth.allowGrowth) {
         const unsupportedId = await logUnsupportedRequest({
           db,
           channel,
@@ -678,7 +676,7 @@ export async function handleLineTextMessage(input: {
         return;
       }
 
-      if (requiresExternalRealtimeData(text)) {
+      if (preGrowth.category === "external_realtime_answer" && preGrowth.useShortExternalReply) {
         await logUnsupportedRequest({
           db,
           channel,
@@ -707,32 +705,34 @@ export async function handleLineTextMessage(input: {
         return;
       }
 
-      try {
-        const fb = await runLlmFallbackAnswer({
-          userText: text,
-          recentUserMessages,
-          recentAssistantMessages,
-        });
-        let finalText = fb.draft;
+      if (preGrowth.preferLlmFallback) {
         try {
-          finalText = await composeNearReplyUnified({
-            actorDisplayName,
-            draft: fb.draft,
-            situation: "success",
-            userMessage: text,
+          const fb = await runLlmFallbackAnswer({
+            userText: text,
             recentUserMessages,
             recentAssistantMessages,
           });
-        } catch (ce) {
-          log.warn({ err: ce }, "composeNearReplyUnified failed (llm fallback path)");
+          let finalText = fb.draft;
+          try {
+            finalText = await composeNearReplyUnified({
+              actorDisplayName,
+              draft: fb.draft,
+              situation: "success",
+              userMessage: text,
+              recentUserMessages,
+              recentAssistantMessages,
+            });
+          } catch (ce) {
+            log.warn({ err: ce }, "composeNearReplyUnified failed (llm fallback path)");
+          }
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
+          return;
+        } catch (fe) {
+          log.warn({ err: fe }, "llm fallback path failed; falling back to growth or clarify");
         }
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log);
-        return;
-      } catch (fe) {
-        log.warn({ err: fe }, "llm fallback path failed; falling back to growth or clarify");
       }
 
-      if (looksLikeGrowthFeatureRequest(text)) {
+      if (looksLikeGrowthFeatureRequest(text) && !isStandaloneGithubIssueCreatePhrase(text)) {
         const unsupportedId = await logUnsupportedRequest({
           db,
           channel,

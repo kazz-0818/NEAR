@@ -8,80 +8,129 @@ import {
 export { isExplicitGrowthDevelopmentRequest, isForcedGrowthOrIssueCommand } from "./growthExplicitRequest.js";
 
 /**
- * 分析用の分類ラベル想定（ログ routing_category 等と対応しやすいようコメントのみ）:
- * existing_module_request / admin_growth_command / ai_answerable_request /
- * external_capability_needed / explicit_growth_request / unknown_but_answerable / unsupported_unknown
+ * preGrowth 分類（ログ routing_category やゲートと対応しやすい値）。
+ * existing_capability は主に thinRouter / モジュール側で処理済みの想定（ここでは未使用に近い）。
  */
+export type PreGrowthCategory =
+  | "existing_capability"
+  | "llm_answerable"
+  | "external_realtime_answer"
+  | "growth_explicit"
+  | "needs_clarification"
+  | "unknown";
+
+export type PreGrowthClassification = {
+  category: PreGrowthCategory;
+  /** true のときのみ従来の Growth パイプライン（提案スケジュール等）へ進めてよい */
+  allowGrowth: boolean;
+  /** true のとき runLlmFallbackAnswer を優先（AI 秘書の既定） */
+  preferLlmFallback: boolean;
+  /** true のとき定型短文（外部事実の幻覚抑制・トークン節約）。LLM でも可だが既定は短文 */
+  useShortExternalReply: boolean;
+  reason: string;
+};
 
 /**
- * 定型モジュール外でも、まず LLM で自然に応答できる依頼か（Growth より前に置く判定用）。
+ * 「今この瞬間の外部世界の事実・数値」を一度きり聞いている目安。
+ * ジャンル列挙は最小限。再現可能な実装依頼（できるように／自動化／保存…）が含まれるなら外す。
  */
-export function isAiAnswerableHeuristic(text: string, parsed: ParsedIntent): boolean {
+export function impliesLiveDataOrExternalOneShot(text: string): boolean {
   if (isExplicitGrowthDevelopmentRequest(text)) return false;
-  if (isForcedGrowthOrIssueCommand(text)) return false;
-  if (requiresExternalRealtimeData(text)) return false;
-
   const t = text.normalize("NFKC").trim();
   if (!t) return false;
-
-  if (/文面.{0,6}(考えて|作って|直して|修正して)/i.test(t)) return true;
-
+  // 実装・永続運用の依頼はワンショット照会ではない（Growth 明示判定へ）
   if (
-    /(文(面|章)?|営業|投稿|LINE|メルカリ|説明文|キャッチコピー|返信|メール|プロンプト|指示文|文案).{0,10}(作って|考えて|書いて|ください|出して)/i.test(
-      t
-    )
+    /(できるように|自動化|連携して|保存して|通知して|実装して|追加して|してほしい|したいです|投稿できるように)/i.test(t)
   ) {
-    return true;
+    return false;
   }
-  if (/(校閲|推敲|要約|説明).*(して|ください)|この文章|ここの文章|文章を整えて|整えてください|直して|修正して/i.test(t)) {
-    return true;
-  }
-  if (/要約して|説明して|比較して|整理して|壁打ち/i.test(t)) return true;
-  if (/どう思う|相談(したい|に乗って)|アイデア.{0,8}(出して|を出して)|企画.{0,8}(考えて|整理して)/i.test(t)) return true;
-  if (/使い方.*教えて|意味.*教えて|これは何/i.test(t)) return true;
-  if (/(Cursor|カーソル).{0,16}(指示|プロンプト|依頼).{0,8}(作って|出して|考えて)/i.test(t)) return true;
-  if (/(プロンプト|指示文).{0,6}(作って|考えて|出して)/i.test(t)) return true;
-  if (parsed.intent === "unknown_custom_request" && t.length <= 120) {
-    if (/(教えて|教えてください|教えてほしい)$/.test(t) && /(使い方|意味|理由|違い|ポイント)/i.test(t)) return true;
-  }
-  return false;
+  const asks = /(教えて|教えてください|調べて|を調べ|はどう|いくら|何％|降水|何℃)/i.test(t);
+  const timeFresh = /(今|最新|リアルタイム|本日|今日|明日|現在)/i.test(t);
+  // 外部確定値になりやすい話題の目安（網羅ではない）
+  const domainHint = /(天気|予報|台風|降水|株|為替|ニュース|速報|近くの|周辺の|店を探|営業中|イベント)/i.test(t);
+  return (asks && timeFresh) || (asks && domainHint);
 }
-
-/** @deprecated 互換名。isAiAnswerableHeuristic と同じ。 */
-export const canAnswerWithLLMFallback = isAiAnswerableHeuristic;
 
 /**
- * リアルタイムの外部データ取得が主目的で、現状の NEAR では未実装のもの。
- * 明示的な開発依頼が同文に含まれる場合は false（Growth 側へ）。
+ * Growth に載せる前の一括判定。個別例はテストに寄せ、ここでは依頼タイプ中心。
  */
-export function requiresExternalRealtimeData(text: string): boolean {
-  if (isExplicitGrowthDevelopmentRequest(text)) return false;
+export function classifyPreGrowthRequest(text: string, parsed: ParsedIntent): PreGrowthClassification {
+  if (isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text)) {
+    return {
+      category: "growth_explicit",
+      allowGrowth: true,
+      preferLlmFallback: false,
+      useShortExternalReply: false,
+      reason: "persistent_feature_or_admin_growth_command",
+    };
+  }
+
+  if (impliesLiveDataOrExternalOneShot(text)) {
+    return {
+      category: "external_realtime_answer",
+      allowGrowth: false,
+      preferLlmFallback: false,
+      useShortExternalReply: true,
+      reason: "likely_one_off_live_or_external_fact",
+    };
+  }
+
   const t = text.normalize("NFKC").trim();
-  if (!t) return false;
-  if (/天気|気温|降水|台風|傘が必要|暑さ指数/i.test(t) && /(教えて|調べて|はどう|どう\?|？|予報|今日|明日|週間)/i.test(t)) return true;
-  if (/(ニュース|速報|ヘッドライン).*(教えて|調べて|最新)/i.test(t)) return true;
-  if (/(株価|為替|円ドル|ドル円|日経|NASDAQ).*(教えて|いくら|どう)/i.test(t)) return true;
-  if (/(近くの|周辺の|徒歩圏|今営業|営業中).{0,12}(店|レストラン|カフェ)/i.test(t)) return true;
-  if (/(今の|リアルタイム|最新の).{0,12}(状況|情報|件数|人数)/i.test(t)) return true;
-  if (/為替レート|指数は/i.test(t)) return true;
-  if (/最新情報.{0,10}(調べて|を調べ|教えて|は)/i.test(t)) return true;
-  if (/(今日|本日)のイベント/i.test(t)) return true;
-  if (/(店|飲食店).{0,8}(探して|検索して)/i.test(t) && /(近く|周辺|付近)/i.test(t)) return true;
-  return false;
+  if (parsed.intent === "unknown_custom_request" && [...t].length > 0 && [...t].length <= 4) {
+    return {
+      category: "needs_clarification",
+      allowGrowth: false,
+      preferLlmFallback: true,
+      useShortExternalReply: false,
+      reason: "too_short_ambiguous",
+    };
+  }
+
+  // 既定: モジュールに当たらなかったらまず AI 秘書（LLM）で理解・回答を試みる
+  return {
+    category: parsed.intent === "unknown_custom_request" ? "unknown" : "llm_answerable",
+    allowGrowth: false,
+    preferLlmFallback: true,
+    useShortExternalReply: false,
+    reason: "default_ai_secretary_llm_first",
+  };
 }
+
+/** @deprecated classifyPreGrowthRequest の結果を参照 */
+export function requiresExternalRealtimeData(text: string): boolean {
+  return impliesLiveDataOrExternalOneShot(text);
+}
+
+/** @deprecated classifyPreGrowthRequest の llm / unknown / needs_clarification に相当 */
+export function isAiAnswerableHeuristic(text: string, parsed: ParsedIntent): boolean {
+  const c = classifyPreGrowthRequest(text, parsed);
+  return c.category === "llm_answerable" || c.category === "unknown" || c.category === "needs_clarification";
+}
+
+/** @deprecated */
+export const canAnswerWithLLMFallback = isAiAnswerableHeuristic;
 
 export function buildExternalCapabilityNeededReply(): string {
   return [
-    "それは外部情報や専用連携が必要な内容かもしれません。今のNEARだけでは、この場で正確に実行した結果をお出しすることが難しいです。",
+    "リアルタイムの外部データや、専用の連携がないと正確に出せない内容かもしれません。今のNEARだけでは、この場で確定値をお出しすることが難しいです。",
     "",
-    "NEARの機能として追加したい場合は、例えば",
+    "NEARの機能として組み込みたい場合は、例えば",
     "「この機能を追加して」",
     "のように送ってください。成長候補として整理できます。",
   ].join("\n");
 }
 
-/** @deprecated 名称変更前の互換 */
 export const buildExternalRealtimeNeededReply = buildExternalCapabilityNeededReply;
+
+/**
+ * 単発の Issue 作成依頼（既存フロー／管理者経路）。issue\s*作って 等の Growth ヒューリスティクスと区別する。
+ */
+export function isStandaloneGithubIssueCreatePhrase(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (!/^(GitHub|ギットハブ).{0,24}(Issue|イシュー).{0,14}(作って|作成して|起票して)/i.test(t)) return false;
+  if (/(自動|できるように|実装して|連携)/i.test(t)) return false;
+  return true;
+}
 
 export function buildUnknownClarifyReply(): string {
   return [
@@ -91,12 +140,20 @@ export function buildUnknownClarifyReply(): string {
   ].join("\n");
 }
 
-/** growth_suggestion_gate: 記録済み unsupported に対し suggestion を進めてよいかの追加判定 */
+/**
+ * Growth 提案ゲート用: AI-first で巻き取るべきものは候補化しない。
+ * LLM 失敗後にヒューリスティック Growth へ進む場合は looksLikeGrowth が true になり得るため、
+ * そのときは allow（明示的な機能拡張っぽさ）を優先する。
+ */
 export function shouldAllowGrowthSuggestionAfterPreRouter(text: string, parsed: ParsedIntent): boolean {
-  if (requiresExternalRealtimeData(text) && !isExplicitGrowthDevelopmentRequest(text)) return false;
-  if (isAiAnswerableHeuristic(text, parsed)) return false;
-  if (isForcedGrowthOrIssueCommand(text)) return true;
-  if (isExplicitGrowthDevelopmentRequest(text)) return true;
+  const c = classifyPreGrowthRequest(text, parsed);
+  if (c.category === "external_realtime_answer") return false;
+  if (isStandaloneGithubIssueCreatePhrase(text)) return false;
+  if (c.category === "growth_explicit" && c.allowGrowth) return true;
+  if (c.category === "needs_clarification") return false;
+  if (c.category === "llm_answerable" || c.category === "unknown") {
+    if (!looksLikeGrowthFeatureRequest(text)) return false;
+  }
   if (looksLikeGrowthFeatureRequest(text)) return true;
   return true;
 }

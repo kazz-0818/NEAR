@@ -15,6 +15,7 @@
 
 import type { Db } from "../db/client.js";
 import { hasPendingSheetPick } from "../db/user_sheet_pending_pick_repo.js";
+import { getSessionMemoryValue } from "../services/conversation_session_memory.js";
 import {
   isExplicitInternalTaskListRequest,
   isExplicitReminderListRequest,
@@ -225,10 +226,18 @@ export async function resolveConversationTurn(input: {
       .catch((): ReminderRow[] => []);
 
     if (rows.length > 0) {
+      let chosen = rows;
+      if (rows.length > 1) {
+        const mem = await getSessionMemoryValue<{ id: number }>(db, channelUserId, "latest_reminder_created");
+        if (mem && typeof mem.id === "number") {
+          const one = rows.filter((r) => r.id === mem.id);
+          if (one.length === 1) chosen = one;
+        }
+      }
       return {
         kind: "reminder_time_update",
         newTimeText: updateTimeText,
-        recentReminders: rows,
+        recentReminders: chosen,
       };
     }
     // 直近リマインドなし → fall through (通常の reminder_request ルートへ)

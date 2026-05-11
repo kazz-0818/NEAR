@@ -37,6 +37,15 @@ LINE 会話ログから、**NEAR の返答品質・文脈理解・ルーティ�
 - 短時間に似た内容を何度も言い直し  
 - ルーティング上のヒューリスティック（例: 構造化 intent なのに LLM フォールバック、モジュール unsupported 後に Growth など）
 
+### ワンクリック・手動で候補に載せる（v1 運用）
+
+次のような LINE 発話は、**即 GitHub Issue 化せず** `improvement_candidates` に保存されます（`NEAR_IMPROVEMENT_CAPSULES_ENABLED` が有効なとき）。直近の会話ウィンドウ・直前の `routing_traces` と紐付けて保存します。
+
+- 「今の返答おかしい」「カプセル化して」「ルーティングミスとして保存して」など  
+- Drive／Sheets 候補選択をユーザーが拒否したあと（`user_rejected_route` など）
+
+詳細コマンドと権限は `docs/near-debug-operations.md` を参照してください。
+
 ## カプセル生成（improvement_capsules）
 
 - バッチごとに `analysis_batch_id`（UUID）を付与。  

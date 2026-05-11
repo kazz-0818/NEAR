@@ -49,7 +49,7 @@ export function parseTaskTargetNumber(text: string): number | null {
 export function parseReminderWhenDescription(text: string): string | null {
   const t = text.normalize("NFKC");
   const m = t.match(
-    /((?:あと\s*)?\d+\s*(?:秒|分|時間)後|明日\s*\d{1,2}時(?:\d{1,2}分)?|今日\s*\d{1,2}時(?:\d{1,2}分)?|明日|今日)/u
+    /((?:あと\s*)?\d+\s*(?:秒|分|時間)後|明日\s*の?\s*\d{1,2}時(?:\d{1,2}分)?|今日\s*の?\s*\d{1,2}時(?:\d{1,2}分)?|明日|今日)/u
   );
   return m?.[1]?.trim() ?? null;
 }

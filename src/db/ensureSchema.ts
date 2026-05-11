@@ -50,6 +50,7 @@ const MIGRATION_FILES = [
   "041_growth_pr_tracking.sql",
   "042_unsupported_routing_category.sql",
   "043_improvement_capsules.sql",
+  "044_routing_trace_session_memory.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

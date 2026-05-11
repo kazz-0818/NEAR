@@ -299,3 +299,9 @@ NEAR は **「できないことを記録するだけのボット」ではない
 | 1 | unsupported 強化、gap メタ、提案・承認・ヒアリング・cursor・手動 | ほぼ既存 + DB 列 + 観測 |
 | 2 | runner 抽象の明確化、registry の version/request_mode、状態マシン集約 | リファクタ中心 |
 | 3 | 自動 coding/testing/deploy、execution_log 強化 | 環境変数 + アダプタ |
+
+---
+
+## 付記: ルーティング可観測性（運用 v1）
+
+会話ごとの LLM 改善分析は行わない前提のまま、**ルーティング要約**（`routing_traces`）と**短期セッションメモリ**（`conversation_session_memory`）で「なぜそうなったか」と「これ／1番」の解決を補助する。詳細は `docs/near-debug-operations.md`。

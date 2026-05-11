@@ -3,6 +3,7 @@ import {
   parseRelativeReminderAt,
 } from "../lib/datetimeContext.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
+import { upsertSessionMemory } from "../services/conversation_session_memory.js";
 
 function parseIso(s: unknown): Date | null {
   if (typeof s !== "string" || !s.trim()) return null;
@@ -31,9 +32,10 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
   }
 
   if (iso) {
-    await ctx.db.query(
+    const ins = await ctx.db.query<{ id: number }>(
       `INSERT INTO reminders (channel, channel_user_id, actor_user_id, group_id, remind_at, message, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+       RETURNING id`,
       [
         ctx.channel,
         ctx.channelUserId,
@@ -43,6 +45,17 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
         message,
       ]
     );
+    const rid = ins.rows[0]?.id;
+    if (rid != null) {
+      void upsertSessionMemory(ctx.db, {
+        channelUserId: ctx.channelUserId,
+        memoryType: "latest_reminder_created",
+        value: { id: rid, message, remind_at: iso.toISOString() },
+        sourceMessageId: ctx.inboundMessageId,
+        sourceRoute: "reminder_manager",
+        expiresAt: new Date(Date.now() + 120 * 60 * 1000),
+      });
+    }
 
     const when = iso.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
     return {

@@ -25,7 +25,7 @@ import {
 import { normalizeUserUtterance } from "../lib/utteranceNormalizer.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
 import { resolveSemanticOperation } from "../services/semantic_operation_resolver.js";
-import { isTaskManagementCommand, tryHandleTaskLine } from "../services/task_line.js";
+import { isTaskManagementCommand, tryHandleTaskLine, type TaskLineResult } from "../services/task_line.js";
 import { tryResolveReminderFromRecentTaskList } from "../services/task_reminder_router.js";
 import { extractTaskItemsFromAssistantMessages, parseTaskTargetNumber } from "../lib/taskListContext.js";
 import {
@@ -37,10 +37,25 @@ import {
   applyReminderTimeUpdate,
   resolveConversationTurn,
 } from "../lib/conversationTurnResolver.js";
+import type { UserRole } from "../db/user_roles_repo.js";
+import { hasRole } from "../lib/permissions.js";
+import type { RoutingTracePatch } from "../services/routing_trace_service.js";
+import { getLatestRoutingTraceBeforeInbound } from "../services/routing_trace_service.js";
+import {
+  formatRoutingDebugReportForLine,
+  isRoutingDebugQuery,
+  matchOneClickImprovementQuery,
+} from "../services/routing_debug_command.js";
+import { saveOneClickImprovementCandidate, saveUserRejectedRouteCandidate } from "../services/improvement_manual_capture.js";
+import {
+  getSessionMemoryValue,
+  upsertSessionMemory,
+} from "../services/conversation_session_memory.js";
+import type { TaskListItem } from "../lib/taskListContext.js";
 
 export type ThinRouterResult =
-  | { handled: true; finalText: string }
-  | { handled: false; forceIntent?: string; forceRequiredParams?: Record<string, unknown> };
+  | { handled: true; finalText: string; routingTracePatch?: RoutingTracePatch }
+  | { handled: false; forceIntent?: string; forceRequiredParams?: Record<string, unknown>; routingTracePatch?: RoutingTracePatch };
 
 function looksLikeContextDependentShortTaskText(text: string): boolean {
   const t = text.normalize("NFKC").trim();
@@ -69,13 +84,42 @@ export async function runThinRouterPhase(input: {
   recentUserMessages?: string[];
   recentAssistantMessages?: string[];
   quotedAssistantMessage?: string;
+  /** ルーティングデバッグ用（省略時は guest） */
+  actorRole?: UserRole;
 }): Promise<ThinRouterResult> {
   const log = getLogger();
-  const { db, env, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType, recentUserMessages, recentAssistantMessages, quotedAssistantMessage } = input;
+  const {
+    db,
+    env,
+    channelUserId,
+    actorUserId,
+    groupId,
+    text,
+    inboundMessageId,
+    lineSourceType,
+    recentUserMessages,
+    recentAssistantMessages,
+    quotedAssistantMessage,
+    actorRole: actorRoleInput,
+  } = input;
+  const actorRoleResolved: UserRole = actorRoleInput ?? "guest";
 
   const effectiveActorId = actorUserId ?? channelUserId;
   // グループでは groupId、1:1 では actorUserId をチャンネルスコープとして使う
   const channelId = groupId ?? effectiveActorId;
+
+  async function persistTaskLineSessionMemory(taskResult: TaskLineResult): Promise<void> {
+    const w = taskResult.sessionMemoryWrite;
+    if (!w) return;
+    await upsertSessionMemory(db, {
+      channelUserId,
+      memoryType: w.memoryType,
+      value: w.value,
+      sourceMessageId: inboundMessageId != null && inboundMessageId > 0 ? inboundMessageId : null,
+      sourceRoute: "task_line",
+      expiresAt: new Date(Date.now() + w.ttlMinutes * 60 * 1000),
+    }).catch(() => {});
+  }
 
   // 権限操作の保留応答（はい / 番号 / キャンセル）を最優先で処理
   // ※ sheet pick の短文チェックより前に実行して権限フローが sheet pick に誤爆しないようにする
@@ -91,11 +135,101 @@ export async function runThinRouterPhase(input: {
   }
 
   const textNorm = text.normalize("NFKC").trim();
+  const inboundId = inboundMessageId ?? 0;
+
+  // ──────────────────────────────────────────────────────────────
+  // 2. ルーティング判定レポート（管理者以上。pending より優先）
+  // ──────────────────────────────────────────────────────────────
+  if (inboundId > 0 && isRoutingDebugQuery(textNorm)) {
+    if (hasRole(actorRoleResolved, "admin")) {
+      const prev = await getLatestRoutingTraceBeforeInbound(db, channelUserId, inboundId);
+      const body = prev
+        ? formatRoutingDebugReportForLine(prev)
+        : "直前のルーティング記録がまだありません。";
+      return {
+        handled: true,
+        finalText: body,
+        routingTracePatch: { route: "routing_debug_report", reason: "admin_routing_trace_request" },
+      };
+    }
+    return {
+      handled: true,
+      finalText: "ルーティングの詳細は管理者向けです。",
+      routingTracePatch: { route: "routing_debug_denied" },
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // 3. ワンクリック改善候補（即 Issue 化しない / pending より優先）
+  // ──────────────────────────────────────────────────────────────
+  if (inboundId > 0) {
+    const oneClick = matchOneClickImprovementQuery(textNorm);
+    if (oneClick) {
+      const priorNear =
+        recentAssistantMessages && recentAssistantMessages.length > 0
+          ? recentAssistantMessages[recentAssistantMessages.length - 1]!
+          : "";
+      const priorUser =
+        recentUserMessages && recentUserMessages.length > 0
+          ? recentUserMessages[recentUserMessages.length - 1]!
+          : undefined;
+      const r = await saveOneClickImprovementCandidate({
+        db,
+        channelUserId,
+        inboundMessageId: inboundId,
+        userText: text,
+        kind: oneClick,
+        priorNearReply: priorNear || "（直前の返答が取得できませんでした）",
+        priorUserMessage: priorUser,
+      });
+      const ack = r.inserted
+        ? "直前の会話を改善候補として保存しました。\n\n日次または手動で「改善カプセル分析して」と送るとまとめ分析できます。"
+        : "同じ理由の改善候補は直近ですでに登録済みです。";
+      return {
+        handled: true,
+        finalText: ack,
+        routingTracePatch: { route: "manual_improvement_capture", used_improvement_capsule_candidate: true },
+      };
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // 3b. 直近リマインド一覧メモリからの N 番削除
+  // ──────────────────────────────────────────────────────────────
+  if (
+    inboundId > 0 &&
+    !isExplicitGrowthDevelopmentRequest(text) &&
+    !isForcedGrowthOrIssueCommand(text)
+  ) {
+    const remDel = textNorm.match(/^(\d{1,2})\s*番?(?:を|は)?(?:削除|消して)(?:して)?$/u);
+    if (remDel) {
+      const mem = await getSessionMemoryValue<{ items: Array<{ index: number; id: number; message: string }> }>(
+        db,
+        channelUserId,
+        "latest_reminder_list"
+      );
+      if (mem?.items?.length) {
+        const n = parseInt(remDel[1]!, 10);
+        const hit = mem.items.find((x) => x.index === n);
+        if (hit) {
+          try {
+            await db.query(`DELETE FROM reminders WHERE id = $1 AND actor_user_id = $2`, [hit.id, effectiveActorId]);
+            return {
+              handled: true,
+              finalText: `了解。${n}番「${hit.message}」のリマインドを削除しました。`,
+              routingTracePatch: { route: "internal_reminder_delete", reminder_used: true },
+            };
+          } catch (e) {
+            log.warn({ err: e }, "session memory reminder delete failed");
+          }
+        }
+      }
+    }
+  }
 
   // ================================================================
-  // 【最上流】Conversation Turn Resolver
-  // pending チェックより前に「この発言は何の続きか」を判定する。
-  // 優先度: 混乱/否定 > リマインド一覧 > 内部タスクリスト > リマインド時間変更
+  // 【Conversation Turn Resolver】混乱・一覧・内部タスク・時刻変更
+  // pending より前に「この発言は何の続きか」を判定する。
   // ================================================================
   const turnRes = await resolveConversationTurn({
     db,
@@ -107,11 +241,35 @@ export async function runThinRouterPhase(input: {
     quotedAssistantMessage,
   });
 
-  // B. 混乱・否定 + stale pending → 解除して謝罪
+  // B. 混乱・否定 + stale pending → 解除して謝罪 + 改善候補
   if (turnRes.kind === "clear_stale_pending") {
     await clearPendingSheetPick(db, channelUserId).catch(() => {});
     log.info({ channelUserId, reason: turnRes.reason }, "conversationTurnResolver: clear_stale_pending");
-    return { handled: true, finalText: turnRes.apologyText };
+    if (inboundId > 0) {
+      const priorNear =
+        recentAssistantMessages && recentAssistantMessages.length > 0
+          ? recentAssistantMessages[recentAssistantMessages.length - 1]!
+          : "";
+      if (priorNear) {
+        void saveUserRejectedRouteCandidate({
+          db,
+          channelUserId,
+          inboundMessageId: inboundId,
+          userText: text,
+          priorNearReply: priorNear,
+        }).catch(() => {});
+      }
+    }
+    return {
+      handled: true,
+      finalText: turnRes.apologyText,
+      routingTracePatch: {
+        route: "clear_stale_pending",
+        cleared_pending: true,
+        used_pending: true,
+        pending_type: "sheet_pick",
+      },
+    };
   }
 
   // C. リマインド一覧 → NEAR 内部 DB から取得（Drive/Sheets に流さない）
@@ -131,9 +289,11 @@ export async function runThinRouterPhase(input: {
           handled: true,
           finalText:
             "現在設定中のリマインドはありません。\n\nリマインドを設定する場合は「明日14時にEC出品を通知して」のように送ってください。",
+          routingTracePatch: { route: "internal_reminder_list", reminder_used: true },
         };
       }
       const lines: string[] = ["現在のリマインド一覧です。", ""];
+      const memItems: Array<{ index: number; id: number; message: string; remind_at: string }> = [];
       for (let i = 0; i < result.rows.length; i++) {
         const r = result.rows[i]!;
         const dt = new Date(r.remind_at).toLocaleString("ja-JP", {
@@ -147,9 +307,22 @@ export async function runThinRouterPhase(input: {
         lines.push(`${i + 1}. ${r.message}`);
         lines.push(`   通知日時：${dt}`);
         lines.push("");
+        memItems.push({ index: i + 1, id: r.id, message: r.message, remind_at: r.remind_at });
       }
       lines.push("変更する場合は「1番を15時に変更」「2番を削除」のように送ってください。");
-      return { handled: true, finalText: lines.join("\n") };
+      void upsertSessionMemory(db, {
+        channelUserId,
+        memoryType: "latest_reminder_list",
+        value: { items: memItems },
+        sourceMessageId: inboundId > 0 ? inboundId : null,
+        sourceRoute: "internal_reminder_list",
+        expiresAt: new Date(Date.now() + 90 * 60 * 1000),
+      }).catch(() => {});
+      return {
+        handled: true,
+        finalText: lines.join("\n"),
+        routingTracePatch: { route: "internal_reminder_list", reminder_used: true, cleared_pending: true },
+      };
     } catch (e) {
       log.warn({ err: e }, "reminder list query failed — falling through to LLM");
     }
@@ -184,9 +357,18 @@ export async function runThinRouterPhase(input: {
             minute: "2-digit",
           });
           log.info({ channelUserId, reminderId: r.id, newDate }, "reminder_time_update: updated");
+          void upsertSessionMemory(db, {
+            channelUserId,
+            memoryType: "latest_reminder_updated",
+            value: { id: r.id, message: r.message, remind_at: newDate.toISOString() },
+            sourceMessageId: inboundId > 0 ? inboundId : null,
+            sourceRoute: "reminder_time_update",
+            expiresAt: new Date(Date.now() + 120 * 60 * 1000),
+          }).catch(() => {});
           return {
             handled: true,
             finalText: `了解です。「${r.message}」を${when}に変更しました。`,
+            routingTracePatch: { route: "reminder_time_update", reminder_used: true },
           };
         } catch (e) {
           log.warn({ err: e }, "reminder_time_update: DB update failed — falling through");
@@ -206,6 +388,7 @@ export async function runThinRouterPhase(input: {
       return {
         handled: true,
         finalText: `どのリマインドを${newTimeText}に変更しますか？\n\n${list}\n\n番号で教えてください。`,
+        routingTracePatch: { route: "reminder_time_update_ambiguous", reminder_used: true },
       };
     }
     // 変換失敗 or 過去時刻 → fall through
@@ -240,18 +423,28 @@ export async function runThinRouterPhase(input: {
       : false;
     if (hasPick) {
       log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
-      return { handled: false, forceIntent: "google_sheets_query" };
+      return {
+        handled: false,
+        forceIntent: "google_sheets_query",
+        routingTracePatch: { route: "google_sheets_query_pending_pick", used_pending: true, sheet_used: true },
+      };
     }
   }
 
   // タスク参照・リマインダー・タスク管理コマンドも Growth 要望・混乱シグナル時はスキップ
   if (!isGrowthRequest && !isConfusion) {
+    const sessionTaskMem = await getSessionMemoryValue<{ items: TaskListItem[] }>(db, channelUserId, "latest_task_list");
+    const sessionTaskCreated = await getSessionMemoryValue<{ title: string }>(db, channelUserId, "latest_task_created");
+
     const directRefNumber = parseTaskTargetNumber(textNorm);
     const looksLikeOnlyReference = directRefNumber != null && /^(?:[1-9][0-9]*\s*(?:番|ばん|つ目|個目)?|一番|いちばん|一つ目|ひとつめ|最初|上のやつ)$/u.test(textNorm);
     if (looksLikeOnlyReference) {
-      const items = extractTaskItemsFromAssistantMessages(
+      let items = extractTaskItemsFromAssistantMessages(
         quotedAssistantMessage ? [...(recentAssistantMessages ?? []), quotedAssistantMessage] : (recentAssistantMessages ?? [])
       );
+      if (items.length === 0 && sessionTaskMem?.items?.length) {
+        items = sessionTaskMem.items;
+      }
       const item = items.find((x) => x.number === directRefNumber);
       if (item) {
         return {
@@ -274,6 +467,8 @@ export async function runThinRouterPhase(input: {
       recentAssistantMessages,
       quotedAssistantMessage: quotedAssistantMessage ?? undefined,
       inboundMessageId,
+      sessionTaskList: sessionTaskMem?.items ?? null,
+      sessionLatestTaskTitle: sessionTaskCreated?.title ?? null,
     });
     if (reminderByList.matched) {
       if (reminderByList.mode === "resolved") {
@@ -343,6 +538,7 @@ export async function runThinRouterPhase(input: {
         quotedAssistantMessage: quotedAssistantMessage ?? undefined,
       });
       if (taskResult.handled) {
+        await persistTaskLineSessionMemory(taskResult);
         return { handled: true, finalText: taskResult.reply };
       }
     }
@@ -368,6 +564,7 @@ export async function runThinRouterPhase(input: {
         quotedAssistantMessage: quotedAssistantMessage ?? undefined,
       });
       if (taskResult.handled) {
+        await persistTaskLineSessionMemory(taskResult);
         return { handled: true, finalText: taskResult.reply };
       }
     }
@@ -592,6 +789,7 @@ export async function runThinRouterPhase(input: {
         });
         if (taskResult.handled) {
           logSemanticAdopt("task_line_semantic");
+          await persistTaskLineSessionMemory(taskResult);
           return { handled: true, finalText: taskResult.reply };
         }
       }

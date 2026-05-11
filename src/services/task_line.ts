@@ -18,8 +18,21 @@ import type { Db } from "../db/client.js";
 import { getLogger } from "../lib/logger.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
 import { extractTaskItemsFromAssistantMessages } from "../lib/taskListContext.js";
+import type { SessionMemoryType } from "./conversation_session_memory.js";
 
 const log = getLogger();
+
+export type TaskLineSessionMemoryWrite = {
+  memoryType: SessionMemoryType;
+  value: unknown;
+  ttlMinutes: number;
+};
+
+export type TaskLineResult = {
+  handled: boolean;
+  reply: string;
+  sessionMemoryWrite?: TaskLineSessionMemoryWrite;
+};
 
 type TaskRow = {
   id: string;
@@ -178,7 +191,7 @@ export async function tryHandleTaskLine(input: {
   groupId?: string;
   recentAssistantMessages?: string[];
   quotedAssistantMessage?: string;
-}): Promise<{ handled: boolean; reply: string }> {
+}): Promise<TaskLineResult> {
   const { db, channelUserId, actorUserId, groupId, recentAssistantMessages = [], quotedAssistantMessage } = input;
   const t = input.text.normalize("NFKC").replace(/\s+/g, " ").trim();
   const inTaskContext = hadRecentTaskListReply(recentAssistantMessages);
@@ -212,13 +225,23 @@ export async function tryHandleTaskLine(input: {
     }
     const taskScope = groupId ? "group" : "personal";
     try {
-      await db.query(
+      const ins = await db.query<{ id: string }>(
         `INSERT INTO tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, status, created_at, updated_at)
-         VALUES ('line', $1, $2, $3, $4, $5, NULL, 'open', now(), now())`,
+         VALUES ('line', $1, $2, $3, $4, $5, NULL, 'open', now(), now())
+         RETURNING id::text`,
         [channelUserId, actorUserId, groupId ?? null, taskScope, title]
       );
+      const taskId = ins.rows[0]?.id ?? "";
       log.info({ title, actorUserId }, "task added");
-      return { handled: true, reply: `✅ 「${title}」をタスクに追加しました。` };
+      return {
+        handled: true,
+        reply: `✅ 「${title}」をタスクに追加しました。`,
+        sessionMemoryWrite: {
+          memoryType: "latest_task_created",
+          value: { id: taskId, title },
+          ttlMinutes: 120,
+        },
+      };
     } catch (e) {
       log.error({ err: e }, "task add failed");
       return { handled: true, reply: "タスクの追加中にエラーが発生しました。" };
@@ -381,7 +404,21 @@ export async function tryHandleTaskLine(input: {
   if (LIST_RE.test(t)) {
     try {
       const tasks = await fetchActiveTasks(db, channelUserId, groupId, actorUserId);
-      return { handled: true, reply: formatTaskList(tasks, groupId) };
+      const items = tasks.map((row, i) => ({
+        number: i + 1,
+        title: row.title,
+        id: row.id,
+        scope: row.task_scope,
+      }));
+      return {
+        handled: true,
+        reply: formatTaskList(tasks, groupId),
+        sessionMemoryWrite: {
+          memoryType: "latest_task_list",
+          value: { items },
+          ttlMinutes: 120,
+        },
+      };
     } catch (e) {
       log.error({ err: e }, "task list failed");
       return { handled: true, reply: "タスクの取得中にエラーが発生しました。" };

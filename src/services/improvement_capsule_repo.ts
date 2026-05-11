@@ -93,6 +93,98 @@ export async function insertImprovementCandidateOrSkip(
   return { inserted: true };
 }
 
+/** 改善候補用: 直近のユーザー発話と NEAR 返信のペア（最大 maxPairs 件・古い順） */
+export async function buildConversationWindowForCandidate(
+  db: Db,
+  channelUserId: string,
+  beforeInboundId: number,
+  maxPairs = 10
+): Promise<{ turns: Array<{ user: string; assistant: string }> }> {
+  try {
+    const r = await db.query<{ user_text: string | null; assistant_text: string | null }>(
+      `WITH recent AS (
+         SELECT id, text FROM inbound_messages
+         WHERE channel = 'line' AND channel_user_id = $1 AND id < $2
+           AND text IS NOT NULL AND btrim(text) <> ''
+         ORDER BY id DESC
+         LIMIT $3
+       )
+       SELECT r.text AS user_text,
+              (SELECT o.text FROM outbound_messages o
+               WHERE o.channel = 'line' AND o.channel_user_id = $1 AND o.inbound_message_id = r.id
+               ORDER BY o.id DESC LIMIT 1) AS assistant_text
+       FROM recent r
+       ORDER BY r.id ASC`,
+      [channelUserId, beforeInboundId, maxPairs]
+    );
+    const turns = r.rows.map((row) => ({
+      user: (row.user_text ?? "").trim(),
+      assistant: (row.assistant_text ?? "").trim(),
+    }));
+    return { turns };
+  } catch {
+    return { turns: [] };
+  }
+}
+
+/**
+ * 手動の改善候補保存（ワンクリック・ルート拒否など）。即 Issue 化しない。
+ * conversation_window_json / routing_trace_id は任意。
+ */
+export async function insertImprovementCandidateManual(
+  db: Db,
+  input: {
+    channelUserId: string;
+    inboundMessageId: number;
+    triggerMessageId: string;
+    triggerReason: string;
+    userMessage: string;
+    nearReply: string;
+    parsed: ParsedIntent | null;
+    routeTaken: string;
+    moduleName: string | null;
+    usedLlmFallback: boolean;
+    usedGrowthPipeline: boolean;
+    conversationWindowJson?: unknown;
+    routingTraceId?: string | null;
+    expectedRouteHint?: string | null;
+  }
+): Promise<{ inserted: boolean }> {
+  const dup = await db.query(
+    `SELECT 1 FROM improvement_candidates
+     WHERE inbound_message_id = $1 AND trigger_reason = $2 AND status = 'pending' LIMIT 1`,
+    [input.inboundMessageId, input.triggerReason]
+  );
+  if (dup.rows.length > 0) return { inserted: false };
+
+  await db.query(
+    `INSERT INTO improvement_candidates (
+       channel_user_id, inbound_message_id, trigger_message_id, trigger_reason,
+       user_message, near_reply, parsed_intent, route_taken, module_name,
+       used_llm_fallback, used_growth_pipeline, status,
+       conversation_window_json, routing_trace_id, expected_route_hint
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,'pending',
+       $12::jsonb, $13::uuid, $14)`,
+    [
+      input.channelUserId,
+      input.inboundMessageId,
+      input.triggerMessageId,
+      input.triggerReason,
+      input.userMessage,
+      input.nearReply,
+      JSON.stringify(input.parsed ?? {}),
+      input.routeTaken,
+      input.moduleName,
+      input.usedLlmFallback,
+      input.usedGrowthPipeline,
+      input.conversationWindowJson != null ? JSON.stringify(input.conversationWindowJson) : null,
+      input.routingTraceId ?? null,
+      input.expectedRouteHint ?? null,
+    ]
+  );
+  return { inserted: true };
+}
+
 export async function listPendingImprovementCandidates(db: Db, limit: number): Promise<ImprovementCandidateRow[]> {
   const r = await db.query<ImprovementCandidateRow>(
     `SELECT candidate_id::text, channel_user_id, inbound_message_id::text, trigger_message_id, trigger_reason,

@@ -64,6 +64,8 @@ import {
 import { runLlmFallbackAnswer } from "./llm_fallback_answer.js";
 import { recordImprovementCandidatesIfEligible } from "./improvement_capsule_record.js";
 import type { ImprovementRoutingSnapshot } from "./improvement_capsule_rules.js";
+import { createRoutingTrace, updateRoutingTrace } from "./routing_trace_service.js";
+import type { UserRole } from "../db/user_roles_repo.js";
 
 async function saveIntentRun(
   db: Db,
@@ -85,7 +87,8 @@ async function replyLineAndRememberOutbound(
   lineUserId: string,
   finalText: string,
   log: ReturnType<typeof getLogger>,
-  capsuleSnap?: ImprovementRoutingSnapshot | null
+  capsuleSnap?: ImprovementRoutingSnapshot | null,
+  routingTraceId?: string | null
 ): Promise<void> {
   const sent = await replyOrPush(replyToken, lineUserId, finalText);
   try {
@@ -99,6 +102,25 @@ async function replyLineAndRememberOutbound(
     });
   } catch (e) {
     log.warn({ err: e }, "saveOutboundAssistantText failed");
+  }
+  if (routingTraceId && capsuleSnap) {
+    const sheetHint = /sheet|スプレッド|ガント|シート/i.test(capsuleSnap.routeTaken + (capsuleSnap.moduleName ?? ""));
+    const driveHint = /drive|ドライブ|候補/i.test(capsuleSnap.routeTaken + (capsuleSnap.moduleName ?? ""));
+    void updateRoutingTrace(db, routingTraceId, {
+      route: capsuleSnap.routeTaken,
+      module_name: capsuleSnap.moduleName,
+      intent: capsuleSnap.parsed?.intent ?? null,
+      confidence: capsuleSnap.parsed?.confidence ?? null,
+      reason: capsuleSnap.parsed?.reason ?? null,
+      used_llm_fallback: capsuleSnap.usedLlmFallback,
+      used_growth_pipeline: capsuleSnap.usedGrowthPipeline,
+      sheet_used: sheetHint,
+      drive_used: driveHint,
+      reminder_used: /reminder|リマインド/i.test(capsuleSnap.routeTaken + (capsuleSnap.moduleName ?? "")),
+      task_used: /task|タスク/i.test(capsuleSnap.routeTaken + (capsuleSnap.moduleName ?? "")),
+      github_used: /github|growth/i.test(capsuleSnap.routeTaken),
+      final_reply_summary: finalText.slice(0, 400),
+    }).catch((e) => log.warn({ err: e }, "updateRoutingTrace failed"));
   }
   if (capsuleSnap) {
     void recordImprovementCandidatesIfEligible({
@@ -217,6 +239,14 @@ export async function handleLineTextMessage(input: {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }
 
+  let routingTraceId: string | null = null;
+  try {
+    routingTraceId = await createRoutingTrace(db, { channelUserId, inboundMessageId, userMessage: text });
+  } catch (e) {
+    log.warn({ err: e }, "createRoutingTrace failed");
+  }
+  const actorRole = await getUserRole(db, actorUserId ?? channelUserId).catch(() => "guest" as const);
+
   const thin = await runThinRouterPhase({
     db,
     env,
@@ -229,16 +259,27 @@ export async function handleLineTextMessage(input: {
     recentUserMessages,
     recentAssistantMessages,
     quotedAssistantMessage: quotedAssistantMessage ?? undefined,
+    actorRole,
   });
   if (thin.handled) {
     capSnap.parsed = null;
-    capSnap.routeTaken = "thin_router";
-    capSnap.moduleName = null;
-    capSnap.usedLlmFallback = false;
-    capSnap.usedGrowthPipeline = false;
+    capSnap.routeTaken = thin.routingTracePatch?.route ?? "thin_router";
+    capSnap.moduleName = thin.routingTracePatch?.module_name ?? null;
+    capSnap.usedLlmFallback = thin.routingTracePatch?.used_llm_fallback ?? false;
+    capSnap.usedGrowthPipeline = thin.routingTracePatch?.used_growth_pipeline ?? false;
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log, capSnap);
+    if (routingTraceId && thin.routingTracePatch) {
+      void updateRoutingTrace(db, routingTraceId, thin.routingTracePatch).catch((e) =>
+        log.warn({ err: e }, "merge thin routingTracePatch failed")
+      );
+    }
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log, capSnap, routingTraceId);
     return;
+  }
+  if (routingTraceId && thin.routingTracePatch) {
+    void updateRoutingTrace(db, routingTraceId, thin.routingTracePatch).catch((e) =>
+      log.warn({ err: e }, "merge thin routingTracePatch (unhandled) failed")
+    );
   }
 
   // thinRouter から強制 intent が返った場合は secretary 層・intent 分類をスキップして直接処理する
@@ -268,7 +309,7 @@ export async function handleLineTextMessage(input: {
       capSnap.usedLlmFallback = false;
       capSnap.usedGrowthPipeline = false;
       capSnap.preGrowthCategory = null;
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap, routingTraceId);
       return;
     }
     if ("forceIntent" in pendingClarification && pendingClarification.forceIntent) {
@@ -296,7 +337,7 @@ export async function handleLineTextMessage(input: {
       capSnap.usedLlmFallback = false;
       capSnap.usedGrowthPipeline = false;
       capSnap.preGrowthCategory = null;
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap, routingTraceId);
       return;
     }
   } else {
@@ -341,7 +382,7 @@ export async function handleLineTextMessage(input: {
             capSnap.usedLlmFallback = false;
             capSnap.usedGrowthPipeline = false;
             capSnap.preGrowthCategory = null;
-            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
             return;
           } catch (e) {
             log.warn({ err: e }, "secretary edit_previous_output failed; continuing to intent routing");
@@ -414,7 +455,7 @@ export async function handleLineTextMessage(input: {
             capSnap.usedLlmFallback = false;
             capSnap.usedGrowthPipeline = false;
             capSnap.preGrowthCategory = null;
-            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
             return;
           } catch (e) {
             log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
@@ -611,8 +652,7 @@ export async function handleLineTextMessage(input: {
     }
   }
 
-  // 権限チェック
-  const actorRole = await getUserRole(db, actorUserId ?? channelUserId).catch(() => "guest" as const);
+  // 権限チェック（actorRole は handleLineTextMessage 冒頭で取得済み）
   const requiredRole = requiredRoleForIntent(parsed.intent);
   if (!hasRole(actorRole, requiredRole)) {
     // 【動作確認】restricted（制限ユーザー）には冷たく一言だけ返す
@@ -633,7 +673,7 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = false;
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log, capSnap);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log, capSnap, routingTraceId);
     return;
   }
 
@@ -693,7 +733,7 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = true;
     capSnap.preGrowthCategory = "growth_explicit";
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
     return;
   }
 
@@ -744,7 +784,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = false;
         capSnap.usedGrowthPipeline = false;
         capSnap.preGrowthCategory = null;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
         await maybeRecordAgentPathGrowthSignals({
           db,
           channel,
@@ -821,7 +861,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = false;
         capSnap.usedGrowthPipeline = true;
         capSnap.preGrowthCategory = preGrowth.category;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
         return;
       }
 
@@ -855,7 +895,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = false;
         capSnap.usedGrowthPipeline = false;
         capSnap.preGrowthCategory = preGrowth.category;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
         return;
       }
 
@@ -884,7 +924,7 @@ export async function handleLineTextMessage(input: {
           capSnap.usedLlmFallback = true;
           capSnap.usedGrowthPipeline = false;
           capSnap.preGrowthCategory = preGrowth.category;
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
           return;
         } catch (fe) {
           log.warn({ err: fe }, "llm fallback path failed; falling back to growth or clarify");
@@ -936,7 +976,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = true;
         capSnap.usedGrowthPipeline = true;
         capSnap.preGrowthCategory = preGrowth.category;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
         return;
       }
 
@@ -979,7 +1019,7 @@ export async function handleLineTextMessage(input: {
       capSnap.usedLlmFallback = false;
       capSnap.usedGrowthPipeline = true;
       capSnap.preGrowthCategory = preGrowth.category;
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
       return;
     }
 
@@ -1092,7 +1132,7 @@ export async function handleLineTextMessage(input: {
           capSnap.usedLlmFallback = false;
           capSnap.usedGrowthPipeline = false;
           capSnap.preGrowthCategory = null;
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
           await maybeRecordAgentPathGrowthSignals({
             db,
             channel,
@@ -1148,7 +1188,7 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = Boolean(growthGateForAck);
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
   } catch (e) {
     log.error({ err: e }, "orchestrator pipeline error");
     const draft =
@@ -1169,6 +1209,6 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = false;
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
   }
 }

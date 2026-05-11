@@ -116,9 +116,25 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
         }
       }
 
-      if (pickResult && isValidSpreadsheetId(pickResult.spreadsheetId)) {
-        spreadsheetId = pickResult.spreadsheetId;
-        restoredOriginalQuery = pickResult.originalQuery;
+      if (pickResult) {
+        if (pickResult.spreadsheetId === "SHEETS_CONFIRM_NO") {
+          // ユーザーがキャンセルを選択
+          log.info({ channelUserId: ctx.channelUserId.slice(0, 12) }, "sheets_query: user cancelled sheet read confirmation");
+          return {
+            success: true,
+            draft: "了解しました。スプレッドシートの読み込みをキャンセルしました。\n\n他にお手伝いできることがあればお知らせください。",
+            situation: "success",
+          };
+        }
+        if (pickResult.spreadsheetId === "SHEETS_CONFIRM_YES") {
+          // ユーザーが確認済み: originalQuery でシート検索を続行（spreadsheetId は使わない）
+          log.info({ channelUserId: ctx.channelUserId.slice(0, 12) }, "sheets_query: user confirmed sheet read — proceeding with original query");
+          restoredOriginalQuery = pickResult.originalQuery;
+          // spreadsheetId は null のまま → Drive 検索で候補を探す
+        } else if (isValidSpreadsheetId(pickResult.spreadsheetId)) {
+          spreadsheetId = pickResult.spreadsheetId;
+          restoredOriginalQuery = pickResult.originalQuery;
+        }
       }
     } catch (e) {
       log.warn({ err: e }, "tryConsumePendingSheetPick failed");

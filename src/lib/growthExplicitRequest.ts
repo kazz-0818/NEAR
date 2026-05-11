@@ -91,7 +91,36 @@ export function isUserConfusionOrNegationSignal(text: string): boolean {
   if (/(うまくいってない|うまくいかない|うまくいかん|機能してない|機能しない|返答がおかしい|おかしい返答)/u.test(t)) return true;
   // 短い嘆き（あー/もー + 感嘆符 or 単体で終わる）
   if ([...t].length <= 6 && /^(あー|あーあ|あーだめ|もー|もーやだ|やだ|はあ|ふう)[！!。]?$/u.test(t)) return true;
+  // Drive / Sheets モジュール拒否（「ドライブじゃないよー」「そうじゃない」等）
+  if (
+    /(ドライブじゃない|ドライブではない|Driveじゃない|Driveではない|スプレッドじゃない|スプシじゃない|シートじゃない|ファイルじゃない|検索じゃない|そうじゃない|そうじゃなくて|そういうんじゃない|そういうのじゃない|そういうことじゃなく)/u.test(t)
+  ) {
+    return true;
+  }
   return false;
+}
+
+/**
+ * ユーザーが NEAR 内部のリマインド一覧を要求しているか。
+ * Drive/Sheets に流さず、必ず内部リマインド一覧を返すために使う。
+ */
+export function isExplicitReminderListRequest(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (!t) return false;
+  return /(リマインド(の)?(一覧|リスト|見せて|だして|出して|確認|状況|何|どれ|どんな|設定|表示|教えて)|リマインダー(の)?(一覧|リスト|見せて|だして|出して|確認)|通知(一覧|リスト|確認|設定|見せて|だして|出して)|設定中の?リマインド|何をリマインド|リマインドは何|リマインドどれ|予定通知(一覧|見せて|だして|確認))/u.test(t);
+}
+
+/**
+ * ユーザーが NEAR 内部の個人タスクリストを要求しているか（スプレッドシート明示なし）。
+ * スプレッドシート/ガントチャート等の明示がない「タスクリスト/タスク一覧」はここで捕捉する。
+ */
+export function isExplicitInternalTaskListRequest(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (!t) return false;
+  // スプレッドシート/ガントチャート/シート等の明示がある場合は除外（sheets ルートへ）
+  if (/(スプレッドシート|スプシ|Googleシート|ガントチャート|タスク管理表)/iu.test(t)) return false;
+  if (/シート.{0,10}タスク|タスク.{0,10}シート/iu.test(t)) return false;
+  return /(タスクリスト(出して|見せて|だして|確認|一覧)?|タスク一覧(出して|見せて|だして|確認)?|個人タスク(一覧|リスト|出して|見せて)|自分のタスク(一覧|リスト|出して|見せて)?|俺のタスク(一覧|出して)?)/u.test(t);
 }
 
 /**

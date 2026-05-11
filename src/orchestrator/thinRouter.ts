@@ -17,8 +17,10 @@ import {
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
 import { tryHandlePermissionLine, tryConsumePendingPermOp } from "../services/permission_line.js";
 import {
+  clearPendingSheetPick,
   hasPendingSheetPick,
   isPendingSheetPickIndexMessage,
+  savePendingSheetPick,
 } from "../db/user_sheet_pending_pick_repo.js";
 import { normalizeUserUtterance } from "../lib/utteranceNormalizer.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
@@ -28,6 +30,8 @@ import { tryResolveReminderFromRecentTaskList } from "../services/task_reminder_
 import { extractTaskItemsFromAssistantMessages, parseTaskTargetNumber } from "../lib/taskListContext.js";
 import {
   isExplicitGrowthDevelopmentRequest,
+  isExplicitInternalTaskListRequest,
+  isExplicitReminderListRequest,
   isForcedGrowthOrIssueCommand,
   isUserConfusionOrNegationSignal,
 } from "../lib/growthExplicitRequest.js";
@@ -87,21 +91,93 @@ export async function runThinRouterPhase(input: {
   const textNorm = text.normalize("NFKC").trim();
 
   // ----------------------------------------------------------------
-  // Growth 明示要望 / 混乱シグナル: stale pending を一切バイパスする
+  // Growth 明示要望 / 混乱シグナル / リマインド一覧 / 内部タスクリスト:
+  // stale pending を一切バイパスする
   // ----------------------------------------------------------------
   const isGrowthRequest = isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
   const isConfusion = isUserConfusionOrNegationSignal(text);
+  const isReminderListReq = isExplicitReminderListRequest(text);
+  const isInternalTaskListReq = isExplicitInternalTaskListRequest(text);
+
   if (isGrowthRequest) {
     log.info({ channelUserId, textLen: textNorm.length }, "explicit growth request — bypassing stale pending states in thinRouter");
   }
   if (isConfusion) {
     log.info({ channelUserId, textLen: textNorm.length }, "user confusion signal — bypassing stale pending states in thinRouter");
   }
+  if (isReminderListReq) {
+    log.info({ channelUserId, textLen: textNorm.length }, "reminder list request — bypassing stale pending, routing to internal reminder list");
+  }
+  if (isInternalTaskListReq) {
+    log.info({ channelUserId, textLen: textNorm.length }, "internal task list request — bypassing stale pending sheet pick");
+  }
+
+  // ----------------------------------------------------------------
+  // B. 混乱・否定・Drive拒否: stale pending pick を解除して謝罪を返す
+  // ----------------------------------------------------------------
+  if (isConfusion || isReminderListReq || isInternalTaskListReq) {
+    const hadPick = await hasPendingSheetPick(db, channelUserId).catch(() => false);
+    if (hadPick) {
+      await clearPendingSheetPick(db, channelUserId).catch(() => {});
+      if (isConfusion) {
+        log.info({ channelUserId }, "confusion + stale pending pick: cleared pick, returning misroute apology");
+        return {
+          handled: true,
+          finalText:
+            "すみません、直前の返答がズレていました。Drive／スプレッドシートの候補選択は解除しました。\n\n改めて何をお手伝いしましょうか？",
+        };
+      }
+      log.info({ channelUserId, isReminderListReq, isInternalTaskListReq }, "new internal request: cleared stale pending pick");
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // C. リマインド一覧: NEAR 内部 DB から取得して返す（Drive/Sheets に流さない）
+  // ----------------------------------------------------------------
+  if (isReminderListReq) {
+    try {
+      const result = await db.query<{ id: number; message: string; remind_at: string }>(
+        `SELECT id, message, remind_at
+         FROM reminders
+         WHERE actor_user_id = $1 AND status = 'pending' AND remind_at > now()
+         ORDER BY remind_at ASC LIMIT 20`,
+        [effectiveActorId]
+      );
+      if (result.rows.length === 0) {
+        return {
+          handled: true,
+          finalText:
+            "現在設定中のリマインドはありません。\n\nリマインドを設定する場合は「明日14時にEC出品を通知して」のように送ってください。",
+        };
+      }
+      const lines: string[] = ["現在のリマインド一覧です。", ""];
+      for (let i = 0; i < result.rows.length; i++) {
+        const r = result.rows[i]!;
+        const dt = new Date(r.remind_at).toLocaleString("ja-JP", {
+          timeZone: "Asia/Tokyo",
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        lines.push(`${i + 1}. ${r.message}`);
+        lines.push(`   通知日時：${dt}`);
+        lines.push("");
+      }
+      lines.push(
+        "変更する場合は「1番を15時に変更」「2番を削除」のように送ってください。"
+      );
+      return { handled: true, finalText: lines.join("\n") };
+    } catch (e) {
+      log.warn({ err: e }, "reminder list query failed — falling through to LLM");
+    }
+  }
 
   // スプレッドシート候補選択の保留チェック（タスク管理より先に実行）
   // 「5」「2番」などがタスク文脈に誤爆しないようにするため最優先で確認する
-  // Growth 要望・混乱シグナルは pending pick をバイパスする（misroute 防止）
-  if (!isGrowthRequest && !isConfusion) {
+  // Growth 要望・混乱・リマインド一覧・内部タスクリストは pending pick をバイパスする
+  if (!isGrowthRequest && !isConfusion && !isReminderListReq && !isInternalTaskListReq) {
     const looksLikePick =
       isPendingSheetPickIndexMessage(text) ||
       (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
@@ -175,8 +251,22 @@ export async function runThinRouterPhase(input: {
     );
 
     if (op.kind === "task.list.sheet") {
-      log.info({ channelUserId, reason: op.reason }, "task utterance resolved as task.list.sheet");
-      return { handled: false, forceIntent: "google_sheets_query" };
+      log.info({ channelUserId, reason: op.reason }, "task utterance resolved as task.list.sheet — asking confirmation");
+      // スプレッドシート読取前に確認を挟む（いきなり読まない）
+      await savePendingSheetPick(
+        db,
+        channelUserId,
+        [
+          { id: "SHEETS_CONFIRM_YES", name: "はい、読む" },
+          { id: "SHEETS_CONFIRM_NO", name: "キャンセル" },
+        ],
+        text
+      ).catch(() => {});
+      return {
+        handled: true,
+        finalText:
+          "スプレッドシートのタスク一覧を確認します。読み込んでよろしいですか？\n\n1. はい、読む\n2. キャンセル",
+      };
     }
     if (op.kind === "task.add" && op.extractedText && op.extractedText.length >= 2 && op.confidence >= 0.9) {
       return {
@@ -336,14 +426,28 @@ export async function runThinRouterPhase(input: {
         };
       }
       if (sem.kind === "task.list.sheet" || sem.kind === "sheet.query") {
-        logSemanticAdopt("google_sheets_query");
-        return {
-          handled: false,
-          forceIntent: "google_sheets_query",
-          forceRequiredParams: {
-            semantic_operation: sem,
-          },
-        };
+        // リマインド一覧・内部タスクリスト要求は Sheets に流さない
+        if (isReminderListReq || isInternalTaskListReq) {
+          logSemanticAdopt("sheets_bypassed_for_reminder_or_internal_task_list");
+          // fall through to LLM fallback
+        } else {
+          // スプレッドシート読取前に確認を挟む
+          logSemanticAdopt("google_sheets_query_confirm");
+          await savePendingSheetPick(
+            db,
+            channelUserId,
+            [
+              { id: "SHEETS_CONFIRM_YES", name: "はい、読む" },
+              { id: "SHEETS_CONFIRM_NO", name: "キャンセル" },
+            ],
+            text
+          ).catch(() => {});
+          return {
+            handled: true,
+            finalText:
+              "スプレッドシートを確認します。読み込んでよろしいですか？\n\n1. はい、読む\n2. キャンセル",
+          };
+        }
       }
       if (sem.kind === "calendar.query") {
         logSemanticAdopt("google_calendar_query");

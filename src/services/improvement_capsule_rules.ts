@@ -1,6 +1,8 @@
 import type { ParsedIntent } from "../models/intent.js";
 import {
   isExplicitGrowthDevelopmentRequest,
+  isExplicitInternalTaskListRequest,
+  isExplicitReminderListRequest,
   isForcedGrowthOrIssueCommand,
   isUserConfusionOrNegationSignal,
 } from "../lib/growthExplicitRequest.js";
@@ -135,6 +137,52 @@ export function collectLocalRuleHits(text: string, snap: ImprovementRoutingSnaps
     hits.push({
       triggerReason: "pending_followup_misroute",
       label: "pending follow-up が Growth 要望を誤ルーティング",
+    });
+  }
+
+  // ミスルート検知: リマインド一覧が Drive/Sheets に流れた
+  if (
+    isExplicitReminderListRequest(text) &&
+    snap.moduleName === "google_sheets_query"
+  ) {
+    hits.push({
+      triggerReason: "drive_misroute_for_reminder_list",
+      label: "リマインド一覧が Drive/Sheets に誤ルーティング",
+    });
+  }
+
+  // ミスルート検知: タスクリストが Sheets に流れた
+  if (
+    isExplicitInternalTaskListRequest(text) &&
+    snap.moduleName === "google_sheets_query"
+  ) {
+    hits.push({
+      triggerReason: "sheets_misroute_for_task_list",
+      label: "タスクリストが Sheets に誤ルーティング",
+    });
+  }
+
+  // ミスルート検知: ユーザーがルートを拒否（ドライブじゃないよー等）
+  if (
+    isUserConfusionOrNegationSignal(text) &&
+    snap.moduleName === "google_sheets_query"
+  ) {
+    hits.push({
+      triggerReason: "user_rejected_route",
+      label: "ユーザーがDrive/Sheetsルートを拒否",
+    });
+  }
+
+  // ミスルート検知: stale pending follow-up が内部機能要求を上書き
+  if (
+    (isExplicitReminderListRequest(text) || isExplicitInternalTaskListRequest(text)) &&
+    (snap.routeTaken === "pending_clarification" ||
+      snap.routeTaken === "pending_tool_confirmation" ||
+      snap.moduleName === "google_sheets_query")
+  ) {
+    hits.push({
+      triggerReason: "stale_pending_followup",
+      label: "stale pending が内部機能要求を上書き",
     });
   }
 

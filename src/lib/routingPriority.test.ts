@@ -17,6 +17,7 @@ import {
   isUserConfusionOrNegationSignal,
   isExplicitExistingFileOperation,
 } from "./growthExplicitRequest.js";
+import { extractReminderTimeUpdateText } from "./conversationTurnResolver.js";
 
 // ────────────────────────────────────────────
 // ケース1: Growth 明示要望は pending pick を無視する
@@ -344,4 +345,73 @@ test("新ケース10: NEARで毎朝9時に売上を通知できるようにし�
   );
   assert.equal(isExplicitReminderListRequest(text), false);
   assert.equal(isExplicitInternalTaskListRequest(text), false);
+});
+
+// ============================================================
+// 【新規: conversationTurnResolver 関連テスト】
+// ============================================================
+
+// ────────────────────────────────────────────
+// リマインド時間変更の検知
+// ────────────────────────────────────────────
+test("CTR統合-1: 「やっぱり14:00に変えて」はリマインド時間更新として検知", () => {
+  const updateTexts = [
+    "やっぱり14:00に変えて",
+    "やっぱり14時に変えて",
+    "14時に変更して",
+    "15:30に変えて",
+    "リマインドの時間を16時に変更",
+  ];
+  for (const t of updateTexts) {
+    const result = extractReminderTimeUpdateText(t);
+    assert.ok(result !== null, `「${t}」はリマインド時間更新として検知されるべき`);
+  }
+});
+
+test("CTR統合-2: 新規リマインド作成フレーズは時間更新として検知しない", () => {
+  const nonUpdateTexts = [
+    "明日14時にリマインドして",
+    "14時に通知して",
+    "タスクリスト出して",
+    "リマインド一覧だして",
+    "NEARで毎朝9時に売上を通知できるようにして",
+  ];
+  for (const t of nonUpdateTexts) {
+    assert.equal(
+      extractReminderTimeUpdateText(t),
+      null,
+      `「${t}」はリマインド時間更新として誤検知されるべきではない`
+    );
+  }
+});
+
+// ────────────────────────────────────────────
+// 「ドライブじゃないよー」系の混乱シグナル確認
+// ────────────────────────────────────────────
+test("CTR統合-3: ドライブじゃない系は混乱シグナルとして検知（APIエラー説明を返さない）", () => {
+  const rejectTexts = [
+    "ドライブじゃないよー",
+    "ドライブじゃない",
+    "そうじゃない",
+    "シートじゃない",
+  ];
+  for (const t of rejectTexts) {
+    assert.ok(
+      isUserConfusionOrNegationSignal(t),
+      `「${t}」は混乱シグナルとして検知されるべき`
+    );
+    // リマインド一覧/内部タスクリクエストではない
+    assert.equal(isExplicitReminderListRequest(t), false);
+    assert.equal(isExplicitInternalTaskListRequest(t), false);
+  }
+});
+
+// ────────────────────────────────────────────
+// 「毎朝9時に売上を通知できるようにして」は Growth（番号確認にしない）
+// ────────────────────────────────────────────
+test("CTR統合-4: 毎朝9時に売上を通知できるようにして → Growth要望（謎の番号確認にしない）", () => {
+  const text = "毎朝9時に売上を通知できるようにして";
+  assert.ok(isExplicitGrowthDevelopmentRequest(text), "Growth要望として検知されるべき");
+  assert.equal(extractReminderTimeUpdateText(text), null, "時間更新として誤検知されるべきではない");
+  assert.equal(isExplicitReminderListRequest(text), false);
 });

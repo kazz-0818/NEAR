@@ -30,11 +30,13 @@ import { tryResolveReminderFromRecentTaskList } from "../services/task_reminder_
 import { extractTaskItemsFromAssistantMessages, parseTaskTargetNumber } from "../lib/taskListContext.js";
 import {
   isExplicitGrowthDevelopmentRequest,
-  isExplicitInternalTaskListRequest,
-  isExplicitReminderListRequest,
   isForcedGrowthOrIssueCommand,
   isUserConfusionOrNegationSignal,
 } from "../lib/growthExplicitRequest.js";
+import {
+  applyReminderTimeUpdate,
+  resolveConversationTurn,
+} from "../lib/conversationTurnResolver.js";
 
 export type ThinRouterResult =
   | { handled: true; finalText: string }
@@ -90,51 +92,32 @@ export async function runThinRouterPhase(input: {
 
   const textNorm = text.normalize("NFKC").trim();
 
-  // ----------------------------------------------------------------
-  // Growth 明示要望 / 混乱シグナル / リマインド一覧 / 内部タスクリスト:
-  // stale pending を一切バイパスする
-  // ----------------------------------------------------------------
-  const isGrowthRequest = isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
-  const isConfusion = isUserConfusionOrNegationSignal(text);
-  const isReminderListReq = isExplicitReminderListRequest(text);
-  const isInternalTaskListReq = isExplicitInternalTaskListRequest(text);
+  // ================================================================
+  // 【最上流】Conversation Turn Resolver
+  // pending チェックより前に「この発言は何の続きか」を判定する。
+  // 優先度: 混乱/否定 > リマインド一覧 > 内部タスクリスト > リマインド時間変更
+  // ================================================================
+  const turnRes = await resolveConversationTurn({
+    db,
+    channelUserId,
+    actorUserId: effectiveActorId,
+    text,
+    recentUserMessages,
+    recentAssistantMessages,
+    quotedAssistantMessage,
+  });
 
-  if (isGrowthRequest) {
-    log.info({ channelUserId, textLen: textNorm.length }, "explicit growth request — bypassing stale pending states in thinRouter");
-  }
-  if (isConfusion) {
-    log.info({ channelUserId, textLen: textNorm.length }, "user confusion signal — bypassing stale pending states in thinRouter");
-  }
-  if (isReminderListReq) {
-    log.info({ channelUserId, textLen: textNorm.length }, "reminder list request — bypassing stale pending, routing to internal reminder list");
-  }
-  if (isInternalTaskListReq) {
-    log.info({ channelUserId, textLen: textNorm.length }, "internal task list request — bypassing stale pending sheet pick");
-  }
-
-  // ----------------------------------------------------------------
-  // B. 混乱・否定・Drive拒否: stale pending pick を解除して謝罪を返す
-  // ----------------------------------------------------------------
-  if (isConfusion || isReminderListReq || isInternalTaskListReq) {
-    const hadPick = await hasPendingSheetPick(db, channelUserId).catch(() => false);
-    if (hadPick) {
-      await clearPendingSheetPick(db, channelUserId).catch(() => {});
-      if (isConfusion) {
-        log.info({ channelUserId }, "confusion + stale pending pick: cleared pick, returning misroute apology");
-        return {
-          handled: true,
-          finalText:
-            "すみません、直前の返答がズレていました。Drive／スプレッドシートの候補選択は解除しました。\n\n改めて何をお手伝いしましょうか？",
-        };
-      }
-      log.info({ channelUserId, isReminderListReq, isInternalTaskListReq }, "new internal request: cleared stale pending pick");
-    }
+  // B. 混乱・否定 + stale pending → 解除して謝罪
+  if (turnRes.kind === "clear_stale_pending") {
+    await clearPendingSheetPick(db, channelUserId).catch(() => {});
+    log.info({ channelUserId, reason: turnRes.reason }, "conversationTurnResolver: clear_stale_pending");
+    return { handled: true, finalText: turnRes.apologyText };
   }
 
-  // ----------------------------------------------------------------
-  // C. リマインド一覧: NEAR 内部 DB から取得して返す（Drive/Sheets に流さない）
-  // ----------------------------------------------------------------
-  if (isReminderListReq) {
+  // C. リマインド一覧 → NEAR 内部 DB から取得（Drive/Sheets に流さない）
+  if (turnRes.kind === "internal_reminder_list") {
+    await clearPendingSheetPick(db, channelUserId).catch(() => {});
+    log.info({ channelUserId }, "conversationTurnResolver: internal_reminder_list");
     try {
       const result = await db.query<{ id: number; message: string; remind_at: string }>(
         `SELECT id, message, remind_at
@@ -165,19 +148,90 @@ export async function runThinRouterPhase(input: {
         lines.push(`   通知日時：${dt}`);
         lines.push("");
       }
-      lines.push(
-        "変更する場合は「1番を15時に変更」「2番を削除」のように送ってください。"
-      );
+      lines.push("変更する場合は「1番を15時に変更」「2番を削除」のように送ってください。");
       return { handled: true, finalText: lines.join("\n") };
     } catch (e) {
       log.warn({ err: e }, "reminder list query failed — falling through to LLM");
     }
   }
 
+  // D. 内部タスクリスト → stale pending を解除し、タスクルーティングへ続行
+  if (turnRes.kind === "internal_task_list") {
+    await clearPendingSheetPick(db, channelUserId).catch(() => {});
+    log.info({ channelUserId }, "conversationTurnResolver: internal_task_list — cleared stale pending, continuing to task routing");
+    // fall through: タスクルーティングブロックが処理する
+  }
+
+  // E. 直前リマインドの時間変更
+  if (turnRes.kind === "reminder_time_update") {
+    const { newTimeText, recentReminders } = turnRes;
+    if (recentReminders.length === 1) {
+      const r = recentReminders[0]!;
+      const originalDate = new Date(r.remind_at);
+      const newDate = applyReminderTimeUpdate(originalDate, newTimeText);
+      if (newDate) {
+        try {
+          await db.query(`UPDATE reminders SET remind_at = $1 WHERE id = $2`, [
+            newDate.toISOString(),
+            r.id,
+          ]);
+          const when = newDate.toLocaleString("ja-JP", {
+            timeZone: "Asia/Tokyo",
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          log.info({ channelUserId, reminderId: r.id, newDate }, "reminder_time_update: updated");
+          return {
+            handled: true,
+            finalText: `了解です。「${r.message}」を${when}に変更しました。`,
+          };
+        } catch (e) {
+          log.warn({ err: e }, "reminder_time_update: DB update failed — falling through");
+        }
+      }
+    } else if (recentReminders.length > 1) {
+      const list = recentReminders
+        .map((r, i) => {
+          const dt = new Date(r.remind_at).toLocaleString("ja-JP", {
+            timeZone: "Asia/Tokyo",
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          return `${i + 1}. ${r.message}（${dt}）`;
+        })
+        .join("\n");
+      return {
+        handled: true,
+        finalText: `どのリマインドを${newTimeText}に変更しますか？\n\n${list}\n\n番号で教えてください。`,
+      };
+    }
+    // 変換失敗 or 過去時刻 → fall through
+  }
+
+  // ================================================================
+  // 以降は既存ルーティング（Growth / pending / task / semantic）
+  // ================================================================
+
+  // Growth 明示要望 / 混乱シグナルの判定（pending バイパス用）
+  const isGrowthRequest = isExplicitGrowthDevelopmentRequest(text) || isForcedGrowthOrIssueCommand(text);
+  const isConfusion = isUserConfusionOrNegationSignal(text);
+  // internal_task_list も pending pick をバイパスする
+  const bypassPendingPick =
+    isGrowthRequest || isConfusion || turnRes.kind === "internal_task_list";
+
+  if (isGrowthRequest) {
+    log.info({ channelUserId, textLen: textNorm.length }, "explicit growth request — bypassing stale pending states in thinRouter");
+  }
+  if (isConfusion) {
+    log.info({ channelUserId, textLen: textNorm.length }, "user confusion signal — bypassing stale pending states in thinRouter");
+  }
+
   // スプレッドシート候補選択の保留チェック（タスク管理より先に実行）
-  // 「5」「2番」などがタスク文脈に誤爆しないようにするため最優先で確認する
-  // Growth 要望・混乱・リマインド一覧・内部タスクリストは pending pick をバイパスする
-  if (!isGrowthRequest && !isConfusion && !isReminderListReq && !isInternalTaskListReq) {
+  // Growth / 混乱 / 内部タスクリストはバイパスする
+  if (!bypassPendingPick) {
     const looksLikePick =
       isPendingSheetPickIndexMessage(text) ||
       (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
@@ -427,7 +481,10 @@ export async function runThinRouterPhase(input: {
       }
       if (sem.kind === "task.list.sheet" || sem.kind === "sheet.query") {
         // リマインド一覧・内部タスクリスト要求は Sheets に流さない
-        if (isReminderListReq || isInternalTaskListReq) {
+        if (
+          turnRes.kind === "internal_reminder_list" ||
+          turnRes.kind === "internal_task_list"
+        ) {
           logSemanticAdopt("sheets_bypassed_for_reminder_or_internal_task_list");
           // fall through to LLM fallback
         } else {

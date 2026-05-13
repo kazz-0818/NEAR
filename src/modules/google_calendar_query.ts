@@ -96,7 +96,7 @@ export async function googleCalendarQuery(ctx: ModuleContext): Promise<ModuleRes
     const resolved = await resolveRefreshTokenForSheets(ctx.db, ctx.channelUserId);
     const r = resolved
       ? await ctx.db.query<{ scope: string | null }>(
-          `SELECT scope FROM user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
+          `SELECT scope FROM near_user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
           [ctx.channelUserId, resolved.googleSub]
         )
       : { rows: [] as { scope: string | null }[] };

@@ -64,7 +64,7 @@ function isRejectCommand(t: string): boolean {
 
 async function latestCapsuleId(db: Db): Promise<number | null> {
   const r = await db.query<{ capsule_id: string }>(
-    `SELECT capsule_id::text FROM improvement_capsules ORDER BY capsule_id DESC LIMIT 1`
+    `SELECT capsule_id::text FROM near_improvement_capsules ORDER BY capsule_id DESC LIMIT 1`
   );
   const id = r.rows[0]?.capsule_id;
   return id ? Number(id) : null;

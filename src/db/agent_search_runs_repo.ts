@@ -14,7 +14,7 @@ export async function insertAgentSearchRun(
   }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO agent_search_runs (
+    `INSERT INTO near_agent_search_runs (
        channel, channel_user_id, inbound_message_id, policy_enabled, attached_web_search, reason_code, user_text_chars, tool_names
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[])`,
     [

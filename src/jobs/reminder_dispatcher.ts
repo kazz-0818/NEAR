@@ -18,7 +18,7 @@ async function dispatchDueReminders(): Promise<void> {
       group_id: string | null;
       message: string;
     }>(
-      `SELECT id, channel_user_id, actor_user_id, group_id, message FROM reminders
+      `SELECT id, channel_user_id, actor_user_id, group_id, message FROM near_reminders
        WHERE status = 'pending' AND remind_at <= $1::timestamptz
        ORDER BY remind_at ASC
        LIMIT 20
@@ -31,7 +31,7 @@ async function dispatchDueReminders(): Promise<void> {
         // グループリマインドはグループへ push、個人は本人へ push
         const pushTo = row.group_id ?? row.channel_user_id;
         await pushText(pushTo, `【NEARリマインド】${row.message}`);
-        await client.query(`UPDATE reminders SET status = 'sent' WHERE id = $1`, [row.id]);
+        await client.query(`UPDATE near_reminders SET status = 'sent' WHERE id = $1`, [row.id]);
         log.info({ reminderId: row.id, pushTo: pushTo.slice(0, 12) }, "reminder dispatched");
       } catch (e) {
         log.error({ err: e, reminderId: row.id }, "reminder dispatch failed for one row");

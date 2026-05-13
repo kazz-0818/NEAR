@@ -14,7 +14,7 @@ export type InsertAgentToolRunInput = {
 
 export async function insertAgentToolRun(input: InsertAgentToolRunInput): Promise<void> {
   await input.db.query(
-    `INSERT INTO agent_tool_runs (
+    `INSERT INTO near_agent_tool_runs (
        channel, channel_user_id, inbound_message_id, tool_name, ok, situation, duration_ms, error_code
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [

@@ -1,4 +1,4 @@
-/** 成長難易度。SSS が最難。DB の implementation_suggestions.difficulty に格納する。 */
+/** 成長難易度。SSS が最難。DB の near_implementation_suggestions.difficulty に格納する。 */
 export const GROWTH_DIFFICULTY_TIERS = ["E", "D", "C", "B", "A", "S", "SS", "SSS"] as const;
 export type GrowthDifficultyTier = (typeof GROWTH_DIFFICULTY_TIERS)[number];
 

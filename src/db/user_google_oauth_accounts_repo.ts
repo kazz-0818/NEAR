@@ -18,11 +18,11 @@ export async function upsertGoogleOAuthAccount(
   scope: string
 ): Promise<void> {
   await db.query(
-    `INSERT INTO user_google_oauth_accounts (
+    `INSERT INTO near_user_google_oauth_accounts (
        line_user_id, google_sub, email, refresh_token_ciphertext, scope, updated_at
      ) VALUES ($1, $2, $3, $4, $5, now())
      ON CONFLICT (line_user_id, google_sub) DO UPDATE SET
-       email = COALESCE(EXCLUDED.email, user_google_oauth_accounts.email),
+       email = COALESCE(EXCLUDED.email, near_user_google_oauth_accounts.email),
        refresh_token_ciphertext = EXCLUDED.refresh_token_ciphertext,
        scope = EXCLUDED.scope,
        updated_at = now()`,
@@ -32,7 +32,7 @@ export async function upsertGoogleOAuthAccount(
 
 export async function setActiveGoogleAccount(db: Db, lineUserId: string, googleSub: string): Promise<void> {
   await db.query(
-    `INSERT INTO user_google_active_oauth (line_user_id, google_sub, updated_at)
+    `INSERT INTO near_user_google_active_oauth (line_user_id, google_sub, updated_at)
      VALUES ($1, $2, now())
      ON CONFLICT (line_user_id) DO UPDATE SET
        google_sub = EXCLUDED.google_sub,
@@ -51,8 +51,8 @@ export async function listGoogleAccountsForLine(db: Db, lineUserId: string): Pro
     `SELECT a.google_sub, a.email,
             (act.google_sub IS NOT NULL AND act.google_sub = a.google_sub) AS is_active,
             a.updated_at
-     FROM user_google_oauth_accounts a
-     LEFT JOIN user_google_active_oauth act ON act.line_user_id = a.line_user_id
+     FROM near_user_google_oauth_accounts a
+     LEFT JOIN near_user_google_active_oauth act ON act.line_user_id = a.line_user_id
      WHERE a.line_user_id = $1
      ORDER BY is_active DESC, a.updated_at DESC`,
     [lineUserId]
@@ -83,7 +83,7 @@ export async function listGoogleOAuthTokenPairsOrdered(
 
 export async function getActiveGoogleSub(db: Db, lineUserId: string): Promise<string | null> {
   const r = await db.query<{ google_sub: string }>(
-    `SELECT google_sub FROM user_google_active_oauth WHERE line_user_id = $1`,
+    `SELECT google_sub FROM near_user_google_active_oauth WHERE line_user_id = $1`,
     [lineUserId]
   );
   return r.rows[0]?.google_sub ?? null;
@@ -97,7 +97,7 @@ async function loadDecryptedRefreshToken(
   const secret = getEnv().GOOGLE_OAUTH_TOKEN_SECRET?.trim();
   if (!secret || secret.length < 16) return null;
   const r = await db.query<{ refresh_token_ciphertext: string }>(
-    `SELECT refresh_token_ciphertext FROM user_google_oauth_accounts
+    `SELECT refresh_token_ciphertext FROM near_user_google_oauth_accounts
      WHERE line_user_id = $1 AND google_sub = $2`,
     [lineUserId, googleSub]
   );

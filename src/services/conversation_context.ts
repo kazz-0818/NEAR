@@ -26,7 +26,7 @@ export async function getPreviousInboundMeta(
   beforeInboundId: number
 ): Promise<{ id: number; created_at: Date; text: string } | null> {
   const res = await db.query<{ id: string; created_at: string; text: string | null }>(
-    `SELECT id, created_at::text, text FROM inbound_messages
+    `SELECT id, created_at::text, text FROM near_inbound_messages
      WHERE channel = $1 AND channel_user_id = $2 AND id < $3
      ORDER BY id DESC LIMIT 1`,
     [channel, channelUserId, beforeInboundId]
@@ -57,7 +57,7 @@ export async function loadRecentUserMessages(
     if (groupId) {
       // グループ内の特定ユーザー発言のみ
       res = await db.query<{ text: string }>(
-        `SELECT text FROM inbound_messages
+        `SELECT text FROM near_inbound_messages
          WHERE channel = $1
            AND group_id = $2
            AND actor_user_id = $3
@@ -71,7 +71,7 @@ export async function loadRecentUserMessages(
     } else {
       // 個人チャット（group_id IS NULL）の特定ユーザー発言
       res = await db.query<{ text: string }>(
-        `SELECT text FROM inbound_messages
+        `SELECT text FROM near_inbound_messages
          WHERE channel = $1
            AND group_id IS NULL
            AND (actor_user_id = $2 OR (actor_user_id IS NULL AND channel_user_id = $2))
@@ -86,7 +86,7 @@ export async function loadRecentUserMessages(
   } else {
     if (groupId) {
       res = await db.query<{ text: string }>(
-        `SELECT text FROM inbound_messages
+        `SELECT text FROM near_inbound_messages
          WHERE channel = $1
            AND group_id = $2
            AND id < $3
@@ -99,7 +99,7 @@ export async function loadRecentUserMessages(
     } else {
       // 個人チャット（group_id IS NULL）
       res = await db.query<{ text: string }>(
-        `SELECT text FROM inbound_messages
+        `SELECT text FROM near_inbound_messages
          WHERE channel = $1
            AND channel_user_id = $2
            AND group_id IS NULL
@@ -139,7 +139,7 @@ export async function loadRecentAssistantMessages(
   if (groupId) {
     // グループ内の NEAR 返答のみ
     res = await db.query<{ text: string }>(
-      `SELECT text FROM outbound_messages
+      `SELECT text FROM near_outbound_messages
        WHERE channel = $1 AND group_id = $2
          AND inbound_message_id IS NOT NULL
          AND inbound_message_id < $3
@@ -150,7 +150,7 @@ export async function loadRecentAssistantMessages(
   } else {
     // 個人チャット（group_id IS NULL）の NEAR 返答
     res = await db.query<{ text: string }>(
-      `SELECT text FROM outbound_messages
+      `SELECT text FROM near_outbound_messages
        WHERE channel = $1 AND channel_user_id = $2
          AND group_id IS NULL
          AND inbound_message_id IS NOT NULL
@@ -179,7 +179,7 @@ export async function loadQuotedAssistantMessage(
   }
 ): Promise<string | null> {
   const inbound = await db.query<{ quoted_message_id: string | null }>(
-    `SELECT quoted_message_id FROM inbound_messages WHERE id = $1 LIMIT 1`,
+    `SELECT quoted_message_id FROM near_inbound_messages WHERE id = $1 LIMIT 1`,
     [input.inboundMessageId]
   );
   const quotedMessageId = inbound.rows[0]?.quoted_message_id;
@@ -188,7 +188,7 @@ export async function loadQuotedAssistantMessage(
   const out = groupId
     ? await db.query<{ text: string }>(
         `SELECT text
-           FROM outbound_messages
+           FROM near_outbound_messages
           WHERE channel = $1
             AND group_id = $2
             AND line_message_id = $3
@@ -198,7 +198,7 @@ export async function loadQuotedAssistantMessage(
       )
     : await db.query<{ text: string }>(
         `SELECT text
-           FROM outbound_messages
+           FROM near_outbound_messages
           WHERE channel = $1
             AND channel_user_id = $2
             AND group_id IS NULL

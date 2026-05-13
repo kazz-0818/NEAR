@@ -15,22 +15,22 @@ export async function upsertGrowthSignalBucket(
   }
 ): Promise<number> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO growth_signal_buckets (
+    `INSERT INTO near_growth_signal_buckets (
        bucket_key, user_message_fingerprint, channel, priority_score, primary_source,
        last_user_text, last_channel_user_id, last_inbound_message_id, last_parsed_intent
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
      ON CONFLICT (bucket_key) DO UPDATE SET
        last_seen = now(),
-       hit_count = growth_signal_buckets.hit_count + 1,
-       priority_score = GREATEST(growth_signal_buckets.priority_score, EXCLUDED.priority_score),
+       hit_count = near_growth_signal_buckets.hit_count + 1,
+       priority_score = GREATEST(near_growth_signal_buckets.priority_score, EXCLUDED.priority_score),
        primary_source = CASE
-         WHEN EXCLUDED.priority_score > growth_signal_buckets.priority_score THEN EXCLUDED.primary_source
-         ELSE growth_signal_buckets.primary_source
+         WHEN EXCLUDED.priority_score > near_growth_signal_buckets.priority_score THEN EXCLUDED.primary_source
+         ELSE near_growth_signal_buckets.primary_source
        END,
-       last_user_text = COALESCE(EXCLUDED.last_user_text, growth_signal_buckets.last_user_text),
-       last_channel_user_id = COALESCE(EXCLUDED.last_channel_user_id, growth_signal_buckets.last_channel_user_id),
-       last_inbound_message_id = COALESCE(EXCLUDED.last_inbound_message_id, growth_signal_buckets.last_inbound_message_id),
-       last_parsed_intent = COALESCE(EXCLUDED.last_parsed_intent, growth_signal_buckets.last_parsed_intent)
+       last_user_text = COALESCE(EXCLUDED.last_user_text, near_growth_signal_buckets.last_user_text),
+       last_channel_user_id = COALESCE(EXCLUDED.last_channel_user_id, near_growth_signal_buckets.last_channel_user_id),
+       last_inbound_message_id = COALESCE(EXCLUDED.last_inbound_message_id, near_growth_signal_buckets.last_inbound_message_id),
+       last_parsed_intent = COALESCE(EXCLUDED.last_parsed_intent, near_growth_signal_buckets.last_parsed_intent)
      RETURNING id`,
     [
       input.bucketKey,
@@ -53,7 +53,7 @@ export async function upsertGrowthSignalBucket(
 
 export async function hasSignalSinceBucketKey(db: Db, bucketKey: string, since: Date): Promise<boolean> {
   const r = await db.query<{ one: number }>(
-    `SELECT 1 AS one FROM growth_candidate_signals
+    `SELECT 1 AS one FROM near_growth_candidate_signals
      WHERE bucket_key = $1 AND created_at >= $2
      LIMIT 1`,
     [bucketKey, since]
@@ -88,7 +88,7 @@ export async function getGrowthSignalBucketById(
   }>(
     `SELECT id, hit_count, priority_score, primary_source, implementation_suggestion_id,
             last_user_text, last_parsed_intent, last_channel_user_id, last_inbound_message_id
-     FROM growth_signal_buckets WHERE id = $1`,
+     FROM near_growth_signal_buckets WHERE id = $1`,
     [bucketId]
   );
   const row = r.rows[0];
@@ -112,7 +112,7 @@ export async function updateBucketImplementationSuggestionId(
   suggestionId: number
 ): Promise<void> {
   await db.query(
-    `UPDATE growth_signal_buckets SET implementation_suggestion_id = $2 WHERE id = $1`,
+    `UPDATE near_growth_signal_buckets SET implementation_suggestion_id = $2 WHERE id = $1`,
     [bucketId, suggestionId]
   );
 }

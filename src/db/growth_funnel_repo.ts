@@ -37,7 +37,7 @@ export async function insertGrowthFunnelEvent(
   }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO growth_funnel_events (
+    `INSERT INTO near_growth_funnel_events (
        inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail,
        growth_signal_bucket_id, implementation_suggestion_id
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
@@ -63,7 +63,7 @@ export async function updateUnsupportedGrowthGate(
   reasonCode: string
 ): Promise<void> {
   await db.query(
-    `UPDATE unsupported_requests
+    `UPDATE near_unsupported_requests
      SET growth_gate_allow = $1,
          growth_gate_reason = $2,
          growth_gate_evaluated_at = now(),

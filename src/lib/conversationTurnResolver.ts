@@ -213,7 +213,7 @@ export async function resolveConversationTurn(input: {
     const rows = await db
       .query<ReminderRow>(
         `SELECT id, message, remind_at
-         FROM reminders
+         FROM near_reminders
          WHERE actor_user_id = $1
            AND status = 'pending'
            AND remind_at > now()

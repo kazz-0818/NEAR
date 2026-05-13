@@ -20,7 +20,7 @@ export type PendingPermOp = {
 
 export async function savePendingPermOp(db: Db, op: PendingPermOp): Promise<void> {
   await db.query(
-    `INSERT INTO pending_perm_ops
+    `INSERT INTO near_pending_perm_ops
        (actor_line_user_id, op_type, stage, candidates_json, target_line_user_id,
         target_display_name, role, notes, channel_id, expires_at)
      VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9, now() + interval '3 minutes')
@@ -65,7 +65,7 @@ export async function getPendingPermOp(
   }>(
     // channel_id が一致するか、旧データ（NULL）の場合も消費できるようにする
     `SELECT op_type, stage, candidates_json, target_line_user_id, target_display_name, role, notes, channel_id
-     FROM pending_perm_ops
+     FROM near_pending_perm_ops
      WHERE actor_line_user_id = $1
        AND (channel_id = $2 OR channel_id IS NULL)
        AND expires_at > now()`,
@@ -90,5 +90,5 @@ export async function getPendingPermOp(
 }
 
 export async function deletePendingPermOp(db: Db, actorLineUserId: string): Promise<void> {
-  await db.query(`DELETE FROM pending_perm_ops WHERE actor_line_user_id = $1`, [actorLineUserId]);
+  await db.query(`DELETE FROM near_pending_perm_ops WHERE actor_line_user_id = $1`, [actorLineUserId]);
 }

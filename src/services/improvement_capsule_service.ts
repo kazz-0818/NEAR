@@ -45,7 +45,7 @@ export async function runImprovementCapsuleAnalysisJob(
         batchesRun: 0,
         capsulesInserted: 0,
         notifiedCapsules: 0,
-        emptyManualMessage: "改善候補はありませんでした（pending の improvement_candidates は0件です）。",
+        emptyManualMessage: "改善候補はありませんでした（pending の候補は0件です）。",
       };
     }
     return { pendingStart: 0, batchesRun: 0, capsulesInserted: 0, notifiedCapsules: 0 };

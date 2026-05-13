@@ -20,7 +20,7 @@ export const requestInterpretationSchema = z.object({
 
 export type RequestInterpretation = z.infer<typeof requestInterpretationSchema>;
 
-/** intent_runs 用の合成 intent（分析・ダッシュボード向け） */
+/** near_intent_runs 用の合成 intent（分析・ダッシュボード向け） */
 export function syntheticIntentForSecretaryLayer(mode: RequestMode, confidence: number): ParsedIntent {
   return {
     intent: "simple_question",

@@ -65,7 +65,7 @@ export async function savePendingSheetPick(
 ): Promise<void> {
   if (options.length === 0) return;
   await db.query(
-    `INSERT INTO user_sheet_pending_pick (line_user_id, options_json, original_query, expires_at)
+    `INSERT INTO near_user_sheet_pending_pick (line_user_id, options_json, original_query, expires_at)
      VALUES ($1, $2::jsonb, $3, now() + interval '45 minutes')
      ON CONFLICT (line_user_id) DO UPDATE SET
        options_json   = EXCLUDED.options_json,
@@ -76,7 +76,7 @@ export async function savePendingSheetPick(
 }
 
 export async function clearPendingSheetPick(db: Db, lineUserId: string): Promise<void> {
-  await db.query(`DELETE FROM user_sheet_pending_pick WHERE line_user_id = $1`, [lineUserId]);
+  await db.query(`DELETE FROM near_user_sheet_pending_pick WHERE line_user_id = $1`, [lineUserId]);
 }
 
 export type SheetPickResult = { spreadsheetId: string; originalQuery: string | null };
@@ -90,7 +90,7 @@ export async function peekPendingSheetPick(
   lineUserId: string
 ): Promise<{ options: SheetPickOption[]; originalQuery: string | null } | null> {
   const r = await db.query<{ options_json: unknown; original_query: string | null }>(
-    `SELECT options_json, original_query FROM user_sheet_pending_pick
+    `SELECT options_json, original_query FROM near_user_sheet_pending_pick
      WHERE line_user_id = $1 AND expires_at > now()`,
     [lineUserId]
   );
@@ -110,7 +110,7 @@ export async function consumePendingSheetPickByIndex(
   const picked = peek.options[idx - 1];
   const id = picked?.id;
   if (typeof id !== "string" || id.length === 0) return null;
-  await db.query(`DELETE FROM user_sheet_pending_pick WHERE line_user_id = $1`, [lineUserId]);
+  await db.query(`DELETE FROM near_user_sheet_pending_pick WHERE line_user_id = $1`, [lineUserId]);
   return { spreadsheetId: id, originalQuery: peek.originalQuery };
 }
 
@@ -126,7 +126,7 @@ export async function tryConsumePendingSheetPick(
 
 export async function hasPendingSheetPick(db: Db, lineUserId: string): Promise<boolean> {
   const r = await db.query<{ c: string }>(
-    `SELECT 1 AS c FROM user_sheet_pending_pick WHERE line_user_id = $1 AND expires_at > now()`,
+    `SELECT 1 AS c FROM near_user_sheet_pending_pick WHERE line_user_id = $1 AND expires_at > now()`,
     [lineUserId]
   );
   return r.rows.length > 0;

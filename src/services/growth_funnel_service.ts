@@ -7,7 +7,7 @@ import {
 import type { GrowthGateResult } from "./growth_suggestion_gate.js";
 
 /**
- * gate 判定を unsupported_requests に保存し、funnel に growth_gate を記録する。
+ * gate 判定を near_unsupported_requests に保存し、funnel に growth_gate を記録する。
  */
 export async function recordGrowthGateEvaluated(
   db: Db,

@@ -35,7 +35,7 @@ export async function upsertSessionMemory(
   const key = input.memoryKey ?? DEFAULT_KEY;
   try {
     await db.query(
-      `INSERT INTO conversation_session_memory (
+      `INSERT INTO near_conversation_session_memory (
          channel_user_id, memory_type, memory_key, memory_value_json, source_message_id, source_route, expires_at
        ) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
        ON CONFLICT (channel_user_id, memory_type, memory_key)
@@ -68,7 +68,7 @@ export async function getSessionMemoryValue<T = unknown>(
 ): Promise<T | null> {
   try {
     const r = await db.query<{ memory_value_json: unknown }>(
-      `SELECT memory_value_json FROM conversation_session_memory
+      `SELECT memory_value_json FROM near_conversation_session_memory
        WHERE channel_user_id = $1 AND memory_type = $2 AND memory_key = $3
          AND expires_at > now()
        LIMIT 1`,

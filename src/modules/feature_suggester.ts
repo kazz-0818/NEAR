@@ -31,7 +31,7 @@ export async function generateAndSaveSuggestion(input: {
   inboundMessageId?: number;
   channel?: string;
   channelUserId?: string;
-  /** growth_signal_buckets 昇格経路のとき、提案作成後にバケットへ紐づけ */
+  /** near_growth_signal_buckets 昇格経路のとき、提案作成後にバケットへ紐づけ */
   growthSignalBucketId?: number;
 }): Promise<void> {
   const env = getEnv();
@@ -39,7 +39,7 @@ export async function generateAndSaveSuggestion(input: {
   const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
   const dup = await input.db.query(
-    `SELECT id FROM implementation_suggestions WHERE unsupported_request_id = $1 LIMIT 1`,
+    `SELECT id FROM near_implementation_suggestions WHERE unsupported_request_id = $1 LIMIT 1`,
     [input.unsupportedId]
   );
   if (dup.rows.length > 0) {
@@ -120,7 +120,7 @@ export async function generateAndSaveSuggestion(input: {
     }
 
     const ins = await input.db.query<{ id: string }>(
-      `INSERT INTO implementation_suggestions (
+      `INSERT INTO near_implementation_suggestions (
          unsupported_request_id, summary, required_apis, suggested_modules, data_stores,
          steps, difficulty, priority_score, raw_llm,
          approval_status, cursor_prompt, improvement_kind, risk_level, estimated_effort,
@@ -148,7 +148,7 @@ export async function generateAndSaveSuggestion(input: {
     if (!Number.isFinite(suggestionId)) return;
 
     await input.db.query(
-      `UPDATE unsupported_requests SET status = 'suggestion_created', updated_at = now() WHERE id = $1`,
+      `UPDATE near_unsupported_requests SET status = 'suggestion_created', updated_at = now() WHERE id = $1`,
       [input.unsupportedId]
     );
 

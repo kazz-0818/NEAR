@@ -22,7 +22,7 @@ export async function replacePendingClarification(
   }
 ): Promise<void> {
   await db.query(
-    `UPDATE pending_clarifications
+    `UPDATE near_pending_clarifications
        SET status = 'cancelled', updated_at = now()
      WHERE channel = $1
        AND channel_user_id = $2
@@ -33,7 +33,7 @@ export async function replacePendingClarification(
   );
   const ttl = Math.max(1, Math.min(180, input.ttlMinutes));
   await db.query(
-    `INSERT INTO pending_clarifications (
+    `INSERT INTO near_pending_clarifications (
       channel, channel_user_id, actor_user_id, group_id, kind, status, required_slot, payload_json, inbound_message_id, expires_at
     ) VALUES (
       $1, $2, $3, $4, $5, 'pending', $6, $7::jsonb, $8, now() + ($9::int * interval '1 minute')
@@ -68,7 +68,7 @@ export async function getPendingClarification(
     payload_json: unknown;
   }>(
     `SELECT id::text, kind, required_slot, payload_json
-       FROM pending_clarifications
+       FROM near_pending_clarifications
       WHERE channel = $1
         AND channel_user_id = $2
         AND actor_user_id IS NOT DISTINCT FROM $3
@@ -95,7 +95,7 @@ export async function getPendingClarification(
 
 export async function markPendingClarificationStatus(db: Db, id: number, status: "consumed" | "cancelled"): Promise<void> {
   await db.query(
-    `UPDATE pending_clarifications
+    `UPDATE near_pending_clarifications
         SET status = $2, updated_at = now()
       WHERE id = $1`,
     [id, status]

@@ -74,8 +74,8 @@ export async function buildGrowthGithubIssueMarkdown(db: Db, suggestionId: numbe
   const r = await db.query(
     `SELECT s.summary, s.steps, s.suggested_modules, s.required_apis,
             u.original_message, u.detected_intent AS unsupported_intent
-     FROM implementation_suggestions s
-     JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+     FROM near_implementation_suggestions s
+     JOIN near_unsupported_requests u ON u.id = s.unsupported_request_id
      WHERE s.id = $1`,
     [suggestionId]
   );
@@ -181,7 +181,7 @@ async function persistGrowthIssueSuccess(
   issueUrl: string
 ): Promise<void> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET github_issue_url = $1,
          github_issue_number = $2,
          github_issue_status = 'open',
@@ -196,7 +196,7 @@ async function persistGrowthIssueSuccess(
 
 async function persistGrowthIssueFailure(db: Db, suggestionId: number, reason: string): Promise<void> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET coding_failure_reason = $1,
          coding_status = COALESCE(coding_status, 'github_issue_failed'),
          updated_at = now()
@@ -218,13 +218,13 @@ export async function ensureGithubIssueForSuggestion(db: Db, suggestionId: numbe
   const repo = env.GROWTH_GITHUB_REPO ?? "";
 
   const existing = await db.query<{ github_issue_url: string | null }>(
-    `SELECT github_issue_url FROM implementation_suggestions WHERE id = $1`,
+    `SELECT github_issue_url FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   const existingUrl = existing.rows[0]?.github_issue_url?.trim();
   if (existingUrl) {
     const numRow = await db.query<{ n: string | null }>(
-      `SELECT github_issue_number::text AS n FROM implementation_suggestions WHERE id = $1`,
+      `SELECT github_issue_number::text AS n FROM near_implementation_suggestions WHERE id = $1`,
       [suggestionId]
     );
     const issueNumRaw = numRow.rows[0]?.n;

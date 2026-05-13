@@ -1,8 +1,8 @@
-/** implementation_suggestions.approval_status（第一段階: 成長候補として進めるか） */
+/** near_implementation_suggestions.approval_status（第一段階: 成長候補として進めるか） */
 export const GROWTH_APPROVAL_STATUSES = ["pending", "approved", "rejected"] as const;
 export type GrowthApprovalStatus = (typeof GROWTH_APPROVAL_STATUSES)[number];
 
-/** implementation_suggestions.implementation_state */
+/** near_implementation_suggestions.implementation_state */
 export const IMPLEMENTATION_STATES = [
   "not_started",
   "awaiting_user_consent",
@@ -17,7 +17,7 @@ export const IMPLEMENTATION_STATES = [
 ] as const;
 export type ImplementationState = (typeof IMPLEMENTATION_STATES)[number];
 
-/** unsupported_requests.status（成長フロー用） */
+/** near_unsupported_requests.status（成長フロー用） */
 export const UNSUPPORTED_FLOW_STATUSES = [
   "logged",
   "suggestion_created",

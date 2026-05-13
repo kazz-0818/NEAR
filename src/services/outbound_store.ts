@@ -17,7 +17,7 @@ export async function saveOutboundAssistantText(db: Db, input: SaveOutboundInput
   if (!t) return;
   const stored = t.length <= MAX_STORED_TEXT_CHARS ? t : `${t.slice(0, MAX_STORED_TEXT_CHARS)}…`;
   await db.query(
-    `INSERT INTO outbound_messages (channel, channel_user_id, group_id, text, inbound_message_id, line_message_id)
+    `INSERT INTO near_outbound_messages (channel, channel_user_id, group_id, text, inbound_message_id, line_message_id)
      VALUES ($1, $2, $3, $4, $5, $6)`,
     [input.channel, input.channelUserId, input.groupId ?? null, stored, input.inboundMessageId, input.lineMessageId ?? null]
   );

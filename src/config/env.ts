@@ -190,7 +190,7 @@ const envSchema = z.object({
       return Number.isFinite(n) && n >= 1 ? n : 1;
     }),
   /**
-   * ゲートの fingerprint 件数に、同一 user_message_fingerprint の growth_signal_buckets の hit を加算する（既定オン）。
+   * ゲートの fingerprint 件数に、同一 user_message_fingerprint の near_growth_signal_buckets の hit を加算する（既定オン）。
    */
   GROWTH_FINGERPRINT_INCLUDE_BUCKETS: z
     .string()
@@ -232,7 +232,7 @@ const envSchema = z.object({
     .transform((s) => s === "true" || s === "1"),
   /**
    * false / 0 でオフ。未設定はオン。
-   * エージェント経路のエラー系・ツール未使用などを growth_candidate_signals に残す（unsupported 以外の観測用）。
+   * エージェント経路のエラー系・ツール未使用などを near_growth_candidate_signals に残す（unsupported 以外の観測用）。
    */
   NEAR_GROWTH_CANDIDATE_SIGNALS_ENABLED: z
     .string()
@@ -240,7 +240,7 @@ const envSchema = z.object({
     .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /**
    * false / 0 でオフ。未設定はオン。
-   * simple_question（FAQ）返答が「準備中／未対応で断る」系の文案に見えるとき growth_candidate_signals に記録する。
+   * simple_question（FAQ）返答が「準備中／未対応で断る」系の文案に見えるとき near_growth_candidate_signals に記録する。
    */
   NEAR_GROWTH_FAQ_DEFLECTION_SIGNAL_ENABLED: z
     .string()
@@ -248,7 +248,7 @@ const envSchema = z.object({
     .transform((s) => (s === undefined || s.trim() === "" ? true : !(s === "false" || s === "0"))),
   /**
    * 同一 bucket_key の raw 行を何時間以内に重ねないか。0＝無効（メッセージごとに常に 1 行。既定）。
-   * 抑制時も `growth_signal_buckets.hit_count` は増える（集約の材料は失わない）。
+   * 抑制時も `near_growth_signal_buckets.hit_count` は増える（集約の材料は失わない）。
    */
   NEAR_GROWTH_SIGNAL_RAW_DEDUPE_HOURS: z
     .string()
@@ -259,7 +259,7 @@ const envSchema = z.object({
       return Number.isFinite(n) && n >= 0 && n <= 168 ? n : 0;
     }),
   /**
-   * growth_signal_buckets から合成 unsupported を経由して suggestion 生成まで進める。
+   * near_growth_signal_buckets から合成 unsupported を経由して suggestion 生成まで進める。
    * 未設定はオン（agent 主体構成では off のままだと suggestion にほぼ届かないため）。false / 0 で無効。
    */
   NEAR_GROWTH_BUCKET_PROMOTION_ENABLED: z
@@ -473,7 +473,7 @@ const envSchema = z.object({
       return Number.isFinite(n) && n >= 1 && n <= 200 ? n : 24;
     }),
   /**
-   * agent_search_runs への行挿入。未設定時: NEAR_WEB_SEARCH_POLICY_ENABLED と同じ（ポリシー ON ならログ ON）。
+   * near_agent_search_runs への行挿入。未設定時: NEAR_WEB_SEARCH_POLICY_ENABLED と同じ（ポリシー ON ならログ ON）。
    * false / 0 で明示オフ、true / 1 で明示オン。
    */
   NEAR_AGENT_SEARCH_RUNS_LOG: z
@@ -565,7 +565,7 @@ const envSchema = z.object({
     .transform((s) => (s?.trim() ? s.trim() : undefined)),
   /**
    * false / 0 でオフ。未設定はオン。
-   * 会話後の軽量ルールで improvement_candidates に記録し、日次/手動バッチで LLM 分析する。
+   * 会話後の軽量ルールで near_improvement_candidates に記録し、日次/手動バッチで LLM 分析する。
    */
   NEAR_IMPROVEMENT_CAPSULES_ENABLED: z
     .string()

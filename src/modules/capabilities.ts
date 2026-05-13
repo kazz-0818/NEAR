@@ -1,7 +1,7 @@
 import type { Db } from "../db/client.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
 
-/** DB 未投入時のフォールバック（capability_registry と同内容を維持） */
+/** DB 未投入時のフォールバック（near_capability_registry と同内容を維持） */
 const STATIC_CAPABILITY_LINES = [
   "タスクの記録（やることリストに追加）",
   "メモの保存",
@@ -25,10 +25,10 @@ export async function helpCapabilities(ctx: ModuleContext): Promise<ModuleResult
   return { success: true, draft: body, situation: "success" };
 }
 
-/** capability_registry を参照。0件のときは静的フォールバック。 */
+/** near_capability_registry を参照。0件のときは静的フォールバック。 */
 export async function listCapabilityLines(db: Db): Promise<string[]> {
   const r = await db.query<{ user_visible_line: string }>(
-    `SELECT user_visible_line FROM capability_registry WHERE enabled = true ORDER BY sort_order ASC`
+    `SELECT user_visible_line FROM near_capability_registry WHERE enabled = true ORDER BY sort_order ASC`
   );
   if (r.rows.length === 0) return [...STATIC_CAPABILITY_LINES];
   return r.rows.map((row) => row.user_visible_line);

@@ -108,7 +108,7 @@ export async function tryHandleAdminGrowthLine(input: {
       };
     }
     const dupRow = await input.db.query<{ github_issue_url: string | null }>(
-      `SELECT github_issue_url FROM implementation_suggestions WHERE id = $1`,
+      `SELECT github_issue_url FROM near_implementation_suggestions WHERE id = $1`,
       [issueSuggestionId]
     );
     const existingIssueUrl = dupRow.rows[0]?.github_issue_url?.trim();
@@ -137,7 +137,7 @@ export async function tryHandleAdminGrowthLine(input: {
   const row = await input.db.query<{
     approval_status: string;
     implementation_state: string;
-  }>(`SELECT approval_status, implementation_state FROM implementation_suggestions WHERE id = $1`, [suggestionId]);
+  }>(`SELECT approval_status, implementation_state FROM near_implementation_suggestions WHERE id = $1`, [suggestionId]);
 
   if (row.rows.length === 0) return { handled: false, reply: "" };
   const { approval_status: ap, implementation_state: st } = row.rows[0]!;

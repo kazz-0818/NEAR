@@ -41,7 +41,7 @@ export type ImprovementCapsuleRow = {
 
 export async function selectInboundLineMessageId(db: Db, inboundMessageId: number): Promise<string | null> {
   const r = await db.query<{ message_id: string }>(
-    `SELECT message_id FROM inbound_messages WHERE id = $1 AND channel = 'line'`,
+    `SELECT message_id FROM near_inbound_messages WHERE id = $1 AND channel = 'line'`,
     [inboundMessageId]
   );
   return r.rows[0]?.message_id ?? null;
@@ -64,14 +64,14 @@ export async function insertImprovementCandidateOrSkip(
   }
 ): Promise<{ inserted: boolean }> {
   const dup = await db.query(
-    `SELECT 1 FROM improvement_candidates
+    `SELECT 1 FROM near_improvement_candidates
      WHERE inbound_message_id = $1 AND trigger_reason = $2 AND status = 'pending' LIMIT 1`,
     [input.inboundMessageId, input.triggerReason]
   );
   if (dup.rows.length > 0) return { inserted: false };
 
   await db.query(
-    `INSERT INTO improvement_candidates (
+    `INSERT INTO near_improvement_candidates (
        channel_user_id, inbound_message_id, trigger_message_id, trigger_reason,
        user_message, near_reply, parsed_intent, route_taken, module_name,
        used_llm_fallback, used_growth_pipeline, status
@@ -103,14 +103,14 @@ export async function buildConversationWindowForCandidate(
   try {
     const r = await db.query<{ user_text: string | null; assistant_text: string | null }>(
       `WITH recent AS (
-         SELECT id, text FROM inbound_messages
+         SELECT id, text FROM near_inbound_messages
          WHERE channel = 'line' AND channel_user_id = $1 AND id < $2
            AND text IS NOT NULL AND btrim(text) <> ''
          ORDER BY id DESC
          LIMIT $3
        )
        SELECT r.text AS user_text,
-              (SELECT o.text FROM outbound_messages o
+              (SELECT o.text FROM near_outbound_messages o
                WHERE o.channel = 'line' AND o.channel_user_id = $1 AND o.inbound_message_id = r.id
                ORDER BY o.id DESC LIMIT 1) AS assistant_text
        FROM recent r
@@ -151,14 +151,14 @@ export async function insertImprovementCandidateManual(
   }
 ): Promise<{ inserted: boolean }> {
   const dup = await db.query(
-    `SELECT 1 FROM improvement_candidates
+    `SELECT 1 FROM near_improvement_candidates
      WHERE inbound_message_id = $1 AND trigger_reason = $2 AND status = 'pending' LIMIT 1`,
     [input.inboundMessageId, input.triggerReason]
   );
   if (dup.rows.length > 0) return { inserted: false };
 
   await db.query(
-    `INSERT INTO improvement_candidates (
+    `INSERT INTO near_improvement_candidates (
        channel_user_id, inbound_message_id, trigger_message_id, trigger_reason,
        user_message, near_reply, parsed_intent, route_taken, module_name,
        used_llm_fallback, used_growth_pipeline, status,
@@ -190,7 +190,7 @@ export async function listPendingImprovementCandidates(db: Db, limit: number): P
     `SELECT candidate_id::text, channel_user_id, inbound_message_id::text, trigger_message_id, trigger_reason,
             user_message, near_reply, parsed_intent, route_taken, module_name,
             used_llm_fallback, used_growth_pipeline, created_at, analyzed_at, analysis_batch_id, status
-     FROM improvement_candidates
+     FROM near_improvement_candidates
      WHERE status = 'pending'
      ORDER BY created_at ASC
      LIMIT $1`,
@@ -210,7 +210,7 @@ export async function markCandidatesStatus(
 ): Promise<void> {
   if (candidateIds.length === 0) return;
   await db.query(
-    `UPDATE improvement_candidates
+    `UPDATE near_improvement_candidates
      SET status = $2, analyzed_at = now(), analysis_batch_id = $3
      WHERE candidate_id = ANY($1::uuid[])`,
     [candidateIds, status, batchId]
@@ -233,7 +233,7 @@ export async function insertImprovementCapsule(
   }
 ): Promise<number> {
   const r = await db.query<{ capsule_id: string }>(
-    `INSERT INTO improvement_capsules (
+    `INSERT INTO near_improvement_capsules (
        analysis_batch_id, problem_type, problem_summary, context_summary, improvement_proposal,
        suggested_requirements, priority, confidence, source_candidate_ids, status
      ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9::uuid[], $10)
@@ -257,7 +257,7 @@ export async function insertImprovementCapsule(
 export async function updateCapsuleNotified(db: Db, capsuleIds: number[]): Promise<void> {
   if (capsuleIds.length === 0) return;
   await db.query(
-    `UPDATE improvement_capsules
+    `UPDATE near_improvement_capsules
      SET status = 'notified', notified_at = now()
      WHERE capsule_id = ANY($1::bigint[]) AND status = 'proposed'`,
     [capsuleIds]
@@ -269,7 +269,7 @@ export async function getCapsuleById(db: Db, capsuleId: number): Promise<Improve
     `SELECT capsule_id::text, analysis_batch_id, problem_type, problem_summary, context_summary, improvement_proposal,
             suggested_requirements, priority, confidence, source_candidate_ids, status, github_issue_url,
             created_at, notified_at, approved_at, rejected_at
-     FROM improvement_capsules WHERE capsule_id = $1`,
+     FROM near_improvement_capsules WHERE capsule_id = $1`,
     [capsuleId]
   );
   return r.rows[0] ?? null;
@@ -284,7 +284,7 @@ export async function listImprovementCapsules(
       `SELECT capsule_id::text, analysis_batch_id, problem_type, problem_summary, context_summary, improvement_proposal,
               suggested_requirements, priority, confidence, source_candidate_ids, status, github_issue_url,
               created_at, notified_at, approved_at, rejected_at
-       FROM improvement_capsules
+       FROM near_improvement_capsules
        WHERE status = ANY($1::text[])
        ORDER BY created_at DESC
        LIMIT $2`,
@@ -296,7 +296,7 @@ export async function listImprovementCapsules(
     `SELECT capsule_id::text, analysis_batch_id, problem_type, problem_summary, context_summary, improvement_proposal,
             suggested_requirements, priority, confidence, source_candidate_ids, status, github_issue_url,
             created_at, notified_at, approved_at, rejected_at
-     FROM improvement_capsules
+     FROM near_improvement_capsules
      ORDER BY created_at DESC
      LIMIT $1`,
     [input.limit]
@@ -306,7 +306,7 @@ export async function listImprovementCapsules(
 
 export async function rejectCapsule(db: Db, capsuleId: number): Promise<boolean> {
   const r = await db.query(
-    `UPDATE improvement_capsules
+    `UPDATE near_improvement_capsules
      SET status = 'rejected', rejected_at = now()
      WHERE capsule_id = $1 AND status NOT IN ('issue_created', 'implemented', 'rejected')`,
     [capsuleId]
@@ -316,7 +316,7 @@ export async function rejectCapsule(db: Db, capsuleId: number): Promise<boolean>
 
 export async function markCapsuleIssueCreated(db: Db, capsuleId: number, issueUrl: string): Promise<boolean> {
   const r = await db.query(
-    `UPDATE improvement_capsules
+    `UPDATE near_improvement_capsules
      SET status = 'issue_created', github_issue_url = $2, approved_at = COALESCE(approved_at, now())
      WHERE capsule_id = $1 AND status IN ('proposed', 'notified', 'approved')`,
     [capsuleId, issueUrl]
@@ -333,7 +333,7 @@ export async function listRecentInboundTextsForUser(
   maxRows: number
 ): Promise<string[]> {
   const r = await db.query<{ text: string | null }>(
-    `SELECT text FROM inbound_messages
+    `SELECT text FROM near_inbound_messages
      WHERE channel = 'line' AND channel_user_id = $1 AND id < $2
        AND created_at >= now() - make_interval(mins => $3)
      ORDER BY id DESC

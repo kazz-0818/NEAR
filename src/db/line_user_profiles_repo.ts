@@ -14,12 +14,12 @@ export async function upsertLineUserProfile(
   profile: { lineUserId: string; displayName: string; pictureUrl?: string | null; language?: string | null }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO line_user_profiles (line_user_id, display_name, picture_url, language, last_seen_at, updated_at)
+    `INSERT INTO near_line_user_profiles (line_user_id, display_name, picture_url, language, last_seen_at, updated_at)
      VALUES ($1, $2, $3, $4, now(), now())
      ON CONFLICT (line_user_id) DO UPDATE SET
        display_name  = EXCLUDED.display_name,
-       picture_url   = COALESCE(EXCLUDED.picture_url, line_user_profiles.picture_url),
-       language      = COALESCE(EXCLUDED.language,    line_user_profiles.language),
+       picture_url   = COALESCE(EXCLUDED.picture_url, near_line_user_profiles.picture_url),
+       language      = COALESCE(EXCLUDED.language,    near_line_user_profiles.language),
        last_seen_at  = now(),
        updated_at    = now()`,
     [profile.lineUserId, profile.displayName, profile.pictureUrl ?? null, profile.language ?? null]
@@ -33,7 +33,7 @@ export async function searchLineUserProfilesByName(
 ): Promise<{ lineUserId: string; displayName: string }[]> {
   const r = await db.query<{ line_user_id: string; display_name: string }>(
     `SELECT line_user_id, display_name
-     FROM line_user_profiles
+     FROM near_line_user_profiles
      WHERE display_name ILIKE $1
      ORDER BY last_seen_at DESC
      LIMIT 10`,
@@ -55,7 +55,7 @@ export async function getLineUserProfile(db: Db, lineUserId: string): Promise<Li
     last_seen_at: Date;
   }>(
     `SELECT line_user_id, display_name, picture_url, language, memo, last_seen_at
-     FROM line_user_profiles WHERE line_user_id = $1`,
+     FROM near_line_user_profiles WHERE line_user_id = $1`,
     [lineUserId]
   );
   const row = r.rows[0];

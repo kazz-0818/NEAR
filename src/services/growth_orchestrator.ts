@@ -36,7 +36,7 @@ const LINE_PUSH_SAFE = 4700;
 
 export async function upsertAdminSession(db: Db, adminUserId: string, suggestionId: number): Promise<void> {
   await db.query(
-    `INSERT INTO growth_admin_sessions (admin_line_user_id, active_suggestion_id, updated_at)
+    `INSERT INTO near_growth_admin_sessions (admin_line_user_id, active_suggestion_id, updated_at)
      VALUES ($1, $2, now())
      ON CONFLICT (admin_line_user_id) DO UPDATE SET
        active_suggestion_id = EXCLUDED.active_suggestion_id,
@@ -47,7 +47,7 @@ export async function upsertAdminSession(db: Db, adminUserId: string, suggestion
 
 async function upsertUserGrowthSession(db: Db, requestingLineUserId: string, suggestionId: number): Promise<void> {
   await db.query(
-    `INSERT INTO growth_user_sessions (requesting_line_user_id, active_suggestion_id, updated_at)
+    `INSERT INTO near_growth_user_sessions (requesting_line_user_id, active_suggestion_id, updated_at)
      VALUES ($1, $2, now())
      ON CONFLICT (requesting_line_user_id) DO UPDATE SET
        active_suggestion_id = EXCLUDED.active_suggestion_id,
@@ -58,7 +58,7 @@ async function upsertUserGrowthSession(db: Db, requestingLineUserId: string, sug
 
 async function clearUserGrowthSessionForSuggestion(db: Db, suggestionId: number): Promise<void> {
   await db.query(
-    `UPDATE growth_user_sessions SET active_suggestion_id = NULL, updated_at = now()
+    `UPDATE near_growth_user_sessions SET active_suggestion_id = NULL, updated_at = now()
      WHERE active_suggestion_id = $1`,
     [suggestionId]
   );
@@ -67,8 +67,8 @@ async function clearUserGrowthSessionForSuggestion(db: Db, suggestionId: number)
 export async function loadSuggestionBundle(db: Db, suggestionId: number) {
   const r = await db.query(
     `SELECT s.*, u.original_message, u.channel_user_id, u.channel AS user_channel, u.id AS unsupported_request_id
-     FROM implementation_suggestions s
-     JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+     FROM near_implementation_suggestions s
+     JOIN near_unsupported_requests u ON u.id = s.unsupported_request_id
      WHERE s.id = $1`,
     [suggestionId]
   );
@@ -83,9 +83,9 @@ export async function completeHearingAndNotifyAdmin(db: Db, suggestionId: number
     return;
   }
   await db.query(
-    `UPDATE unsupported_requests u
+    `UPDATE near_unsupported_requests u
      SET status = 'final_approval_requested', updated_at = now()
-     FROM implementation_suggestions s
+     FROM near_implementation_suggestions s
      WHERE s.id = $1 AND u.id = s.unsupported_request_id`,
     [suggestionId]
   );
@@ -148,7 +148,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
   const unsupportedRequestId = Number(row.unsupported_request_id);
   const channelUserId = String(row.channel_user_id ?? "").trim();
   const inboundRow = await db.query<{ inbound_message_id: string | null }>(
-    `SELECT inbound_message_id::text AS inbound_message_id FROM unsupported_requests WHERE id = $1`,
+    `SELECT inbound_message_id::text AS inbound_message_id FROM near_unsupported_requests WHERE id = $1`,
     [unsupportedRequestId]
   );
   const rawIm = inboundRow.rows[0]?.inbound_message_id;
@@ -158,8 +158,8 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
   if (channelUserId && Number.isFinite(inboundMessageId)) {
     const dup = await db.query<{ id: string }>(
       `SELECT s.id::text AS id
-       FROM implementation_suggestions s
-       JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+       FROM near_implementation_suggestions s
+       JOIN near_unsupported_requests u ON u.id = s.unsupported_request_id
        WHERE u.channel_user_id = $1
          AND u.inbound_message_id = $2
          AND s.id <> $3
@@ -171,7 +171,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
     const priorId = dup.rows[0]?.id ? Number(dup.rows[0].id) : null;
     if (priorId != null && Number.isFinite(priorId)) {
       await db.query(
-        `UPDATE implementation_suggestions
+        `UPDATE near_implementation_suggestions
          SET approval_status = 'rejected',
              implementation_state = 'failed',
              failure_reason = COALESCE(failure_reason, $2),
@@ -181,7 +181,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
         [suggestionId, `duplicate suggestion for inbound_message_id=${inboundMessageId}`, `prior_suggestion_id=${priorId}`]
       );
       await db.query(
-        `UPDATE unsupported_requests
+        `UPDATE near_unsupported_requests
          SET status = 'growth_skipped', notes = COALESCE(notes, $2), updated_at = now()
          WHERE id = $1`,
         [unsupportedRequestId, `duplicate_suggestion_suppressed prior_suggestion_id=${priorId}`]
@@ -201,13 +201,13 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
   }
 
   await db.query(
-    `UPDATE unsupported_requests
+    `UPDATE near_unsupported_requests
      SET status = 'user_consent_requested', updated_at = now()
      WHERE id = $1`,
     [unsupportedRequestId]
   );
 
-  await db.query(`UPDATE implementation_suggestions SET updated_at = now() WHERE id = $1`, [suggestionId]);
+  await db.query(`UPDATE near_implementation_suggestions SET updated_at = now() WHERE id = $1`, [suggestionId]);
 
   if (channelUserId) {
     await upsertUserGrowthSession(db, channelUserId, suggestionId);
@@ -304,7 +304,7 @@ export async function onSuggestionCreated(db: Db, suggestionId: number): Promise
 
 export async function handleUserConsentAffirmative(db: Db, suggestionId: number): Promise<string> {
   const cur = await db.query<{ implementation_state: string }>(
-    `SELECT implementation_state FROM implementation_suggestions WHERE id = $1`,
+    `SELECT implementation_state FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   const st = cur.rows[0]?.implementation_state;
@@ -316,9 +316,9 @@ export async function handleUserConsentAffirmative(db: Db, suggestionId: number)
   if (!r.ok) return "状態の更新に失敗しました。しばらくしてからもう一度お試しください。";
 
   await db.query(
-    `UPDATE unsupported_requests u
+    `UPDATE near_unsupported_requests u
      SET status = 'user_hearing_in_progress', updated_at = now()
-     FROM implementation_suggestions s
+     FROM near_implementation_suggestions s
      WHERE s.id = $1 AND u.id = s.unsupported_request_id`,
     [suggestionId]
   );
@@ -329,7 +329,7 @@ export async function handleUserConsentAffirmative(db: Db, suggestionId: number)
 
 export async function handleUserConsentNegative(db: Db, suggestionId: number): Promise<string> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET approval_status = 'rejected',
          implementation_state = 'failed',
          failure_reason = COALESCE(failure_reason, '依頼者が成長候補を見送り'),
@@ -338,9 +338,9 @@ export async function handleUserConsentNegative(db: Db, suggestionId: number): P
     [suggestionId]
   );
   await db.query(
-    `UPDATE unsupported_requests u
+    `UPDATE near_unsupported_requests u
      SET status = 'rejected', updated_at = now()
-     FROM implementation_suggestions s
+     FROM near_implementation_suggestions s
      WHERE s.id = $1 AND u.id = s.unsupported_request_id`,
     [suggestionId]
   );
@@ -350,7 +350,7 @@ export async function handleUserConsentNegative(db: Db, suggestionId: number): P
 
 export async function handleUserHearingCancel(db: Db, suggestionId: number): Promise<string> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET implementation_state = 'failed',
          failure_reason = COALESCE(failure_reason, '依頼者がヒアリングを中断'),
          updated_at = now()
@@ -358,9 +358,9 @@ export async function handleUserHearingCancel(db: Db, suggestionId: number): Pro
     [suggestionId]
   );
   await db.query(
-    `UPDATE unsupported_requests u
+    `UPDATE near_unsupported_requests u
      SET status = 'failed', updated_at = now()
-     FROM implementation_suggestions s
+     FROM near_implementation_suggestions s
      WHERE s.id = $1 AND u.id = s.unsupported_request_id`,
     [suggestionId]
   );
@@ -475,7 +475,7 @@ export async function resolveSuggestionIdForAdmin(
 ): Promise<number | null> {
   if (explicitId != null && Number.isFinite(explicitId)) return explicitId;
   const s = await db.query<{ active_suggestion_id: string | null }>(
-    `SELECT active_suggestion_id FROM growth_admin_sessions WHERE admin_line_user_id = $1`,
+    `SELECT active_suggestion_id FROM near_growth_admin_sessions WHERE admin_line_user_id = $1`,
     [adminUserId]
   );
   const id = s.rows[0]?.active_suggestion_id;
@@ -489,7 +489,7 @@ export async function resolveSuggestionIdForRequestingUser(
 ): Promise<number | null> {
   if (explicitId != null && Number.isFinite(explicitId)) return explicitId;
   const s = await db.query<{ active_suggestion_id: string | null }>(
-    `SELECT active_suggestion_id FROM growth_user_sessions WHERE requesting_line_user_id = $1`,
+    `SELECT active_suggestion_id FROM near_growth_user_sessions WHERE requesting_line_user_id = $1`,
     [requestingLineUserId]
   );
   const id = s.rows[0]?.active_suggestion_id;

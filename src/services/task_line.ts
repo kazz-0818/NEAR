@@ -137,7 +137,7 @@ async function fetchActiveTasks(
   if (groupId) {
     const r = await db.query<TaskRow>(
       `SELECT id, title, notes, status, task_scope, actor_user_id, created_at
-       FROM tasks
+       FROM near_tasks
        WHERE status = 'open'
          AND (
            (group_id = $1 AND task_scope = 'group')
@@ -152,7 +152,7 @@ async function fetchActiveTasks(
   } else {
     const r = await db.query<TaskRow>(
       `SELECT id, title, notes, status, task_scope, actor_user_id, created_at
-       FROM tasks
+       FROM near_tasks
        WHERE status = 'open'
          AND channel_user_id = $1
          AND task_scope = 'personal'
@@ -226,7 +226,7 @@ export async function tryHandleTaskLine(input: {
     const taskScope = groupId ? "group" : "personal";
     try {
       const ins = await db.query<{ id: string }>(
-        `INSERT INTO tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, status, created_at, updated_at)
+        `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, status, created_at, updated_at)
          VALUES ('line', $1, $2, $3, $4, $5, NULL, 'open', now(), now())
          RETURNING id::text`,
         [channelUserId, actorUserId, groupId ?? null, taskScope, title]
@@ -265,7 +265,7 @@ export async function tryHandleTaskLine(input: {
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }
-      await db.query(`UPDATE tasks SET notes = $1, updated_at = now() WHERE id = $2`, [newNote, target.id]);
+      await db.query(`UPDATE near_tasks SET notes = $1, updated_at = now() WHERE id = $2`, [newNote, target.id]);
       return { handled: true, reply: `✏️ 「${target.title}」のメモを更新しました。` };
     } catch (e) {
       log.error({ err: e }, "task note update failed");
@@ -290,7 +290,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }
       await db.query(
-        `UPDATE tasks SET title = $1, updated_at = now() WHERE id = $2`,
+        `UPDATE near_tasks SET title = $1, updated_at = now() WHERE id = $2`,
         [newTitle, target.id]
       );
       log.info({ taskId: target.id, actorUserId }, "task title updated");
@@ -328,7 +328,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: "削除するタスクがありません。" };
       }
       if (tasks.length === 1) {
-        await db.query(`DELETE FROM tasks WHERE id = $1`, [tasks[0]!.id]);
+        await db.query(`DELETE FROM near_tasks WHERE id = $1`, [tasks[0]!.id]);
         log.info({ taskId: tasks[0]!.id, actorUserId }, "task deleted (no-num)");
         return { handled: true, reply: `🗑️ 「${tasks[0]!.title}」を削除しました。` };
       }
@@ -347,7 +347,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: "完了するタスクがありません。" };
       }
       if (tasks.length === 1) {
-        await db.query(`UPDATE tasks SET status = 'done', updated_at = now() WHERE id = $1`, [tasks[0]!.id]);
+        await db.query(`UPDATE near_tasks SET status = 'done', updated_at = now() WHERE id = $1`, [tasks[0]!.id]);
         log.info({ taskId: tasks[0]!.id, actorUserId }, "task done (no-num)");
         return { handled: true, reply: `✅ 「${tasks[0]!.title}」を完了にしました。` };
       }
@@ -369,7 +369,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: "削除するタスクがありません。" };
       }
       const ids = tasks.map((t) => t.id);
-      await db.query(`DELETE FROM tasks WHERE id = ANY($1::bigint[])`, [ids]);
+      await db.query(`DELETE FROM near_tasks WHERE id = ANY($1::bigint[])`, [ids]);
       const titles = tasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
       log.info({ count: ids.length, actorUserId }, "all tasks deleted");
       return { handled: true, reply: `🗑️ ${tasks.length}件のタスクをすべて削除しました。\n\n${titles}` };
@@ -390,7 +390,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: "完了するタスクがありません。" };
       }
       const ids = tasks.map((t) => t.id);
-      await db.query(`UPDATE tasks SET status = 'done', updated_at = now() WHERE id = ANY($1::bigint[])`, [ids]);
+      await db.query(`UPDATE near_tasks SET status = 'done', updated_at = now() WHERE id = ANY($1::bigint[])`, [ids]);
       const titles = tasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
       log.info({ count: ids.length, actorUserId }, "all tasks marked done");
       return { handled: true, reply: `✅ ${tasks.length}件のタスクをすべて完了にしました。\n\n${titles}` };
@@ -479,7 +479,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください（例: 「タスク完了 1」）。` };
       }
       await db.query(
-        `UPDATE tasks SET status = 'done', updated_at = now() WHERE id = $1`,
+        `UPDATE near_tasks SET status = 'done', updated_at = now() WHERE id = $1`,
         [target.id]
       );
       log.info({ taskId: target.id, actorUserId }, "task marked done");
@@ -504,7 +504,7 @@ export async function tryHandleTaskLine(input: {
       if (!target) {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください（例: 「タスク削除 1」）。` };
       }
-      await db.query(`DELETE FROM tasks WHERE id = $1`, [target.id]);
+      await db.query(`DELETE FROM near_tasks WHERE id = $1`, [target.id]);
       log.info({ taskId: target.id, actorUserId }, "task deleted");
       return { handled: true, reply: `🗑️ 「${target.title}」を削除しました。` };
     } catch (e) {
@@ -532,7 +532,7 @@ export async function tryHandleTaskLine(input: {
         return { handled: true, reply: `1〜${tasks.length} の番号を指定してください。` };
       }
       await db.query(
-        `UPDATE tasks SET title = $1, updated_at = now() WHERE id = $2`,
+        `UPDATE near_tasks SET title = $1, updated_at = now() WHERE id = $2`,
         [newTitle, target.id]
       );
       log.info({ taskId: target.id, actorUserId }, "task edited");

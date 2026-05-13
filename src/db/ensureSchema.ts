@@ -51,10 +51,11 @@ const MIGRATION_FILES = [
   "042_unsupported_routing_category.sql",
   "043_improvement_capsules.sql",
   "044_routing_trace_session_memory.sql",
+  "045_near_schema_and_rename.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS schema_migrations (
+  CREATE TABLE IF NOT EXISTS public.schema_migrations (
     filename   TEXT        PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )
@@ -63,7 +64,7 @@ const CREATE_MIGRATION_TABLE_SQL = `
 /** 適用済みマイグレーション一覧をセットで返す */
 async function loadApplied(pool: ReturnType<typeof getPool>): Promise<Set<string>> {
   try {
-    const r = await pool.query<{ filename: string }>("SELECT filename FROM schema_migrations");
+    const r = await pool.query<{ filename: string }>("SELECT filename FROM public.schema_migrations");
     return new Set(r.rows.map((row) => row.filename));
   } catch {
     return new Set();
@@ -97,7 +98,7 @@ export async function ensureSchema(): Promise<void> {
     const sql = await readFile(sqlPath, "utf-8");
     await pool.query(sql);
     await pool.query(
-      "INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
+      "INSERT INTO public.schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
       [name]
     );
     log.info({ migration: name }, "migration applied");

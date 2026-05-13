@@ -17,7 +17,7 @@ export async function insertGrowthCandidateSignalRow(
   }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO growth_candidate_signals (
+    `INSERT INTO near_growth_candidate_signals (
        inbound_message_id, channel, channel_user_id, source, reason_code, detail, parsed_intent_snapshot,
        bucket_id, user_message_fingerprint, bucket_key, priority_score
      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11)`,

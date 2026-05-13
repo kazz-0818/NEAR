@@ -9,7 +9,7 @@ function pickBody(ctx: ModuleContext): string {
 
 export async function memoStore(ctx: ModuleContext): Promise<ModuleResult> {
   const body = pickBody(ctx);
-  await ctx.db.query(`INSERT INTO memos (channel, channel_user_id, body) VALUES ($1, $2, $3)`, [
+  await ctx.db.query(`INSERT INTO near_memos (channel, channel_user_id, body) VALUES ($1, $2, $3)`, [
     ctx.channel,
     ctx.channelUserId,
     body,

@@ -12,7 +12,7 @@ export type UserRoleRecord = {
 
 export async function getUserRole(db: Db, lineUserId: string): Promise<UserRole> {
   const r = await db.query<{ role: string }>(
-    `SELECT role FROM user_roles WHERE line_user_id = $1`,
+    `SELECT role FROM near_user_roles WHERE line_user_id = $1`,
     [lineUserId]
   );
   const row = r.rows[0];
@@ -28,12 +28,12 @@ export async function upsertUserRole(
   notes?: string | null
 ): Promise<void> {
   await db.query(
-    `INSERT INTO user_roles (line_user_id, role, granted_by, notes, granted_at, updated_at)
+    `INSERT INTO near_user_roles (line_user_id, role, granted_by, notes, granted_at, updated_at)
      VALUES ($1, $2, $3, $4, now(), now())
      ON CONFLICT (line_user_id) DO UPDATE SET
        role       = EXCLUDED.role,
        granted_by = EXCLUDED.granted_by,
-       notes      = COALESCE(EXCLUDED.notes, user_roles.notes),
+       notes      = COALESCE(EXCLUDED.notes, near_user_roles.notes),
        updated_at = now()`,
     [lineUserId, role, grantedBy, notes ?? null]
   );
@@ -41,7 +41,7 @@ export async function upsertUserRole(
 
 export async function deleteUserRole(db: Db, lineUserId: string): Promise<boolean> {
   const r = await db.query(
-    `DELETE FROM user_roles WHERE line_user_id = $1`,
+    `DELETE FROM near_user_roles WHERE line_user_id = $1`,
     [lineUserId]
   );
   return (r.rowCount ?? 0) > 0;
@@ -56,7 +56,7 @@ export async function listUserRoles(db: Db): Promise<UserRoleRecord[]> {
     granted_at: Date;
   }>(
     `SELECT line_user_id, role, granted_by, notes, granted_at
-     FROM user_roles
+     FROM near_user_roles
      WHERE role != 'guest'
      ORDER BY
        CASE role WHEN 'developer' THEN 1 WHEN 'admin' THEN 2 WHEN 'member' THEN 3 WHEN 'restricted' THEN 5 ELSE 4 END,

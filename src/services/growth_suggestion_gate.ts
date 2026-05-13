@@ -12,7 +12,7 @@ import type { ParsedIntent } from "../models/intent.js";
 export type GrowthGateResult = { allow: boolean; reason: string };
 
 /**
- * 未対応は記録済み前提。implementation_suggestions / 管理者通知に進めてよいかを判定する。
+ * 未対応は記録済み前提。near_implementation_suggestions / 管理者通知に進めてよいかを判定する。
  */
 export async function evaluateGrowthSuggestionEligibility(input: {
   db: Db;
@@ -85,18 +85,18 @@ export async function evaluateGrowthSuggestionEligibility(input: {
 
 async function countUnsupportedByFingerprint(db: Db, fingerprint: string): Promise<number> {
   const r = await db.query<{ c: string }>(
-    `SELECT COUNT(*)::text AS c FROM unsupported_requests WHERE message_fingerprint = $1`,
+    `SELECT COUNT(*)::text AS c FROM near_unsupported_requests WHERE message_fingerprint = $1`,
     [fingerprint]
   );
   const n = Number(r.rows[0]?.c ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
 
-/** growth_signal_buckets の hit を同一 user_message_fingerprint で足し込み（agent 経路の「証拠」）。 */
+/** near_growth_signal_buckets の hit を同一 user_message_fingerprint で足し込み（agent 経路の「証拠」）。 */
 async function sumBucketHitEvidence(db: Db, fingerprint: string, capPerBucket: number): Promise<number> {
   const r = await db.query<{ s: string }>(
     `SELECT COALESCE(SUM(LEAST(GREATEST(hit_count, 0), $2)), 0)::text AS s
-     FROM growth_signal_buckets WHERE user_message_fingerprint = $1`,
+     FROM near_growth_signal_buckets WHERE user_message_fingerprint = $1`,
     [fingerprint, capPerBucket]
   );
   const n = Number(r.rows[0]?.s ?? 0);
@@ -121,7 +121,7 @@ export async function markUnsupportedGrowthSkipped(
 ): Promise<void> {
   const line = `[growth_gate] ${gateReason} @ ${new Date().toISOString()}`;
   await db.query(
-    `UPDATE unsupported_requests
+    `UPDATE near_unsupported_requests
      SET status = 'growth_skipped',
          notes = CASE
            WHEN notes IS NULL OR btrim(notes) = '' THEN $1

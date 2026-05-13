@@ -30,7 +30,7 @@ export async function taskManager(ctx: ModuleContext): Promise<ModuleResult> {
   const taskScope = !isGroup ? "personal" : isExplicitPersonalTaskIntent(ctx.originalText) ? "personal" : "group";
 
   await ctx.db.query(
-    `INSERT INTO tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes)
+    `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [ctx.channel, ctx.channelUserId, ctx.actorUserId ?? null, ctx.groupId ?? null, taskScope, title, notes]
   );

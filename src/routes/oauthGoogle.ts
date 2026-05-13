@@ -43,7 +43,7 @@ export function createGoogleOAuthApp(): Hono {
 
     const db = getPool();
     const r = await db.query<{ line_user_id: string }>(
-      `SELECT line_user_id FROM google_oauth_link_tokens WHERE token = $1 AND expires_at > now()`,
+      `SELECT line_user_id FROM near_google_oauth_link_tokens WHERE token = $1 AND expires_at > now()`,
       [link]
     );
     const lineUserId = r.rows[0]?.line_user_id;
@@ -82,7 +82,7 @@ export function createGoogleOAuthApp(): Hono {
 
     const db = getPool();
     const linkRow = await db.query<{ line_user_id: string }>(
-      `SELECT line_user_id FROM google_oauth_link_tokens WHERE token = $1 AND expires_at > now()`,
+      `SELECT line_user_id FROM near_google_oauth_link_tokens WHERE token = $1 AND expires_at > now()`,
       [state]
     );
     const lineUserId = linkRow.rows[0]?.line_user_id;
@@ -128,7 +128,7 @@ export function createGoogleOAuthApp(): Hono {
 
       await upsertGoogleOAuthAccount(db, lineUserId, sub, email, cipher, scopeStr);
       await setActiveGoogleAccount(db, lineUserId, sub);
-      await db.query(`DELETE FROM google_oauth_link_tokens WHERE token = $1`, [state]);
+      await db.query(`DELETE FROM near_google_oauth_link_tokens WHERE token = $1`, [state]);
     } catch (e) {
       log.warn({ err: e }, "google oauth callback failed");
       return c.html(

@@ -38,7 +38,7 @@ export async function savePendingSpreadsheetConfirm(
   suggestedName: string
 ): Promise<void> {
   await db.query(
-    `INSERT INTO user_sheet_pending_confirm (line_user_id, spreadsheet_id, suggested_name, expires_at)
+    `INSERT INTO near_user_sheet_pending_confirm (line_user_id, spreadsheet_id, suggested_name, expires_at)
      VALUES ($1, $2, $3, now() + interval '45 minutes')
      ON CONFLICT (line_user_id) DO UPDATE SET
        spreadsheet_id = EXCLUDED.spreadsheet_id,
@@ -53,7 +53,7 @@ export async function getPendingSpreadsheetConfirm(
   lineUserId: string
 ): Promise<{ spreadsheetId: string; suggestedName: string } | null> {
   const r = await db.query<{ spreadsheet_id: string; suggested_name: string }>(
-    `SELECT spreadsheet_id, suggested_name FROM user_sheet_pending_confirm
+    `SELECT spreadsheet_id, suggested_name FROM near_user_sheet_pending_confirm
      WHERE line_user_id = $1 AND expires_at > now()`,
     [lineUserId]
   );
@@ -70,7 +70,7 @@ export async function tryConsumePendingSpreadsheetConfirm(
 ): Promise<string | null> {
   if (!isSpreadsheetConfirmAffirmative(text)) return null;
   const r = await db.query<{ spreadsheet_id: string }>(
-    `DELETE FROM user_sheet_pending_confirm
+    `DELETE FROM near_user_sheet_pending_confirm
      WHERE line_user_id = $1 AND expires_at > now()
      RETURNING spreadsheet_id`,
     [lineUserId]
@@ -79,5 +79,5 @@ export async function tryConsumePendingSpreadsheetConfirm(
 }
 
 export async function clearPendingSpreadsheetConfirm(db: Db, lineUserId: string): Promise<void> {
-  await db.query(`DELETE FROM user_sheet_pending_confirm WHERE line_user_id = $1`, [lineUserId]);
+  await db.query(`DELETE FROM near_user_sheet_pending_confirm WHERE line_user_id = $1`, [lineUserId]);
 }

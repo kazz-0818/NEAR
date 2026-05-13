@@ -213,7 +213,7 @@ export async function runThinRouterPhase(input: {
         const hit = mem.items.find((x) => x.index === n);
         if (hit) {
           try {
-            await db.query(`DELETE FROM reminders WHERE id = $1 AND actor_user_id = $2`, [hit.id, effectiveActorId]);
+            await db.query(`DELETE FROM near_reminders WHERE id = $1 AND actor_user_id = $2`, [hit.id, effectiveActorId]);
             return {
               handled: true,
               finalText: `了解。${n}番「${hit.message}」のリマインドを削除しました。`,
@@ -279,7 +279,7 @@ export async function runThinRouterPhase(input: {
     try {
       const result = await db.query<{ id: number; message: string; remind_at: string }>(
         `SELECT id, message, remind_at
-         FROM reminders
+         FROM near_reminders
          WHERE actor_user_id = $1 AND status = 'pending' AND remind_at > now()
          ORDER BY remind_at ASC LIMIT 20`,
         [effectiveActorId]
@@ -344,7 +344,7 @@ export async function runThinRouterPhase(input: {
       const newDate = applyReminderTimeUpdate(originalDate, newTimeText);
       if (newDate) {
         try {
-          await db.query(`UPDATE reminders SET remind_at = $1 WHERE id = $2`, [
+          await db.query(`UPDATE near_reminders SET remind_at = $1 WHERE id = $2`, [
             newDate.toISOString(),
             r.id,
           ]);

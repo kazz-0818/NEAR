@@ -21,8 +21,8 @@ function jString(v: unknown, fallback = "[]"): string {
 export async function buildFinalCursorPrompt(db: Db, suggestionId: number): Promise<string> {
   const r = await db.query(
     `SELECT s.*, u.original_message, u.detected_intent, u.channel_user_id
-     FROM implementation_suggestions s
-     JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+     FROM near_implementation_suggestions s
+     JOIN near_unsupported_requests u ON u.id = s.unsupported_request_id
      WHERE s.id = $1`,
     [suggestionId]
   );
@@ -114,7 +114,7 @@ export async function buildFinalCursorPrompt(db: Db, suggestionId: number): Prom
 
 export async function persistBuiltCursorPrompt(db: Db, suggestionId: number, text: string): Promise<void> {
   await db.query(
-    `UPDATE implementation_suggestions SET cursor_prompt = $1, updated_at = now() WHERE id = $2`,
+    `UPDATE near_implementation_suggestions SET cursor_prompt = $1, updated_at = now() WHERE id = $2`,
     [text, suggestionId]
   );
 }

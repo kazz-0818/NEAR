@@ -96,7 +96,7 @@ export async function tryHandleGrowthRequestingUserLine(input: {
 
   if (isGrowthResetCommand(text)) {
     const r = await input.db.query(
-      `UPDATE growth_user_sessions
+      `UPDATE near_growth_user_sessions
        SET active_suggestion_id = NULL, updated_at = now()
        WHERE requesting_line_user_id = $1 AND active_suggestion_id IS NOT NULL`,
       [input.channelUserId]
@@ -133,7 +133,7 @@ export async function tryHandleGrowthRequestingUserLine(input: {
   const row = await input.db.query<{
     implementation_state: string;
     approval_status: string;
-  }>(`SELECT implementation_state, approval_status FROM implementation_suggestions WHERE id = $1`, [suggestionId]);
+  }>(`SELECT implementation_state, approval_status FROM near_implementation_suggestions WHERE id = $1`, [suggestionId]);
 
   if (row.rows.length === 0) return { handled: false, reply: "" };
   const { implementation_state: st, approval_status: ap } = row.rows[0]!;

@@ -89,14 +89,14 @@ export async function maybePromoteGrowthBucketAfterSignal(
   const channelUserForSynthetic = (bucket.last_channel_user_id ?? input.channelUserId).trim();
 
   const existing = await db.query<{ id: string }>(
-    `SELECT id FROM unsupported_requests WHERE growth_signal_bucket_id = $1 LIMIT 1`,
+    `SELECT id FROM near_unsupported_requests WHERE growth_signal_bucket_id = $1 LIMIT 1`,
     [input.bucketId]
   );
   const existingId = existing.rows[0]?.id != null ? Number(existing.rows[0].id) : null;
 
   if (existingId != null) {
     const sug = await db.query(
-      `SELECT id FROM implementation_suggestions WHERE unsupported_request_id = $1 LIMIT 1`,
+      `SELECT id FROM near_implementation_suggestions WHERE unsupported_request_id = $1 LIMIT 1`,
       [existingId]
     );
     if (sug.rows.length > 0) return;

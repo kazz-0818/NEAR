@@ -27,7 +27,7 @@ export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise
   const normalizedMessage = input.originalMessage.normalize("NFKC").trim();
 
   const res = await input.db.query<{ id: string }>(
-    `INSERT INTO unsupported_requests (
+    `INSERT INTO near_unsupported_requests (
        channel, channel_user_id, original_message, detected_intent, why_unsupported,
        suggested_implementation_category, priority, status, notes, confidence, inbound_message_id,
        message_fingerprint, improvement_kind, normalized_message, intent_guess,
@@ -53,11 +53,11 @@ export async function logUnsupportedRequest(input: LogUnsupportedInput): Promise
     ]
   );
   const id = res.rows[0]?.id;
-  if (!id) throw new Error("Failed to insert unsupported_requests");
+  if (!id) throw new Error("Failed to insert near_unsupported_requests");
   return Number(id);
 }
 
-/** growth_signal_buckets からの昇格用。既存の suggestion / JOIN 互換のため unsupported 行を合成する。 */
+/** near_growth_signal_buckets からの昇格用。既存の suggestion / JOIN 互換のため unsupported 行を合成する。 */
 export async function logUnsupportedFromGrowthBucket(input: LogUnsupportedInput & { growthSignalBucketId: number }): Promise<number> {
   const why =
     input.whyOverride ?? "成長シグナルバケットからの昇格（agent/FAQ 等の未解決シグナル）";
@@ -67,7 +67,7 @@ export async function logUnsupportedFromGrowthBucket(input: LogUnsupportedInput 
   const normalizedMessage = input.originalMessage.normalize("NFKC").trim();
 
   const res = await input.db.query<{ id: string }>(
-    `INSERT INTO unsupported_requests (
+    `INSERT INTO near_unsupported_requests (
        channel, channel_user_id, original_message, detected_intent, why_unsupported,
        suggested_implementation_category, priority, status, notes, confidence, inbound_message_id,
        message_fingerprint, improvement_kind, normalized_message, intent_guess,
@@ -94,6 +94,6 @@ export async function logUnsupportedFromGrowthBucket(input: LogUnsupportedInput 
     ]
   );
   const id = res.rows[0]?.id;
-  if (!id) throw new Error("Failed to insert unsupported_requests (growth bucket)");
+  if (!id) throw new Error("Failed to insert near_unsupported_requests (growth bucket)");
   return Number(id);
 }

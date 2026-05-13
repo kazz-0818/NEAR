@@ -19,14 +19,14 @@ export async function replacePendingToolConfirmation(
     ttlMinutes: number;
   }
 ): Promise<void> {
-  await db.query(`DELETE FROM pending_tool_confirmations WHERE channel = $1 AND channel_user_id = $2 AND status = 'pending'`, [
+  await db.query(`DELETE FROM near_pending_tool_confirmations WHERE channel = $1 AND channel_user_id = $2 AND status = 'pending'`, [
     input.channel,
     input.channelUserId,
   ]);
   const nonce = randomUUID();
   const mins = Math.max(1, Math.min(120, input.ttlMinutes));
   await db.query(
-    `INSERT INTO pending_tool_confirmations (
+    `INSERT INTO near_pending_tool_confirmations (
        expires_at, channel, channel_user_id, status, tool_name, args_json, inbound_message_id, confirmation_nonce
      ) VALUES (now() + ($1::int * interval '1 minute'), $2, $3, 'pending', $4, $5::jsonb, $6, $7)`,
     [
@@ -47,7 +47,7 @@ export async function getPendingToolConfirmation(
   channelUserId: string
 ): Promise<PendingToolRow | null> {
   const r = await db.query<{ id: string; tool_name: string; args_json: unknown }>(
-    `SELECT id::text, tool_name, args_json FROM pending_tool_confirmations
+    `SELECT id::text, tool_name, args_json FROM near_pending_tool_confirmations
      WHERE channel = $1 AND channel_user_id = $2 AND status = 'pending' AND expires_at > now()
      LIMIT 1`,
     [channel, channelUserId]
@@ -61,7 +61,7 @@ export async function getPendingToolConfirmation(
 
 export async function cancelPendingToolConfirmation(db: Db, channel: string, channelUserId: string): Promise<void> {
   await db.query(
-    `UPDATE pending_tool_confirmations SET status = 'cancelled'
+    `UPDATE near_pending_tool_confirmations SET status = 'cancelled'
      WHERE channel = $1 AND channel_user_id = $2 AND status = 'pending'`,
     [channel, channelUserId]
   );
@@ -74,9 +74,9 @@ export async function finalizePendingToolConfirmation(
   channelUserId: string
 ): Promise<PendingToolRow | null> {
   const r = await db.query<{ id: string; tool_name: string; args_json: unknown }>(
-    `UPDATE pending_tool_confirmations SET status = 'executed'
+    `UPDATE near_pending_tool_confirmations SET status = 'executed'
      WHERE id = (
-       SELECT id FROM pending_tool_confirmations
+       SELECT id FROM near_pending_tool_confirmations
        WHERE channel = $1 AND channel_user_id = $2 AND status = 'pending' AND expires_at > now()
        ORDER BY created_at DESC LIMIT 1
      )

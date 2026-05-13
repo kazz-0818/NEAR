@@ -49,7 +49,7 @@ export async function tryHandleGoogleOAuthUserLine(input: {
 
   const token = randomBytes(32).toString("base64url");
   await input.db.query(
-    `INSERT INTO google_oauth_link_tokens (token, line_user_id, expires_at)
+    `INSERT INTO near_google_oauth_link_tokens (token, line_user_id, expires_at)
      VALUES ($1, $2, now() + interval '15 minutes')`,
     [token, input.channelUserId]
   );
@@ -119,7 +119,7 @@ export async function tryHandleGoogleDiagnostic(input: {
       const scopeMap = new Map<string, string>();
       for (const a of accounts) {
         const r = await input.db.query<{ scope: string | null }>(
-          `SELECT scope FROM user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
+          `SELECT scope FROM near_user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
           [input.channelUserId, a.googleSub]
         );
         scopeMap.set(a.googleSub, r.rows[0]?.scope ?? "");

@@ -75,7 +75,7 @@ async function saveIntentRun(
 ): Promise<void> {
   const env = getEnv();
   await db.query(
-    `INSERT INTO intent_runs (inbound_message_id, model, raw_output, parsed) VALUES ($1, $2, $3::jsonb, $4::jsonb)`,
+    `INSERT INTO near_intent_runs (inbound_message_id, model, raw_output, parsed) VALUES ($1, $2, $3::jsonb, $4::jsonb)`,
     [inboundMessageId, env.OPENAI_INTENT_MODEL, JSON.stringify(rawOutput), JSON.stringify(parsed)]
   );
 }

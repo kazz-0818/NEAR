@@ -21,7 +21,7 @@ export type SaveInboundResult = {
 
 export async function saveInboundMessage(db: Db, input: SaveInboundInput): Promise<SaveInboundResult> {
   const res = await db.query<{ id: string }>(
-    `INSERT INTO inbound_messages (channel, channel_user_id, actor_user_id, group_id, message_id, quoted_message_id, message_type, text, raw_payload)
+    `INSERT INTO near_inbound_messages (channel, channel_user_id, actor_user_id, group_id, message_id, quoted_message_id, message_type, text, raw_payload)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
      ON CONFLICT (channel, message_id) DO NOTHING
      RETURNING id`,
@@ -41,7 +41,7 @@ export async function saveInboundMessage(db: Db, input: SaveInboundInput): Promi
     return { id: Number(res.rows[0].id), isDuplicate: false };
   }
   const existing = await db.query<{ id: string }>(
-    `SELECT id FROM inbound_messages WHERE channel = $1 AND message_id = $2`,
+    `SELECT id FROM near_inbound_messages WHERE channel = $1 AND message_id = $2`,
     [input.channel, input.messageId]
   );
   const id = existing.rows[0]?.id;

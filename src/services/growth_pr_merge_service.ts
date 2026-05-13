@@ -109,7 +109,7 @@ async function findOpenPrForSuggestionHeads(owner: string, repo: string, suggest
 
 async function persistGrowthPrMeta(db: Db, suggestionId: number, prNumber: number, prUrlStr: string): Promise<void> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET github_growth_pr_number = $1,
          github_growth_pr_url = $2,
          updated_at = now()
@@ -167,7 +167,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
 
   if (prNumber == null) {
     const sess = await input.db.query<{ active_suggestion_id: string | null }>(
-      `SELECT active_suggestion_id::text AS active_suggestion_id FROM growth_admin_sessions WHERE admin_line_user_id = $1`,
+      `SELECT active_suggestion_id::text AS active_suggestion_id FROM near_growth_admin_sessions WHERE admin_line_user_id = $1`,
       [input.adminUserId]
     );
     const raw = sess.rows[0]?.active_suggestion_id;
@@ -185,7 +185,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
       github_issue_url: string | null;
     }>(
       `SELECT github_growth_pr_number, github_issue_number, github_issue_url
-       FROM implementation_suggestions WHERE id = $1`,
+       FROM near_implementation_suggestions WHERE id = $1`,
       [suggestionId]
     );
     const r0 = row.rows[0];
@@ -235,7 +235,7 @@ export async function tryMergeGrowthPrFromAdminLine(input: {
     }
   } else {
     const m = await input.db.query<{ id: string }>(
-      `SELECT id::text AS id FROM implementation_suggestions
+      `SELECT id::text AS id FROM near_implementation_suggestions
        WHERE github_growth_pr_number = $1
        LIMIT 1`,
       [prNumber]

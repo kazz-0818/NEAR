@@ -31,7 +31,7 @@ export async function setImplementationState(
   opts?: { failureReason?: string | null }
 ): Promise<{ ok: boolean; error?: string; from?: ImplementationState }> {
   const cur = await db.query<{ implementation_state: string }>(
-    `SELECT implementation_state FROM implementation_suggestions WHERE id = $1`,
+    `SELECT implementation_state FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   if (cur.rows.length === 0) return { ok: false, error: "suggestion not found" };
@@ -41,7 +41,7 @@ export async function setImplementationState(
     return { ok: false, error: `invalid transition: ${from} -> ${to}`, from };
   }
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET implementation_state = $1,
          failure_reason = CASE WHEN $2::text IS NOT NULL THEN $2 ELSE failure_reason END,
          updated_at = now()
@@ -58,7 +58,7 @@ export async function setFirstApproval(
   reviewNotes?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
   const cur = await db.query<{ approval_status: string }>(
-    `SELECT approval_status FROM implementation_suggestions WHERE id = $1`,
+    `SELECT approval_status FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   if (cur.rows.length === 0) return { ok: false, error: "not found" };
@@ -69,7 +69,7 @@ export async function setFirstApproval(
     const failureReason = "承認: いいえ";
     const notes = reviewNotes ?? null;
     await db.query(
-      `UPDATE implementation_suggestions
+      `UPDATE near_implementation_suggestions
        SET approval_status = 'rejected',
            implementation_state = 'failed',
            failure_reason = $1,
@@ -83,7 +83,7 @@ export async function setFirstApproval(
     return { ok: true };
   }
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET implementation_state = 'hearing_required',
          review_notes = COALESCE($1, review_notes),
          reviewed_at = now(),
@@ -102,7 +102,7 @@ export async function setFinalApprovalAndStartCoding(
   reviewNotes?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
   const cur = await db.query<{ implementation_state: string; approval_status: string }>(
-    `SELECT implementation_state, approval_status FROM implementation_suggestions WHERE id = $1`,
+    `SELECT implementation_state, approval_status FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   if (cur.rows.length === 0) return { ok: false, error: "not found" };
@@ -111,7 +111,7 @@ export async function setFinalApprovalAndStartCoding(
   }
   if (decision === "rejected") {
     await db.query(
-      `UPDATE implementation_suggestions
+      `UPDATE near_implementation_suggestions
        SET implementation_state = 'failed',
            failure_reason = COALESCE($1, '第二段階承認: 見送り'),
            review_notes = COALESCE($2, review_notes),
@@ -126,7 +126,7 @@ export async function setFinalApprovalAndStartCoding(
   const r = await setImplementationState(db, suggestionId, "coding");
   if (!r.ok) return r;
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET approval_status = 'approved',
          review_notes = COALESCE($1, review_notes),
          reviewed_at = now(),
@@ -144,7 +144,7 @@ export async function markImplementationFailed(
   reason: string
 ): Promise<void> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET implementation_state = 'failed',
          failure_reason = $1,
          updated_at = now()
@@ -156,7 +156,7 @@ export async function markImplementationFailed(
 
 export async function markImplementedComplete(db: Db, suggestionId: number): Promise<{ ok: boolean; error?: string }> {
   const cur = await db.query<{ implementation_state: string }>(
-    `SELECT implementation_state FROM implementation_suggestions WHERE id = $1`,
+    `SELECT implementation_state FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   if (cur.rows.length === 0) return { ok: false, error: "not found" };
@@ -179,9 +179,9 @@ async function syncUnsupportedStatusForSuggestion(
 ): Promise<void> {
   try {
     await db.query(
-      `UPDATE unsupported_requests u
+      `UPDATE near_unsupported_requests u
        SET status = $1, updated_at = now()
-       FROM implementation_suggestions s
+       FROM near_implementation_suggestions s
        WHERE s.id = $2 AND u.id = s.unsupported_request_id`,
       [status, suggestionId]
     );
@@ -202,7 +202,7 @@ export async function patchImplementationState(
   }
   if (opts?.deploySafetyConfirmed === true) {
     await db.query(
-      `UPDATE implementation_suggestions SET deploy_safety_confirmed = true, updated_at = now() WHERE id = $1`,
+      `UPDATE near_implementation_suggestions SET deploy_safety_confirmed = true, updated_at = now() WHERE id = $1`,
       [suggestionId]
     );
   }
@@ -217,21 +217,21 @@ export async function patchApprovalStatus(
   reviewNotes?: string | null
 ): Promise<{ ok: boolean; error?: string }> {
   const cur = await db.query<{ approval_status: string }>(
-    `SELECT approval_status FROM implementation_suggestions WHERE id = $1`,
+    `SELECT approval_status FROM near_implementation_suggestions WHERE id = $1`,
     [suggestionId]
   );
   if (cur.rows.length === 0) return { ok: false, error: "not found" };
   const from = cur.rows[0].approval_status;
   if (from === to) {
     await db.query(
-      `UPDATE implementation_suggestions SET review_notes = COALESCE($1, review_notes), updated_at = now() WHERE id = $2`,
+      `UPDATE near_implementation_suggestions SET review_notes = COALESCE($1, review_notes), updated_at = now() WHERE id = $2`,
       [reviewNotes, suggestionId]
     );
     return { ok: true };
   }
   if (from === "pending" && to === "approved") {
     const st = await db.query<{ implementation_state: string }>(
-      `SELECT implementation_state FROM implementation_suggestions WHERE id = $1`,
+      `SELECT implementation_state FROM near_implementation_suggestions WHERE id = $1`,
       [suggestionId]
     );
     const impl = st.rows[0]?.implementation_state;

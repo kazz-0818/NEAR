@@ -289,7 +289,7 @@ export async function seedHearingItems(
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i]!;
     await db.query(
-      `INSERT INTO growth_hearing_items (
+      `INSERT INTO near_growth_hearing_items (
          implementation_suggestion_id, sort_order, question_key, question_text
        ) VALUES ($1, $2, $3, $4)
        ON CONFLICT (implementation_suggestion_id, question_key) DO NOTHING`,
@@ -305,7 +305,7 @@ export async function listHearingQuestionBlocks(
   suggestionId: number
 ): Promise<{ key: string; text: string }[]> {
   const r = await db.query<{ question_key: string; question_text: string }>(
-    `SELECT question_key, question_text FROM growth_hearing_items
+    `SELECT question_key, question_text FROM near_growth_hearing_items
      WHERE implementation_suggestion_id = $1
      ORDER BY sort_order ASC`,
     [suggestionId]
@@ -320,7 +320,7 @@ export async function applyHearingAnswersByKey(
 ): Promise<void> {
   for (const [key, text] of Object.entries(answers)) {
     await db.query(
-      `UPDATE growth_hearing_items
+      `UPDATE near_growth_hearing_items
        SET answer_text = $1, answered_at = now()
        WHERE implementation_suggestion_id = $2 AND question_key = $3`,
       [text, suggestionId, key]
@@ -335,7 +335,7 @@ export async function getNextUnansweredHearing(db: Db, suggestionId: number): Pr
 } | null> {
   const r = await db.query<{ id: string; question_key: string; question_text: string }>(
     `SELECT id, question_key, question_text
-     FROM growth_hearing_items
+     FROM near_growth_hearing_items
      WHERE implementation_suggestion_id = $1 AND answer_text IS NULL
      ORDER BY sort_order ASC
      LIMIT 1`,
@@ -352,7 +352,7 @@ export async function saveHearingAnswer(
   answerText: string
 ): Promise<void> {
   await db.query(
-    `UPDATE growth_hearing_items
+    `UPDATE near_growth_hearing_items
      SET answer_text = $1, answered_at = now()
      WHERE id = $2`,
     [answerText.trim(), itemId]
@@ -361,7 +361,7 @@ export async function saveHearingAnswer(
 
 export async function hearingAnswersAsJson(db: Db, suggestionId: number): Promise<Record<string, string>> {
   const r = await db.query<{ question_key: string; answer_text: string | null }>(
-    `SELECT question_key, answer_text FROM growth_hearing_items
+    `SELECT question_key, answer_text FROM near_growth_hearing_items
      WHERE implementation_suggestion_id = $1 AND answer_text IS NOT NULL
      ORDER BY sort_order`,
     [suggestionId]
@@ -379,7 +379,7 @@ export async function mergeRequiredInformation(
   answers: Record<string, string>
 ): Promise<void> {
   await db.query(
-    `UPDATE implementation_suggestions
+    `UPDATE near_implementation_suggestions
      SET required_information = required_information || $1::jsonb,
          updated_at = now()
      WHERE id = $2`,

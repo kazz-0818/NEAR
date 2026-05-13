@@ -47,7 +47,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT id, channel, channel_user_id, message_id, message_type, text, created_at
-       FROM inbound_messages ORDER BY id DESC LIMIT $1`,
+       FROM near_inbound_messages ORDER BY id DESC LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -58,7 +58,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT ir.id, ir.inbound_message_id, ir.model, ir.parsed, ir.created_at
-       FROM intent_runs ir ORDER BY ir.id DESC LIMIT $1`,
+       FROM near_intent_runs ir ORDER BY ir.id DESC LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -70,7 +70,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT id, created_at, channel, channel_user_id, inbound_message_id, tool_name, ok, situation, duration_ms, error_code
-       FROM agent_tool_runs ORDER BY id DESC LIMIT $1`,
+       FROM near_agent_tool_runs ORDER BY id DESC LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -82,7 +82,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT id, created_at, channel, channel_user_id, inbound_message_id, policy_enabled, attached_web_search, reason_code, user_text_chars, tool_names
-       FROM agent_search_runs ORDER BY id DESC LIMIT $1`,
+       FROM near_agent_search_runs ORDER BY id DESC LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -94,7 +94,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT id, created_at, expires_at, channel, channel_user_id, status, tool_name, args_json, inbound_message_id
-       FROM pending_tool_confirmations
+       FROM near_pending_tool_confirmations
        WHERE status = 'pending' AND expires_at > now()
        ORDER BY id DESC LIMIT $1`,
       [limit]
@@ -106,7 +106,7 @@ export function createAdminApp(): Hono {
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
     const pool = getPool();
     const r = await pool.query(
-      `SELECT * FROM unsupported_requests ORDER BY id DESC LIMIT $1`,
+      `SELECT * FROM near_unsupported_requests ORDER BY id DESC LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -124,7 +124,7 @@ export function createAdminApp(): Hono {
     const r = await pool.query(
       `SELECT id, created_at, inbound_message_id, unsupported_request_id, channel, channel_user_id, step, allowed, reason_code, detail,
               growth_signal_bucket_id, implementation_suggestion_id
-       FROM growth_funnel_events
+       FROM near_growth_funnel_events
        WHERE ($1::bigint IS NULL OR unsupported_request_id = $1)
        ORDER BY id DESC LIMIT $2`,
       [usNum, limit]
@@ -139,7 +139,7 @@ export function createAdminApp(): Hono {
     const r = await pool.query(
       `SELECT id, created_at, inbound_message_id, channel, channel_user_id, source, reason_code, detail, parsed_intent_snapshot,
               bucket_id, user_message_fingerprint, bucket_key, priority_score
-       FROM growth_candidate_signals ORDER BY id DESC LIMIT $1`,
+       FROM near_growth_candidate_signals ORDER BY id DESC LIMIT $1`,
       [limit]
     );
     return c.json({ items: r.rows });
@@ -151,7 +151,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT id, bucket_key, user_message_fingerprint, channel, first_seen, last_seen, hit_count, priority_score, primary_source
-       FROM growth_signal_buckets
+       FROM near_growth_signal_buckets
        ORDER BY priority_score DESC, last_seen DESC
        LIMIT $1`,
       [limit]
@@ -164,27 +164,27 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const funnel = await pool.query(
       `SELECT step, reason_code, COUNT(*)::int AS count
-       FROM growth_funnel_events
+       FROM near_growth_funnel_events
        WHERE created_at > now() - interval '30 days'
        GROUP BY step, reason_code
        ORDER BY count DESC`
     );
     const unsupportedByStatus = await pool.query(
       `SELECT status, COUNT(*)::int AS count
-       FROM unsupported_requests
+       FROM near_unsupported_requests
        WHERE created_at > now() - interval '30 days'
        GROUP BY status
        ORDER BY count DESC`
     );
     const suggestionsByApproval = await pool.query(
       `SELECT approval_status, COUNT(*)::int AS count
-       FROM implementation_suggestions
+       FROM near_implementation_suggestions
        WHERE created_at > now() - interval '30 days'
        GROUP BY approval_status
        ORDER BY count DESC`
     );
     const signalBuckets = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM growth_signal_buckets WHERE last_seen > now() - interval '30 days'`
+      `SELECT COUNT(*)::int AS count FROM near_growth_signal_buckets WHERE last_seen > now() - interval '30 days'`
     );
     return c.json({
       period_days: 30,
@@ -208,7 +208,7 @@ export function createAdminApp(): Hono {
     params.push(limit);
     const limParam = `$${params.length}`;
     const r = await pool.query(
-      `SELECT * FROM implementation_suggestions ${where} ORDER BY id DESC LIMIT ${limParam}`,
+      `SELECT * FROM near_implementation_suggestions ${where} ORDER BY id DESC LIMIT ${limParam}`,
       params
     );
     return c.json({ items: r.rows });
@@ -222,7 +222,7 @@ export function createAdminApp(): Hono {
     }
     const pool = getPool();
     const r = await pool.query<{ cursor_prompt: string | null }>(
-      `SELECT cursor_prompt FROM implementation_suggestions WHERE id = $1`,
+      `SELECT cursor_prompt FROM near_implementation_suggestions WHERE id = $1`,
       [id]
     );
     if (r.rows.length === 0) return c.text("not found", 404);
@@ -236,7 +236,7 @@ export function createAdminApp(): Hono {
       return c.json({ error: "invalid id" }, 400);
     }
     const pool = getPool();
-    const r = await pool.query(`SELECT * FROM implementation_suggestions WHERE id = $1`, [id]);
+    const r = await pool.query(`SELECT * FROM near_implementation_suggestions WHERE id = $1`, [id]);
     if (r.rows.length === 0) return c.json({ error: "not found" }, 404);
     return c.json(r.rows[0]);
   });
@@ -270,7 +270,7 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const r = await pool.query(
       `SELECT id, sort_order, question_key, question_text, answer_text, asked_at, answered_at
-       FROM growth_hearing_items WHERE implementation_suggestion_id = $1 ORDER BY sort_order`,
+       FROM near_growth_hearing_items WHERE implementation_suggestion_id = $1 ORDER BY sort_order`,
       [id]
     );
     return c.json({ items: r.rows });
@@ -309,7 +309,7 @@ export function createAdminApp(): Hono {
       if (!r.ok) return c.json({ error: r.error }, 400);
     } else if (parsed.data.failure_reason != null || parsed.data.review_notes != null) {
       await pool.query(
-        `UPDATE implementation_suggestions
+        `UPDATE near_implementation_suggestions
          SET review_notes = COALESCE($1, review_notes),
              failure_reason = COALESCE($2, failure_reason),
              updated_at = now()
@@ -318,7 +318,7 @@ export function createAdminApp(): Hono {
       );
     }
 
-    const cur = await pool.query(`SELECT approval_status, implementation_state FROM implementation_suggestions WHERE id = $1`, [
+    const cur = await pool.query(`SELECT approval_status, implementation_state FROM near_implementation_suggestions WHERE id = $1`, [
       id,
     ]);
     return c.json({ ok: true, id, ...cur.rows[0] });
@@ -331,7 +331,7 @@ export function createAdminApp(): Hono {
       `SELECT message_fingerprint,
               COUNT(*)::int AS count,
               MAX(original_message) AS sample_message
-       FROM unsupported_requests
+       FROM near_unsupported_requests
        WHERE message_fingerprint IS NOT NULL AND message_fingerprint <> ''
        GROUP BY message_fingerprint
        ORDER BY count DESC
@@ -345,13 +345,13 @@ export function createAdminApp(): Hono {
     const pool = getPool();
     const byIntent = await pool.query(
       `SELECT detected_intent AS key, COUNT(*)::int AS count
-       FROM unsupported_requests
+       FROM near_unsupported_requests
        GROUP BY detected_intent
        ORDER BY count DESC`
     );
     const byCategory = await pool.query(
       `SELECT COALESCE(suggested_implementation_category, '(null)') AS key, COUNT(*)::int AS count
-       FROM unsupported_requests
+       FROM near_unsupported_requests
        GROUP BY suggested_implementation_category
        ORDER BY count DESC`
     );
@@ -364,14 +364,14 @@ export function createAdminApp(): Hono {
   app.get("/tasks", async (c) => {
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
     const pool = getPool();
-    const r = await pool.query(`SELECT * FROM tasks ORDER BY id DESC LIMIT $1`, [limit]);
+    const r = await pool.query(`SELECT * FROM near_tasks ORDER BY id DESC LIMIT $1`, [limit]);
     return c.json({ items: r.rows });
   });
 
   app.get("/reminders", async (c) => {
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
     const pool = getPool();
-    const r = await pool.query(`SELECT * FROM reminders ORDER BY id DESC LIMIT $1`, [limit]);
+    const r = await pool.query(`SELECT * FROM near_reminders ORDER BY id DESC LIMIT $1`, [limit]);
     return c.json({ items: r.rows });
   });
 

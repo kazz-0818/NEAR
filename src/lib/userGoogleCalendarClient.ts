@@ -24,7 +24,7 @@ export async function getCalendarClientForLineUser(
   if (!resolved) return null;
 
   const r = await db.query<{ scope: string | null }>(
-    `SELECT scope FROM user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
+    `SELECT scope FROM near_user_google_oauth_accounts WHERE line_user_id = $1 AND google_sub = $2`,
     [lineUserId, resolved.googleSub]
   );
   const scope = r.rows[0]?.scope ?? null;

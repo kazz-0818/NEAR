@@ -33,7 +33,7 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
 
   if (iso) {
     const ins = await ctx.db.query<{ id: number }>(
-      `INSERT INTO reminders (channel, channel_user_id, actor_user_id, group_id, remind_at, message, status)
+      `INSERT INTO near_reminders (channel, channel_user_id, actor_user_id, group_id, remind_at, message, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
        RETURNING id`,
       [

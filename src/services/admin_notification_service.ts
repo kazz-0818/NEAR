@@ -30,7 +30,7 @@ async function sendGrowthAdminChannel(body: string): Promise<void> {
   await pushText(to, text);
 }
 
-/** unsupported_requests から「誰の成長依頼か」（グループ発言も送信者 userId） */
+/** near_unsupported_requests から「誰の成長依頼か」（グループ発言も送信者 userId） */
 async function linesGrowthRequesterBySuggestion(
   db: Db,
   suggestionId: number
@@ -38,8 +38,8 @@ async function linesGrowthRequesterBySuggestion(
   try {
     const r = await db.query<{ channel_user_id: string; channel: string }>(
       `SELECT u.channel_user_id, u.channel
-       FROM implementation_suggestions s
-       JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+       FROM near_implementation_suggestions s
+       JOIN near_unsupported_requests u ON u.id = s.unsupported_request_id
        WHERE s.id = $1`,
       [suggestionId]
     );
@@ -63,7 +63,7 @@ export async function notifyUserGrowthConsent(input: {
   suggestionId: number;
   userOriginalSnippet: string;
   userSummary: string;
-  /** implementation_suggestions.difficulty（E〜SSS） */
+  /** near_implementation_suggestions.difficulty（E〜SSS） */
   growthDifficultyTier?: string | null;
 }): Promise<void> {
   const log = getLogger();
@@ -160,7 +160,7 @@ export async function notifyGrowthFirstApproval(input: {
   let tierLines: string[] = [];
   try {
     const dr = await input.db.query<{ difficulty: string | null }>(
-      `SELECT difficulty FROM implementation_suggestions WHERE id = $1`,
+      `SELECT difficulty FROM near_implementation_suggestions WHERE id = $1`,
       [input.suggestionId]
     );
     tierLines = formatGrowthDifficultyLines(dr.rows[0]?.difficulty ?? null);
@@ -237,8 +237,8 @@ export async function notifyFinalApproval(input: {
     }>(
       `SELECT u.original_message, s.summary, s.required_information,
               u.channel_user_id, u.channel, s.difficulty
-       FROM implementation_suggestions s
-       JOIN unsupported_requests u ON u.id = s.unsupported_request_id
+       FROM near_implementation_suggestions s
+       JOIN near_unsupported_requests u ON u.id = s.unsupported_request_id
        WHERE s.id = $1`,
       [input.suggestionId]
     );
@@ -404,7 +404,7 @@ export async function notifyImprovementCapsuleDigest(input: { db: Db; capsuleIds
     improvement_proposal: string;
   }>(
     `SELECT capsule_id::text, priority, problem_type, problem_summary, improvement_proposal
-     FROM improvement_capsules WHERE capsule_id = ANY($1::bigint[]) ORDER BY capsule_id ASC`,
+     FROM near_improvement_capsules WHERE capsule_id = ANY($1::bigint[]) ORDER BY capsule_id ASC`,
     [input.capsuleIds]
   );
   const lines: string[] = [

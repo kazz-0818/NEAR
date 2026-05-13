@@ -67,7 +67,7 @@ export async function createRoutingTrace(
 ): Promise<string | null> {
   try {
     const r = await db.query<{ trace_id: string }>(
-      `INSERT INTO routing_traces (
+      `INSERT INTO near_routing_traces (
          channel_user_id, inbound_message_id, user_message, route, reason
        ) VALUES ($1, $2, $3, 'started', 'message_received')
        RETURNING trace_id::text`,
@@ -117,7 +117,7 @@ export async function updateRoutingTrace(db: Db, traceId: string, patch: Routing
   if (sets.length === 0) return;
   vals.push(traceId);
   try {
-    await db.query(`UPDATE routing_traces SET ${sets.join(", ")} WHERE trace_id = $${i}::uuid`, vals);
+    await db.query(`UPDATE near_routing_traces SET ${sets.join(", ")} WHERE trace_id = $${i}::uuid`, vals);
   } catch (e) {
     getLogger().warn({ err: e, traceId }, "updateRoutingTrace failed");
   }
@@ -137,7 +137,7 @@ export async function getLatestRoutingTraceBeforeInbound(
               used_pending, cleared_pending, pending_type, pending_id,
               sheet_used, drive_used, reminder_used, task_used, github_used,
               final_reply_summary, meta_json, created_at
-       FROM routing_traces
+       FROM near_routing_traces
        WHERE channel_user_id = $1 AND inbound_message_id < $2
        ORDER BY inbound_message_id DESC, created_at DESC
        LIMIT 1`,
@@ -163,7 +163,7 @@ export async function getRoutingTraceByInbound(
               used_pending, cleared_pending, pending_type, pending_id,
               sheet_used, drive_used, reminder_used, task_used, github_used,
               final_reply_summary, meta_json, created_at
-       FROM routing_traces
+       FROM near_routing_traces
        WHERE channel_user_id = $1 AND inbound_message_id = $2
        ORDER BY created_at DESC
        LIMIT 1`,

@@ -53,6 +53,7 @@ const MIGRATION_FILES = [
   "044_routing_trace_session_memory.sql",
   "045_near_schema_and_rename.sql",
   "046_veliora_os.sql",
+  "047_near_repair_public_stragglers.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

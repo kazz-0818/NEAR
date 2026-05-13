@@ -8,7 +8,7 @@
 
 手動で流す場合は、次のファイルと同等の SQL を SQL Editor で実行してください。
 
-- NEAR: `src/db/migrations/046_veliora_os.sql`
+- NEAR: `src/db/migrations/046_veliora_os.sql` および **`047_near_repair_public_stragglers.sql`**（`public` に残った NEAR 用テーブルを `near` スキーマへ寄せる冪等リペア。Supabase Table Editor のスキーマ＝フォルダ表示用）
 - SERA: `src/db/migrations/010_veliora_os.sql`（046 と同一 DDL）＋ `011_sera_inbound_group_id.sql`
 
 **推奨順序**

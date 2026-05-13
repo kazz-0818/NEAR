@@ -1,6 +1,6 @@
 import type { PoolConfig } from "pg";
 
-/** NEAR アプリ用テーブルは near スキーマ。修飾なし SQL は public を先に解決し、マイグレの CREATE は従来どおり public に置く。 */
+/** NEAR アプリ用テーブルは near スキーマ（Supabase Table Editor の「フォルダ」に相当）。修飾なし SQL は public を先に解決し、マイグレの CREATE は従来どおり public に置く。 */
 const SEARCH_PATH_OPTIONS = "-c search_path=public,near,veliora";
 
 function mergeSearchPathIntoConnectionString(connectionString: string): string {

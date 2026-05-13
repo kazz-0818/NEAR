@@ -3,6 +3,7 @@ import { bearerAuth } from "hono/bearer-auth";
 import { z } from "zod";
 import { getEnv } from "../config/env.js";
 import { getPool } from "../db/client.js";
+import { VELIORA_PARENT_BRAND } from "../veliora/constants.js";
 import { listCapabilityLines } from "../modules/capabilities.js";
 import { listRegisteredIntents } from "../modules/registry.js";
 import { patchApprovalStatus, patchImplementationState } from "../services/approval_service.js";
@@ -50,7 +51,77 @@ export function createAdminApp(): Hono {
        FROM near_inbound_messages ORDER BY id DESC LIMIT $1`,
       [limit]
     );
-    return c.json({ items: r.rows });
+    return c.json({
+      items: r.rows,
+      veliora_hint: "全 AI 横断の履歴は GET /admin/veliora/line-messages（veliora.line_messages）を参照",
+    });
+  });
+
+  /** Veliora OS: AI 部署マスタ */
+  app.get("/veliora/ai-agents", async (c) => {
+    const pool = getPool();
+    const r = await pool.query(
+      `SELECT agent_code, display_name, parent_brand, is_active, created_at
+       FROM veliora.ai_agents
+       ORDER BY agent_code ASC`
+    );
+    return c.json({ parent_brand: VELIORA_PARENT_BRAND, items: r.rows });
+  });
+
+  /**
+   * Veliora OS 統一 LINE 履歴（near + sera 等の line_message_events を集約したビュー）。
+   * Query: agent_code, line_user_id, group_id, conversation_key, direction, limit
+   */
+  app.get("/veliora/line-messages", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 80), 500);
+    const pool = getPool();
+    const parts: string[] = [];
+    const params: unknown[] = [];
+    const agent = c.req.query("agent_code")?.trim();
+    const lineUserId = c.req.query("line_user_id")?.trim();
+    const groupId = c.req.query("group_id")?.trim();
+    const conversationKey = c.req.query("conversation_key")?.trim();
+    const direction = c.req.query("direction")?.trim();
+    if (agent) {
+      params.push(agent);
+      parts.push(`agent_code = $${params.length}`);
+    }
+    if (lineUserId) {
+      params.push(lineUserId);
+      parts.push(`line_user_id = $${params.length}`);
+    }
+    if (groupId) {
+      params.push(groupId);
+      parts.push(`group_id = $${params.length}`);
+    }
+    if (conversationKey) {
+      params.push(conversationKey);
+      parts.push(`conversation_key = $${params.length}`);
+    }
+    if (direction === "inbound" || direction === "outbound") {
+      params.push(direction);
+      parts.push(`direction = $${params.length}`);
+    }
+    params.push(limit);
+    const lim = params.length;
+    const where = parts.length ? `WHERE ${parts.join(" AND ")}` : "";
+    const r = await pool.query(
+      `SELECT * FROM veliora.line_messages ${where} ORDER BY id DESC LIMIT $${lim}`,
+      params
+    );
+    return c.json({ parent_brand: VELIORA_PARENT_BRAND, items: r.rows });
+  });
+
+  /** Veliora 名前空間の未対応依頼ビュー（実体は near.near_unsupported_requests） */
+  app.get("/veliora/unsupported-requests", async (c) => {
+    const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
+    const pool = getPool();
+    const r = await pool.query(`SELECT * FROM veliora.unsupported_requests ORDER BY id DESC LIMIT $1`, [limit]);
+    return c.json({
+      parent_brand: VELIORA_PARENT_BRAND,
+      items: r.rows,
+      backing: "veliora.unsupported_requests → near.near_unsupported_requests",
+    });
   });
 
   app.get("/intent-runs", async (c) => {

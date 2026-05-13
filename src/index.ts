@@ -91,7 +91,7 @@ app.get("/", (c) => {
       '<li><a href="https://dashboard.render.com/" rel="noopener noreferrer">Render ダッシュボード</a>（一覧からサービスを開いてください）</li>'
     );
   }
-  parts.push("</ul>", "<p style=\"font-size:.9rem;color:#555\">管理 API は <code>/admin</code> 配下（要 <code>Authorization: Bearer …</code>）。</p>", "</body></html>");
+    parts.push("</ul>", "<p style=\"font-size:.9rem;color:#555\">管理 API は <code>/admin</code> 配下（要 <code>Authorization: Bearer …</code>）。Veliora 横断 LINE 履歴は <code>/admin/veliora/line-messages</code>。</p>", "</body></html>");
   return c.html(parts.join(""));
 });
 

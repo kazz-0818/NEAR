@@ -1,4 +1,5 @@
 import type { Db } from "../db/client.js";
+import { appendVelioraNearLineEvent } from "../db/veliora_line_log.js";
 
 export type SaveInboundInput = {
   channel: string;
@@ -38,7 +39,22 @@ export async function saveInboundMessage(db: Db, input: SaveInboundInput): Promi
     ]
   );
   if (res.rows[0]?.id) {
-    return { id: Number(res.rows[0].id), isDuplicate: false };
+    const idNum = Number(res.rows[0].id);
+    void appendVelioraNearLineEvent(db, {
+      direction: "inbound",
+      channel: input.channel,
+      lineUserId: input.channelUserId,
+      actorUserId: input.actorUserId ?? null,
+      groupId: input.groupId ?? null,
+      lineMessageId: input.messageId,
+      messageType: input.messageType,
+      bodyText: input.text,
+      rawPayload: input.rawPayload,
+      legacySchema: "near",
+      legacyTable: "near_inbound_messages",
+      legacyRowId: idNum,
+    });
+    return { id: idNum, isDuplicate: false };
   }
   const existing = await db.query<{ id: string }>(
     `SELECT id FROM near_inbound_messages WHERE channel = $1 AND message_id = $2`,

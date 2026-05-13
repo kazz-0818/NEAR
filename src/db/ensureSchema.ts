@@ -52,6 +52,7 @@ const MIGRATION_FILES = [
   "043_improvement_capsules.sql",
   "044_routing_trace_session_memory.sql",
   "045_near_schema_and_rename.sql",
+  "046_veliora_os.sql",
 ] as const;
 
 const CREATE_MIGRATION_TABLE_SQL = `

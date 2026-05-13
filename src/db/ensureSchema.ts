@@ -54,10 +54,27 @@ const MIGRATION_FILES = [
   "045_near_schema_and_rename.sql",
   "046_veliora_os.sql",
   "047_near_repair_public_stragglers.sql",
+  "048_rename_near_schema_migrations.sql",
 ] as const;
 
+/** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */
+const RENAME_LEGACY_MIGRATION_TABLE_SQL = `
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'schema_migrations'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'near_schema_migrations'
+  ) THEN
+    ALTER TABLE public.schema_migrations RENAME TO near_schema_migrations;
+  END IF;
+END $$;
+`;
+
 const CREATE_MIGRATION_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS public.schema_migrations (
+  CREATE TABLE IF NOT EXISTS public.near_schema_migrations (
     filename   TEXT        PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )
@@ -66,7 +83,7 @@ const CREATE_MIGRATION_TABLE_SQL = `
 /** 適用済みマイグレーション一覧をセットで返す */
 async function loadApplied(pool: ReturnType<typeof getPool>): Promise<Set<string>> {
   try {
-    const r = await pool.query<{ filename: string }>("SELECT filename FROM public.schema_migrations");
+    const r = await pool.query<{ filename: string }>("SELECT filename FROM public.near_schema_migrations");
     return new Set(r.rows.map((row) => row.filename));
   } catch {
     return new Set();
@@ -75,14 +92,14 @@ async function loadApplied(pool: ReturnType<typeof getPool>): Promise<Set<string
 
 /**
  * 未適用のマイグレーションだけを実行する（初回起動以外は高速）。
- * schema_migrations テーブルで適用済みを追跡するため、
+ * public.near_schema_migrations で適用済みを追跡する（旧 public.schema_migrations は起動時にリネーム）。
  * 既存の SQL は全て IF NOT EXISTS / DO NOTHING 形式で冪等になっている前提。
  */
 export async function ensureSchema(): Promise<void> {
   const log = getLogger();
   const pool = getPool();
 
-  // migrations 追跡テーブルを確保
+  await pool.query(RENAME_LEGACY_MIGRATION_TABLE_SQL);
   await pool.query(CREATE_MIGRATION_TABLE_SQL);
 
   const applied = await loadApplied(pool);
@@ -100,7 +117,7 @@ export async function ensureSchema(): Promise<void> {
     const sql = await readFile(sqlPath, "utf-8");
     await pool.query(sql);
     await pool.query(
-      "INSERT INTO public.schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
+      "INSERT INTO public.near_schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
       [name]
     );
     log.info({ migration: name }, "migration applied");

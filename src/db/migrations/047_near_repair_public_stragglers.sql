@@ -1,6 +1,6 @@
 -- 045 適用後も public に NEAR 用テーブルが残っている環境向けの冪等リペア。
 -- Supabase Table Editor ではスキーマが「フォルダ」になるため、本番が public に散らばっているとき near へ寄せる。
--- SERA 用（sera.*）や public.schema_migrations には触れない。
+-- SERA 用（sera.*）や public.near_schema_migrations / public.sera_schema_migrations には触れない。
 
 CREATE SCHEMA IF NOT EXISTS near;
 

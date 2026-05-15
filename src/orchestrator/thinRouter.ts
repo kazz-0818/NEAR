@@ -415,9 +415,7 @@ export async function runThinRouterPhase(input: {
   // スプレッドシート候補選択の保留チェック（タスク管理より先に実行）
   // Growth / 混乱 / 内部タスクリストはバイパスする
   if (!bypassPendingPick) {
-    const looksLikePick =
-      isPendingSheetPickIndexMessage(text) ||
-      (textNorm.length <= 50 && !/\n/.test(textNorm) && !/docs\.google\.com/i.test(textNorm));
+    const looksLikePick = isPendingSheetPickIndexMessage(text);
     const hasPick = looksLikePick
       ? await hasPendingSheetPick(db, channelUserId).catch(() => false)
       : false;

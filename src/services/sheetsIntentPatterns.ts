@@ -115,6 +115,7 @@ export function assistantLastMessageSuggestsSheetsNeedMoreInfo(recentAssistantMe
   return (
     /(ファイル名|ファイル).{0,80}(教え|聞か|送って|ください|ほしい)/u.test(last) ||
     /どのシート/u.test(last) ||
+    /シートを.{0,24}(確認|見れ|見れば)/u.test(last) ||
     /(スプレッドシート|スプシ).{0,100}(リンク|URL).{0,40}(送って|貼|ください|ほしい)/u.test(last) ||
     /(リンク|URL).{0,30}(送って|貼って|ください)/u.test(last) ||
     /Drive (で|上).{0,50}(候補|検索|見つか)/u.test(last) ||

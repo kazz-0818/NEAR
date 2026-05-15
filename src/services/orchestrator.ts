@@ -35,6 +35,7 @@ import {
   explicitUnanchoredSheetReadIntent,
   looksLikeSheetsThreadFollowUp,
   recentUserThreadHadSheetsTopic,
+  roughSheetsBusinessRequest,
 } from "./sheetsIntentPatterns.js";
 import { saveOutboundAssistantText } from "./outbound_store.js";
 import { interpretSecretaryRequest } from "./request_interpreter.js";
@@ -177,6 +178,15 @@ function looksLikeShortEntityReply(text: string): boolean {
   const t = text.normalize("NFKC").trim();
   if (t.length === 0 || t.length > 48) return false;
   return /(です|だよ|です。|だよ。|です！|だよ！)$/.test(t) || /^[A-Za-z0-9][A-Za-z0-9 _-]{1,24}$/.test(t);
+}
+
+/** 挨拶・呼びかけのみ（直前が誤った確認文でも clarify で止めない） */
+function looksLikeTrivialLinePing(text: string): boolean {
+  const t = text.normalize("NFKC").trim();
+  if (t.length === 0 || t.length > 32) return false;
+  return /^(にあ|ニア|ねあ|nea|near|こんにちは|こんばんは|おはよう|おーい|おつ|おつかれ|よう|はろー|hello|hi|やあ|やー)$/iu.test(
+    t
+  );
 }
 
 function buildBroadConsultationFallbackDraft(): string {
@@ -398,6 +408,8 @@ export async function handleLineTextMessage(input: {
         } else if (isConfusion) {
           // 混乱・フラストレーションシグナルは clarify を出さず LLM に渡す
           log.info({ mode: interpretation.mode }, "secretary clarify skipped: user confusion signal — let LLM handle naturally");
+        } else if (looksLikeTrivialLinePing(text)) {
+          log.info({ mode: interpretation.mode }, "secretary clarify skipped: trivial ping / greeting");
         } else if (
           recentAssistantMessages.length > 0 &&
           /^(これ|それ|あれ|この|その|あの)(は|が|を|に|で|の|って|どういう|どゆ|何|なに|どう)/u.test(text.trim())
@@ -413,10 +425,9 @@ export async function handleLineTextMessage(input: {
         if (shouldSkipClarifyForConsultation) {
           log.info({ mode: interpretation.mode }, "secretary clarify skipped: prefer direct broad consultation answer");
         } else if (
-          sheetsReadIntegrationEnabled() &&
           recentAssistantMessages.length > 0 &&
           assistantLastMessageSuggestsSheetsNeedMoreInfo(recentAssistantMessages) &&
-          recentUserThreadHadSheetsTopic(recentUserMessages) &&
+          (recentUserThreadHadSheetsTopic(recentUserMessages) || roughSheetsBusinessRequest(text)) &&
           text.trim().length <= 48
         ) {
           log.info(
@@ -424,12 +435,14 @@ export async function handleLineTextMessage(input: {
             "secretary clarify skipped: short reply after sheets-target prompt"
           );
         } else if (
-          sheetsReadIntegrationEnabled() &&
-          (looksLikeSheetsThreadFollowUp(text, recentUserMessages) ||
-            explicitUnanchoredSheetReadIntent(text, recentUserMessages))
+          looksLikeSheetsThreadFollowUp(text, recentUserMessages) ||
+          explicitUnanchoredSheetReadIntent(text, recentUserMessages)
         ) {
           log.info(
-            { mode: interpretation.mode },
+            {
+              mode: interpretation.mode,
+              sheetsReadIntegrationEnabled: sheetsReadIntegrationEnabled(),
+            },
             "secretary clarify skipped: sheet read / drive search routing likely"
           );
         } else if (

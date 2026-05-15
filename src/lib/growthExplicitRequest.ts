@@ -88,7 +88,11 @@ export function isUserConfusionOrNegationSignal(text: string): boolean {
   // 「ダメだ」「だめだ」単体の短い失望・却下表現
   if ([...t].length <= 8 && /(ダメだ|だめだ|ダメ|あかん)[！!。]?$/u.test(t)) return true;
   // 「うまくいってない」系 (NEAR の返答が機能していない旨)
-  if (/(うまくいってない|うまくいかない|うまくいかん|機能してない|機能しない|返答がおかしい|おかしい返答)/u.test(t)) return true;
+  if (
+    /(うまくいってない|うまくいかない|うまくいかん|機能してない|機能しない|返答がおかしい|おかしい返答|バグってる|バグって)/u.test(t)
+  ) {
+    return true;
+  }
   // 短い嘆き（あー/もー + 感嘆符 or 単体で終わる）
   if ([...t].length <= 6 && /^(あー|あーあ|あーだめ|もー|もーやだ|やだ|はあ|ふう)[！!。]?$/u.test(t)) return true;
   // Drive / Sheets モジュール拒否（「ドライブじゃないよー」「そうじゃない」等）

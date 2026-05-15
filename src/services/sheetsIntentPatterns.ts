@@ -87,6 +87,42 @@ function looksLikeShortSheetsContinuation(text: string, recentUserMessages: stri
   return SHORT_SHEETS_CONTINUATION.test(t);
 }
 
+/**
+ * スプシ依頼の直後に、対象ブック名だけ／「いつもの」など短く返すパターン。
+ * （秘書 clarify が「ファイル名を」とループするのを防ぐ）
+ */
+function looksLikeSheetsTopicShortDisambiguation(text: string, recentUserMessages: string[]): boolean {
+  const t = text.trim();
+  if (t.length > 80) return false;
+  if (!recentUserThreadHadSheetsTopic(recentUserMessages)) return false;
+  return (
+    /いつも(みてる|見てる|使ってる|見て)/u.test(t) ||
+    /いつもの/u.test(t) ||
+    /いつものやつ/u.test(t) ||
+    /同じ(やつ|シート)?$/u.test(t) ||
+    /^ネオベース/u.test(t) ||
+    /購入代行.{0,8}スプシ/u.test(t) ||
+    /^(スプシ|シート)(だけ|の話)?$/u.test(t)
+  );
+}
+
+/**
+ * 直近の NEAR 返答が「スプレッドシートを特定するための追加情報」を求めているか（表現ゆれに強め）。
+ */
+export function assistantLastMessageSuggestsSheetsNeedMoreInfo(recentAssistantMessages: string[]): boolean {
+  const last = [...recentAssistantMessages].reverse().find((m) => (m ?? "").trim().length > 0) ?? "";
+  if (last.length < 24) return false;
+  return (
+    /(ファイル名|ファイル).{0,80}(教え|聞か|送って|ください|ほしい)/u.test(last) ||
+    /どのシート/u.test(last) ||
+    /(スプレッドシート|スプシ).{0,100}(リンク|URL).{0,40}(送って|貼|ください|ほしい)/u.test(last) ||
+    /(リンク|URL).{0,30}(送って|貼って|ください)/u.test(last) ||
+    /Drive (で|上).{0,50}(候補|検索|見つか)/u.test(last) ||
+    /番号(だけ|を)?送って/u.test(last) ||
+    /どれですか/u.test(last)
+  );
+}
+
 export function looksLikeSheetsThreadFollowUp(text: string, recentUserMessages: string[] = []): boolean {
   const t = text.trim();
   const hadSheetsContext = recentUserThreadHadSheetsTopic(recentUserMessages);
@@ -95,7 +131,8 @@ export function looksLikeSheetsThreadFollowUp(text: string, recentUserMessages: 
     SHEETS_NUMERIC_FOLLOWUP.test(t) ||
     roughSheetsBusinessRequest(t) ||
     (AMBIGUOUS_SHEETS_OPINION_FOLLOWUP.test(t) && hadSheetsContext) ||
-    looksLikeShortSheetsContinuation(t, recentUserMessages)
+    looksLikeShortSheetsContinuation(t, recentUserMessages) ||
+    looksLikeSheetsTopicShortDisambiguation(t, recentUserMessages)
   );
 }
 
@@ -109,6 +146,7 @@ export function explicitUnanchoredSheetReadIntent(text: string, recentUserMessag
   if (indirectSheetReadOrReviewRequest(t)) return true;
   if (allowDefaultSheetPromotionWithoutUrl(t)) return true;
   if (looksLikeShortSheetsContinuation(t, recentUserMessages)) return true;
+  if (looksLikeSheetsTopicShortDisambiguation(t, recentUserMessages)) return true;
   if (/読み上げ|読んで|読み取って/.test(t) && /シート|表|スプシ|売上|管理|代行|推移|担当/i.test(t)) return true;
   return false;
 }

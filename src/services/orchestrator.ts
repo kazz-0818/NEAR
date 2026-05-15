@@ -31,8 +31,10 @@ import {
   promoteSheetsPendingPick,
 } from "./sheetsIntentFollowUp.js";
 import {
+  assistantLastMessageSuggestsSheetsNeedMoreInfo,
   explicitUnanchoredSheetReadIntent,
   looksLikeSheetsThreadFollowUp,
+  recentUserThreadHadSheetsTopic,
 } from "./sheetsIntentPatterns.js";
 import { saveOutboundAssistantText } from "./outbound_store.js";
 import { interpretSecretaryRequest } from "./request_interpreter.js";
@@ -410,8 +412,18 @@ export async function handleLineTextMessage(input: {
           (looksLikeShortEntityReply(text) && recentUserMessages.slice(-6).some((m) => looksLikeBroadConsultation(m)));
         if (shouldSkipClarifyForConsultation) {
           log.info({ mode: interpretation.mode }, "secretary clarify skipped: prefer direct broad consultation answer");
-        } else
-        if (
+        } else if (
+          sheetsReadIntegrationEnabled() &&
+          recentAssistantMessages.length > 0 &&
+          assistantLastMessageSuggestsSheetsNeedMoreInfo(recentAssistantMessages) &&
+          recentUserThreadHadSheetsTopic(recentUserMessages) &&
+          text.trim().length <= 48
+        ) {
+          log.info(
+            { mode: interpretation.mode },
+            "secretary clarify skipped: short reply after sheets-target prompt"
+          );
+        } else if (
           sheetsReadIntegrationEnabled() &&
           (looksLikeSheetsThreadFollowUp(text, recentUserMessages) ||
             explicitUnanchoredSheetReadIntent(text, recentUserMessages))

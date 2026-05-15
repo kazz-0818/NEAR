@@ -30,6 +30,7 @@ import {
   getRenderRuntimeInfo,
 } from "./lib/renderRuntime.js";
 import { createGoogleOAuthApp } from "./routes/oauthGoogle.js";
+import { getSheetsIntegrationDiagnostics } from "./lib/userGoogleSheetsClient.js";
 
 const app = new Hono();
 const log = getLogger();
@@ -37,11 +38,13 @@ const log = getLogger();
 app.get("/health", (c) => {
   const render = getRenderRuntimeInfo();
   const publicBase = getEffectivePublicBaseUrl();
+  const googleSheets = getSheetsIntegrationDiagnostics();
   return c.json({
     ok: true,
     service: "NEAR",
     built_at: getDeployedAtIso(),
     public_base_url: publicBase ?? null,
+    google_sheets: googleSheets,
     render: render.on_render
       ? {
           external_url: render.external_url,

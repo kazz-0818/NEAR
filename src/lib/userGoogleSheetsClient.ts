@@ -8,7 +8,7 @@ import {
   listGoogleOAuthTokenPairsOrdered,
   resolveRefreshTokenForSheets,
 } from "../db/user_google_oauth_accounts_repo.js";
-import { getDriveAPI, getSheetsAPI, googleSheetsConfigured } from "./googleSheetsAuth.js";
+import { getDriveAPI, getSheetsAPI, googleSheetsConfigured, parseServiceAccountJson } from "./googleSheetsAuth.js";
 import { googleUserOAuthEnvConfigured } from "./googleUserOAuthConfig.js";
 
 export type SheetsAndDrive = { sheets: sheets_v4.Sheets; drive: drive_v3.Drive };
@@ -66,6 +66,36 @@ export async function listSheetsAndDriveClientsOrdered(db: Db, lineUserId: strin
 
 export function sheetsReadIntegrationEnabled(): boolean {
   return googleSheetsConfigured() || googleUserOAuthEnvConfigured();
+}
+
+/**
+ * 本番の設定切れ調査用（秘密は出さない）。`/health` に載せる。
+ */
+export function getSheetsIntegrationDiagnostics(): {
+  sheets_read_integration_enabled: boolean;
+  oauth_env_fully_configured: boolean;
+  oauth_client_id_set: boolean;
+  oauth_client_secret_set: boolean;
+  oauth_redirect_uri_set: boolean;
+  oauth_token_secret_ok: boolean;
+  service_account_env_nonempty: boolean;
+  service_account_credentials_parse_ok: boolean;
+} {
+  const env = getEnv();
+  const saNonempty = !!(env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || env.GOOGLE_SERVICE_ACCOUNT_JSON_B64?.trim());
+  const j = parseServiceAccountJson();
+  const saOk = !!(j && typeof j.client_email === "string" && typeof j.private_key === "string");
+  const oauthFull = googleUserOAuthEnvConfigured();
+  return {
+    sheets_read_integration_enabled: googleSheetsConfigured() || oauthFull,
+    oauth_env_fully_configured: oauthFull,
+    oauth_client_id_set: !!env.GOOGLE_OAUTH_CLIENT_ID?.trim(),
+    oauth_client_secret_set: !!env.GOOGLE_OAUTH_CLIENT_SECRET?.trim(),
+    oauth_redirect_uri_set: !!env.GOOGLE_OAUTH_REDIRECT_URI?.trim(),
+    oauth_token_secret_ok: !!env.GOOGLE_OAUTH_TOKEN_SECRET?.trim(),
+    service_account_env_nonempty: saNonempty,
+    service_account_credentials_parse_ok: saOk,
+  };
 }
 
 async function loadUserRefreshTokenPlain(db: Db, lineUserId: string): Promise<string | null> {

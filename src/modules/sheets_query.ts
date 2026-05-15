@@ -29,7 +29,7 @@ import { buildSheetReadSuccessHeader, SHEET_READ_SUCCESS_HEADER_REGEX } from "..
 import { clipTsv, escapeSheetTitleForA1, resolveSheetTitle, valuesToTsv } from "../lib/sheetFormat.js";
 import { setActiveGoogleAccount } from "../db/user_google_oauth_accounts_repo.js";
 import { searchSpreadsheetByUserHint } from "../lib/googleDriveSpreadsheetSearch.js";
-import { listSheetsAndDriveClientsOrdered, sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
+import { listSheetsAndDriveClientsOrdered, sheetsReadIntegrationEnabled, getSheetsIntegrationDiagnostics } from "../lib/userGoogleSheetsClient.js";
 import { listGoogleAccountsForLine } from "../db/user_google_oauth_accounts_repo.js";
 import { getLogger } from "../lib/logger.js";
 import type { sheets_v4 } from "googleapis";
@@ -60,10 +60,24 @@ export async function sheetsQuery(ctx: ModuleContext): Promise<ModuleResult> {
   const env = getEnv();
 
   if (!sheetsReadIntegrationEnabled()) {
+    const d = getSheetsIntegrationDiagnostics();
+    let serverHint = "";
+    if (d.service_account_env_nonempty && !d.service_account_credentials_parse_ok) {
+      serverHint =
+        "\n\n【サーバー側の状況】`GOOGLE_SERVICE_ACCOUNT_JSON`（または `_B64`）に文字列はありますが、**JSON として読み取れていません**（Base64 欠け・改行混入など）。Render の Environment を開き直してください。";
+    } else if (!d.oauth_env_fully_configured && (d.oauth_client_id_set || d.oauth_client_secret_set || d.oauth_redirect_uri_set)) {
+      serverHint =
+        "\n\n【サーバー側の状況】Google OAuth 用の変数が**一部だけ**です。`GOOGLE_OAUTH_CLIENT_ID` / `CLIENT_SECRET` / `REDIRECT_URI` / `TOKEN_SECRET`（**16文字以上**）の **4つすべて**が必要です。";
+    } else if (!d.service_account_env_nonempty && !d.oauth_env_fully_configured) {
+      serverHint =
+        "\n\n【サーバー側の状況】**OAuth もサービスアカウントも未設定**に見えます。Render を再作成した直後は、以前の Environment がコピーされていないことが多いです。";
+    }
     return {
       success: false,
       draft:
-        "Googleスプレッドシートを読む機能は、**あなたの Google で連携**（LINE で「Google連携」）または**管理者のサービスアカウント連携**のどちらかが必要です。手順は NEAR の DEPLOY.md「Google スプレッドシート」を参照してください。",
+        "Googleスプレッドシートを読む機能は、**あなたの Google で連携**（LINE で「Google連携」）または**管理者のサービスアカウント連携**のどちらかが必要です。手順は NEAR の DEPLOY.md「Google スプレッドシート」を参照してください。" +
+        serverHint +
+        "\n\n（管理者向け）設定の有無だけは `GET /health` の `google_sheets` で確認できます（秘密は含みません）。",
       situation: "unsupported",
     };
   }

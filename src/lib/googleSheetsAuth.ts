@@ -28,8 +28,8 @@ function serviceAccountJwtOrThrow(): JWT {
 }
 
 export function googleSheetsConfigured(): boolean {
-  const env = getEnv();
-  return !!(env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() || env.GOOGLE_SERVICE_ACCOUNT_JSON_B64?.trim());
+  const j = parseServiceAccountJson();
+  return !!(j && typeof j.client_email === "string" && typeof j.private_key === "string");
 }
 
 export function parseServiceAccountJson(): Record<string, unknown> | null {

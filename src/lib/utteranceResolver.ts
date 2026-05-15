@@ -25,7 +25,7 @@ export type ResolvedOperation = {
 
 const TASK_WORD_RE = /(タスク|タスクリスト|todo|やること|指示|リスト|ガントチャート|タスク管理表)/iu;
 const SHEET_EXPLICIT_RE =
-  /(スプレッドシート|スプシ|googleシート|シート|タスク管理表|ガントチャート|表から|シートから)/iu;
+  /(スプレッドシート|スプシ|スプレット|スプレっと|googleシート|シート|タスク管理表|ガントチャート|表から|シートから)/iu;
 const ADD_WORD_RE =
   /(追加|入れて|タスク化|タスクにして|todoに|やることに|覚え(?:て|と)いて|後でやるやつにして|リスト.*入れ|入れといて|保存して|登録して|(?:タスク|todo|やること).{0,6}登録)/iu;
 const LOCAL_LIST_RE =

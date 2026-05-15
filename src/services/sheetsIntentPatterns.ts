@@ -3,8 +3,15 @@
  * 正規表現が増えたらこのファイルに集約する。
  */
 
+/** 略語・誤字（LINE で「スプレット」等）もスプレッドシート扱い */
+const SPREADSHEET_WORD =
+  /スプシ|スプレッド(?:シート)?|スプレット|スプレっと|spreadsheet/i;
+
 const SHEETS_TOPIC_EXPLICIT =
-  /シート|スプシ|スプレッド|spreadsheet|一覧を|一覧が|一覧に|表を|表の|表に|表データ|ブック|セル|先に(送|貼|共有)|このブック|この一覧|この表|既定の|読み取った|取り込ん|docs\.google\.com\/spreadsheets/i;
+  new RegExp(
+    `${SPREADSHEET_WORD.source}|シート|一覧を|一覧が|一覧に|表を|表の|表に|表データ|ブック|セル|先に(送|貼|共有)|このブック|この一覧|この表|既定の|読み取った|取り込ん|docs\\.google\\.com/spreadsheets`,
+    "i"
+  );
 
 const ANALYZE_OR_CONTINUE_SHEETS =
   /(これ|それ|上|さっき|先|直前|このデータ|この表|この一覧|一覧).{0,30}(見て|読んで|分析|解析|どう思|教えて|解説|コメント|判断|説明)|分析(して|できますか|できる)|見て.{0,12}(判断|どう|分析)|^ニア[,、\s]*(これ|それ|上).{0,25}(見て|分析)/i;
@@ -23,9 +30,12 @@ const AMBIGUOUS_SHEETS_OPINION_FOLLOWUP =
 export function indirectSheetReadOrReviewRequest(text: string): boolean {
   const t = text.trim();
   if (t.length > 400) return false;
-  const sheetish = /(シート|スプシ|スプレッド|スプレッドシート|表|一覧|管理表)/i.test(t);
+  const sheetish = SPREADSHEET_WORD.test(t) || /(シート|表|一覧|管理表)/i.test(t);
   const biz = /(購入代行|代行|管理|売上|在庫|受注|発注|POPUP|ポップアップ)/i.test(t);
-  if (sheetish && /(見て|確認|チェック|教えて|読ん|把握|俯瞰|整理|まとめ|判断|所感|ざっくり|状況)/i.test(t)) {
+  if (
+    sheetish &&
+    /(見て|確認|チェック|教えて|読ん|把握|俯瞰|整理|まとめ|判断|所感|ざっくり|状況|開いて|開く|開け)/i.test(t)
+  ) {
     return true;
   }
   if (
@@ -40,6 +50,22 @@ export function indirectSheetReadOrReviewRequest(text: string): boolean {
 
 export function roughSheetsBusinessRequest(text: string): boolean {
   const t = text.trim();
+  // 「購入代行のスプレット開いて」等（略語 + 開く／見る）
+  if (
+    /(POPUP|ポップアップ|購入代行|代行|在庫|受注|発注|売上|仕入|管理|業務).{0,45}(スプシ|スプレッド|スプレット|スプレっと)/i.test(
+      t
+    ) &&
+    /(開いて|開く|見せて|出して|見て|読んで|教えて|確認|チェック|一覧|売上|データ)/i.test(t)
+  ) {
+    return true;
+  }
+  if (
+    /(?:スプシ|スプレッド(?:シート)?|スプレット|スプレっと).{0,55}(の|で|は)?\s*(売上|売り上げ|集計|件数|合計|平均|一覧|データ|数字|\d{1,2}月|先月|今月|昨日|教えて|ください|いくら|どのくらい|どれくらい|開いて|開く)/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
   if (
     /(シート|スプシ|スプレッド).{0,55}(の|で|は)?\s*(売上|売り上げ|集計|件数|合計|平均|一覧|データ|数字|\d{1,2}月|先月|今月|昨日|教えて|ください|いくら|どのくらい|どれくらい)/i.test(
       t
@@ -47,13 +73,15 @@ export function roughSheetsBusinessRequest(text: string): boolean {
   ) {
     return true;
   }
-  if (/(スプレッドシート|シート|スプシ).{0,50}タスク.{0,15}(一覧|出して|見せて|教えて|ください)/i.test(t)) return true;
+  if (/(スプレッドシート|シート|スプシ|スプレット|スプレっと).{0,50}タスク.{0,15}(一覧|出して|見せて|教えて|ください)/i.test(t))
+    return true;
   if (/(売上|売り上げ|件数|集計|一覧|実績|予算).{0,35}(シート|スプシ|表で|表の|タブ)/i.test(t)) return true;
   // 購入代行】管理シート のように記号・中黒が挟まっても代行〜シートを拾う
-  if (/(POPUP|ポップアップ|購入代行|代行|在庫|受注|発注|売上|仕入).{0,40}(シート|表)/i.test(t)) return true;
+  if (/(POPUP|ポップアップ|購入代行|代行|在庫|受注|発注|売上|仕入).{0,40}(シート|表|スプシ|スプレッド|スプレット|スプレっと)/i.test(t))
+    return true;
   if (
     /(売上|売り上げ|件数|合計).{0,18}(教えて|ください|いくら|どのくらい|どれくらい)/i.test(t) &&
-    /(シート|表|スプシ|\d{1,2}月|先月|今月|タブ|データ)/i.test(t)
+    /(シート|表|スプシ|スプレット|スプレっと|\d{1,2}月|先月|今月|タブ|データ)/i.test(t)
   ) {
     return true;
   }
@@ -75,7 +103,7 @@ export function recentUserThreadHadSheetsTopic(recentUserMessages: string[]): bo
 }
 
 const SHORT_SHEETS_CONTINUATION =
-  /売上|売り上げ|読み|読んで|上げて|ざっくり|箇条書き|部分|担当|推移|タブ|シート|一覧|集計|教えて|出力|見せ|数字|いくら|件数|内訳/i;
+  /売上|売り上げ|読み|読んで|上げて|ざっくり|箇条書き|部分|担当|推移|タブ|シート|一覧|集計|教えて|出力|見せ|数字|いくら|件数|内訳|開いて|開く|スプレット|スプシ/i;
 
 /**
  * シート会話の続きの短文（「売上の部分」「ざっくり読み上げて」）をスレッド文脈と組み合わせて検出する。
@@ -101,7 +129,7 @@ function looksLikeSheetsTopicShortDisambiguation(text: string, recentUserMessage
     /いつものやつ/u.test(t) ||
     /同じ(やつ|シート)?$/u.test(t) ||
     /^ネオベース/u.test(t) ||
-    /購入代行.{0,8}スプシ/u.test(t) ||
+    /購入代行.{0,8}(スプシ|スプレット|スプレっと)/u.test(t) ||
     /^(スプシ|シート)(だけ|の話)?$/u.test(t)
   );
 }
@@ -114,7 +142,8 @@ export function assistantLastMessageSuggestsSheetsNeedMoreInfo(recentAssistantMe
   if (last.length < 24) return false;
   return (
     /(ファイル名|ファイル).{0,80}(教え|聞か|送って|ください|ほしい)/u.test(last) ||
-    /どのシート/u.test(last) ||
+    /どの(シート|ファイル)/u.test(last) ||
+    /どのファイルを使用/u.test(last) ||
     /シートを.{0,24}(確認|見れ|見れば)/u.test(last) ||
     /(スプレッドシート|スプシ).{0,100}(リンク|URL).{0,40}(送って|貼|ください|ほしい)/u.test(last) ||
     /(リンク|URL).{0,30}(送って|貼って|ください)/u.test(last) ||
@@ -148,7 +177,8 @@ export function explicitUnanchoredSheetReadIntent(text: string, recentUserMessag
   if (allowDefaultSheetPromotionWithoutUrl(t)) return true;
   if (looksLikeShortSheetsContinuation(t, recentUserMessages)) return true;
   if (looksLikeSheetsTopicShortDisambiguation(t, recentUserMessages)) return true;
-  if (/読み上げ|読んで|読み取って/.test(t) && /シート|表|スプシ|売上|管理|代行|推移|担当/i.test(t)) return true;
+  if (/読み上げ|読んで|読み取って|開いて|開く/.test(t) && /シート|表|スプシ|スプレット|スプレっと|売上|管理|代行|推移|担当/i.test(t))
+    return true;
   return false;
 }
 

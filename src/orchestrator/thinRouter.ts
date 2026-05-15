@@ -415,17 +415,23 @@ export async function runThinRouterPhase(input: {
   // スプレッドシート候補選択の保留チェック（タスク管理より先に実行）
   // Growth / 混乱 / 内部タスクリストはバイパスする
   if (!bypassPendingPick) {
-    const looksLikePick = isPendingSheetPickIndexMessage(text);
-    const hasPick = looksLikePick
-      ? await hasPendingSheetPick(db, channelUserId).catch(() => false)
-      : false;
-    if (hasPick) {
-      log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
-      return {
-        handled: false,
-        forceIntent: "google_sheets_query",
-        routingTracePatch: { route: "google_sheets_query_pending_pick", used_pending: true, sheet_used: true },
-      };
+    /** 「1」「一番」または「はい、読む」確認の短文（番号以外の肯定） */
+    const looksLikeSheetPickReply = (() => {
+      if (isPendingSheetPickIndexMessage(text)) return true;
+      const t = textNorm;
+      if (t.length > 48 || /\n/.test(t) || /docs\.google\.com/i.test(t)) return false;
+      return /^(はい|ハイ|ひい|イエス|yes|うん|ええ|ＯＫ|ok|お願い|お願いします|読む|読んで)[!！。…\s]*$/iu.test(t);
+    })();
+    if (looksLikeSheetPickReply) {
+      const hasPick = await hasPendingSheetPick(db, channelUserId).catch(() => false);
+      if (hasPick) {
+        log.info({ channelUserId, textLen: textNorm.length }, "pending sheet pick detected — forcing google_sheets_query");
+        return {
+          handled: false,
+          forceIntent: "google_sheets_query",
+          routingTracePatch: { route: "google_sheets_query_pending_pick", used_pending: true, sheet_used: true },
+        };
+      }
     }
   }
 

@@ -7,6 +7,7 @@ import { HeroScene } from "./components/HeroScene";
 import { AgentSection } from "./components/AgentSection";
 import { PhaseRoadmap } from "./components/PhaseRoadmap";
 import { SiteFooter } from "./components/SiteFooter";
+import { CosmicBackground } from "./components/CosmicBackground";
 import { useScrollTrigger } from "./hooks/useScrollTrigger";
 import { useReducedMotion } from "./hooks/useReducedMotion";
 import { AGENT_ACCENTS } from "./lib/colors";
@@ -139,9 +140,10 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen">
+      <CosmicBackground />
       <Nav />
       <HeroAnimations />
-      <main>
+      <main className="relative z-10">
         <HeroScene
           title={data.meta.title}
           tagline={data.meta.tagline}
@@ -157,7 +159,7 @@ export default function App() {
         <SectionDivider />
         <PhaseRoadmap phases={data.phases} />
       </main>
-      <SiteFooter />
+      <SiteFooter className="relative z-10" />
     </div>
   );
 }

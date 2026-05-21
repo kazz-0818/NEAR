@@ -1,17 +1,12 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { ShowcaseAgent } from "../types/showcase";
 import { OrbitingCapabilities } from "./OrbitingCapabilities";
 import { EvolutionTimeline } from "./EvolutionTimeline";
 import { agentSectionId } from "../lib/agents";
-import { useInView3d } from "../hooks/useInView3d";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
-
-const AgentSpace3D = lazy(() =>
-  import("./AgentSpace3D").then((m) => ({ default: m.AgentSpace3D })),
-);
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -23,7 +18,6 @@ interface AgentSectionProps {
 export function AgentSection({ agent, index }: AgentSectionProps) {
   const ref = useRef<HTMLElement>(null);
   usePauseAnimationsOffscreen(ref);
-  const showSpace3d = useInView3d(ref);
   const reduced = useReducedMotion();
   const isEven = index % 2 === 0;
 
@@ -86,16 +80,10 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
       ref={ref}
       className="agent-section relative scroll-mt-[5.5rem] overflow-hidden px-5 py-20 sm:px-8 sm:py-28 lg:py-32"
     >
-      <div className="agent-space-fallback pointer-events-none absolute inset-0 z-0" aria-hidden />
-      {showSpace3d && (
-        <Suspense fallback={null}>
-          <AgentSpace3D accent={agent.accent} agentId={agent.id} />
-        </Suspense>
-      )}
       <div
-        className="agent-bg-drift pointer-events-none absolute inset-0 z-[2]"
+        className="agent-bg-drift pointer-events-none absolute inset-0 z-[1]"
         style={{
-          background: `radial-gradient(ellipse 55% 45% at ${isEven ? "15%" : "85%"} 40%, ${agent.accent}22, transparent 65%), radial-gradient(ellipse 90% 50% at 50% 100%, rgba(15,23,42,0.35), transparent 55%)`,
+          background: `radial-gradient(ellipse 50% 40% at ${isEven ? "12%" : "88%"} 38%, ${agent.accent}14, transparent 70%)`,
         }}
       />
       <div

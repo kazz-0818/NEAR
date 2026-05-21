@@ -1,4 +1,4 @@
-/** メンバー公式カラー（ショーケース・3D・UI 共通） */
+/** メンバー公式カラー（ショーケース・UI 共通） */
 export const AGENT_ACCENTS: Record<string, string> = {
   near: "#f472b6", // ピンク
   sera: "#facc15", // 黄

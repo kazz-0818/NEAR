@@ -2,9 +2,6 @@ import type { ShowcaseAgent } from "../types/showcase";
 import { MemberHud } from "./MemberHud";
 import { OlympicMemberRings } from "./OlympicMemberRings";
 
-const HERO_BG =
-  "radial-gradient(ellipse 80% 55% at 50% 42%, rgba(244,114,182,0.1), transparent 55%), radial-gradient(ellipse 50% 40% at 75% 25%, rgba(250,204,21,0.07), transparent 50%), radial-gradient(ellipse 45% 35% at 20% 70%, rgba(167,139,250,0.06), transparent 50%), #050508";
-
 interface HeroSceneProps {
   title: string;
   tagline: string;
@@ -16,14 +13,8 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
   return (
     <section
       id="hero"
-      className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050508]"
+      className="relative flex min-h-[100svh] flex-col overflow-hidden"
     >
-      <div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{ background: HERO_BG }}
-      />
-      <div className="pointer-events-none absolute inset-0 z-0 grid-bg opacity-10" />
-
       <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-5xl flex-col px-5 pt-[5.5rem] pb-10 sm:px-8 lg:max-w-6xl lg:px-10">
         <header className="shrink-0 text-center">
           <p className="hero-chip mb-2 font-display text-[10px] tracking-[0.45em] text-slate-400 uppercase sm:text-xs">

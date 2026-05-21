@@ -1,6 +1,10 @@
-export function SiteFooter() {
+interface SiteFooterProps {
+  className?: string;
+}
+
+export function SiteFooter({ className = "" }: SiteFooterProps) {
   return (
-    <footer className="border-t border-white/5 px-6 py-16 text-center">
+    <footer className={`border-t border-white/5 px-6 py-16 text-center ${className}`}>
       <p className="font-display text-xs tracking-[0.3em] text-slate-600 uppercase">
         Veliora Showcase
       </p>

@@ -81,7 +81,6 @@ export function PhaseRoadmap({ phases }: PhaseRoadmapProps) {
 
   return (
     <section id="roadmap" ref={ref} className="relative px-6 py-28 md:py-40">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(34,211,238,0.06),transparent_55%)]" />
       <div className="relative mx-auto max-w-3xl">
         <h2 className="roadmap-title text-center font-display text-3xl font-bold text-white md:text-4xl">
           Phase Roadmap

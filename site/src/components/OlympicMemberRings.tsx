@@ -50,7 +50,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
     <div
       ref={wrapRef}
       className="olympic-rings relative mx-auto h-[11.5rem] w-full max-w-[22rem] sm:h-[13rem] sm:max-w-[26rem] md:h-[15rem] md:max-w-[30rem]"
-      aria-label="Veriora メンバー — クリックで詳細"
+      aria-label="Veliora メンバー — クリックで詳細"
     >
       {/* 装飾用の薄いリング（アイコン背面） */}
       <svg

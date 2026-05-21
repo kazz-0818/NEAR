@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Veriora",
+    "title": "Veliora",
     "tagline": "組織 OS — AI が部署として動く",
     "subtitle": "秘書・マーケ・経理・品質・編集 — 五つの AI 部署が並び、それぞれの領域で進化し続ける組織 OS。"
   },
@@ -12,7 +12,7 @@
       "department": "秘書部",
       "displayName": "NEAR-ニア-『秘書部』",
       "role": "総合窓口・秘書・タスク整理・指示受付",
-      "description": "Veriora の一次窓口。ユーザーの依頼を受け、タスク整理・スケジュール・社内オペレーションの補助を行い、専門部署へ適切に取次ぐ。未対応領域はログ化し改善サイクルへ渡す。",
+      "description": "Veliora の一次窓口。ユーザーの依頼を受け、タスク整理・スケジュール・社内オペレーションの補助を行い、専門部署へ適切に取次ぐ。未対応領域はログ化し改善サイクルへ渡す。",
       "accent": "#f472b6",
       "handoffRules": [
         "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
@@ -158,7 +158,7 @@
   ],
   "phases": [
     { "id": 0, "title": "現状調査", "summary": "既存 LINE / DB / env の棚卸し", "status": "done" },
-    { "id": 1, "title": "ドキュメント整備", "summary": "Veriora アーキテクチャ・規約", "status": "done" },
+    { "id": 1, "title": "ドキュメント整備", "summary": "Veliora アーキテクチャ・規約", "status": "done" },
     { "id": 2, "title": "Agent Registry", "summary": "5部署の役割定義をコード化", "status": "done" },
     { "id": 3, "title": "env 互換", "summary": "VERIORA_* / legacy alias 同期", "status": "done" },
     { "id": 4, "title": "横断ログ", "summary": "会話ログ形式の統一", "status": "active" },

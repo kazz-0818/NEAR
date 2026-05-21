@@ -87,7 +87,7 @@ export function PhaseRoadmap({ phases }: PhaseRoadmapProps) {
           Phase Roadmap
         </h2>
         <p className="roadmap-title mt-4 text-center text-sm text-slate-500">
-          Veriora 組織 OS の拡張フェーズ
+          Veliora 組織 OS の拡張フェーズ
         </p>
         <ul className="mt-14 space-y-4">
           {phases.map((phase) => {

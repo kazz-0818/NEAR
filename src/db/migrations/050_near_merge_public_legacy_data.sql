@@ -154,34 +154,44 @@ BEGIN
         CONTINUE;
       END IF;
 
-      EXECUTE format(
-        $q$
-        INSERT INTO near.near_outbound_messages (
-          channel, channel_user_id, group_id, text, inbound_message_id, line_message_id, created_at
-        )
-        SELECT
-          l.channel,
-          l.channel_user_id,
-          %s,
-          l.text,
-          m.near_id,
-          %s,
-          l.created_at
-        FROM %I.%I l
-        LEFT JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM near.near_outbound_messages o
-          WHERE o.channel = l.channel
-            AND o.channel_user_id = l.channel_user_id
-            AND o.created_at = l.created_at
-            AND o.text = l.text
-        )
-        $q$,
-        near._legacy_col_expr(src_schema, src_rel, 'group_id', 'l.group_id', 'NULL'),
-        near._legacy_col_expr(src_schema, src_rel, 'line_message_id', 'l.line_message_id', 'NULL'),
-        src_schema,
-        src_rel
-      );
+      IF near._legacy_has_column(src_schema, src_rel, 'inbound_message_id') THEN
+        EXECUTE format(
+          $q$
+          INSERT INTO near.near_outbound_messages (
+            channel, channel_user_id, group_id, text, inbound_message_id, line_message_id, created_at
+          )
+          SELECT l.channel, l.channel_user_id, %s, l.text, m.near_id, %s, l.created_at
+          FROM %I.%I l
+          LEFT JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
+          WHERE NOT EXISTS (
+            SELECT 1 FROM near.near_outbound_messages o
+            WHERE o.channel = l.channel AND o.channel_user_id = l.channel_user_id
+              AND o.created_at = l.created_at AND o.text = l.text
+          )
+          $q$,
+          near._legacy_col_expr(src_schema, src_rel, 'group_id', 'l.group_id', 'NULL'),
+          near._legacy_col_expr(src_schema, src_rel, 'line_message_id', 'l.line_message_id', 'NULL'),
+          src_schema, src_rel
+        );
+      ELSE
+        EXECUTE format(
+          $q$
+          INSERT INTO near.near_outbound_messages (
+            channel, channel_user_id, group_id, text, inbound_message_id, line_message_id, created_at
+          )
+          SELECT l.channel, l.channel_user_id, %s, l.text, NULL, %s, l.created_at
+          FROM %I.%I l
+          WHERE NOT EXISTS (
+            SELECT 1 FROM near.near_outbound_messages o
+            WHERE o.channel = l.channel AND o.channel_user_id = l.channel_user_id
+              AND o.created_at = l.created_at AND o.text = l.text
+          )
+          $q$,
+          near._legacy_col_expr(src_schema, src_rel, 'group_id', 'l.group_id', 'NULL'),
+          near._legacy_col_expr(src_schema, src_rel, 'line_message_id', 'l.line_message_id', 'NULL'),
+          src_schema, src_rel
+        );
+      END IF;
     END LOOP;
   END IF;
 
@@ -197,22 +207,24 @@ BEGIN
         CONTINUE;
       END IF;
 
-      EXECUTE format(
-        $q$
-        INSERT INTO near.near_intent_runs (inbound_message_id, model, raw_output, parsed, created_at)
-        SELECT m.near_id, l.model, l.raw_output, l.parsed, l.created_at
-        FROM %I.%I l
-        INNER JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM near.near_intent_runs ir
-          WHERE ir.inbound_message_id = m.near_id
-            AND ir.created_at = l.created_at
-            AND ir.model = l.model
-        )
-        $q$,
-        src_schema,
-        src_rel
-      );
+      IF near._legacy_has_column(src_schema, src_rel, 'inbound_message_id') THEN
+        EXECUTE format(
+          $q$
+          INSERT INTO near.near_intent_runs (inbound_message_id, model, raw_output, parsed, created_at)
+          SELECT m.near_id, l.model, l.raw_output, l.parsed, l.created_at
+          FROM %I.%I l
+          INNER JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
+          WHERE NOT EXISTS (
+            SELECT 1 FROM near.near_intent_runs ir
+            WHERE ir.inbound_message_id = m.near_id
+              AND ir.created_at = l.created_at AND ir.model = l.model
+          )
+          $q$,
+          src_schema, src_rel
+        );
+      ELSE
+        RAISE NOTICE 'near_merge: skip intent_runs from %.% (no inbound_message_id)', src_schema, src_rel;
+      END IF;
     END LOOP;
   END IF;
 
@@ -379,29 +391,50 @@ BEGIN
     LOOP
       IF NOT near._is_base_table(src_schema, src_rel) THEN CONTINUE; END IF;
 
-      EXECUTE format(
-        $q$
-        INSERT INTO near.near_unsupported_requests (
-          channel, channel_user_id, original_message, detected_intent, why_unsupported,
-          suggested_implementation_category, priority, status, notes, confidence,
-          inbound_message_id, created_at
-        )
-        SELECT
-          l.channel, l.channel_user_id, l.original_message, l.detected_intent, l.why_unsupported,
-          l.suggested_implementation_category, l.priority, l.status, l.notes, l.confidence,
-          m.near_id, l.created_at
-        FROM %I.%I l
-        LEFT JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM near.near_unsupported_requests u
-          WHERE u.channel = l.channel
-            AND u.channel_user_id = l.channel_user_id
-            AND u.original_message = l.original_message
-            AND u.created_at = l.created_at
-        )
-        $q$,
-        src_schema, src_rel
-      );
+      IF near._legacy_has_column(src_schema, src_rel, 'inbound_message_id') THEN
+        EXECUTE format(
+          $q$
+          INSERT INTO near.near_unsupported_requests (
+            channel, channel_user_id, original_message, detected_intent, why_unsupported,
+            suggested_implementation_category, priority, status, notes, confidence,
+            inbound_message_id, created_at
+          )
+          SELECT
+            l.channel, l.channel_user_id, l.original_message, l.detected_intent, l.why_unsupported,
+            l.suggested_implementation_category, l.priority, l.status, l.notes, l.confidence,
+            m.near_id, l.created_at
+          FROM %I.%I l
+          LEFT JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
+          WHERE NOT EXISTS (
+            SELECT 1 FROM near.near_unsupported_requests u
+            WHERE u.channel = l.channel AND u.channel_user_id = l.channel_user_id
+              AND u.original_message = l.original_message AND u.created_at = l.created_at
+          )
+          $q$,
+          src_schema, src_rel
+        );
+      ELSE
+        EXECUTE format(
+          $q$
+          INSERT INTO near.near_unsupported_requests (
+            channel, channel_user_id, original_message, detected_intent, why_unsupported,
+            suggested_implementation_category, priority, status, notes, confidence,
+            inbound_message_id, created_at
+          )
+          SELECT
+            l.channel, l.channel_user_id, l.original_message, l.detected_intent, l.why_unsupported,
+            l.suggested_implementation_category, l.priority, l.status, l.notes, l.confidence,
+            NULL, l.created_at
+          FROM %I.%I l
+          WHERE NOT EXISTS (
+            SELECT 1 FROM near.near_unsupported_requests u
+            WHERE u.channel = l.channel AND u.channel_user_id = l.channel_user_id
+              AND u.original_message = l.original_message AND u.created_at = l.created_at
+          )
+          $q$,
+          src_schema, src_rel
+        );
+      END IF;
 
       EXECUTE format(
         $q$

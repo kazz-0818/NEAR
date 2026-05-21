@@ -3,7 +3,7 @@
 ## 方針
 
 - **いま**: 各 LLM 応答の `usage` を捨てない。`recordLlmUsage()` で構造化ログ（debug）のみ。
-- **あとで**: RITS が `POST /admin/usage` を実装したら、env を入れるだけで自動送信。
+- **RITS 実装済み**: `VERIORA_RITS_*` env を入れると `POST /admin/usage` へ自動送信。日次 LINE に占有率が載る。
 
 ## 環境変数（任意・全エージェント共通想定）
 
@@ -45,10 +45,8 @@ if (u) recordLlmUsage(u);
 - `src/services/llm_fallback_answer.ts`
 - その他 `chat.completions.create` / `responses.create` があるファイル
 
-## RITS 側（未実装）
+## RITS 側（実装済み）
 
-```
-POST {RITS_URL}/admin/usage
-x-admin-api-key: ...
-{ agent_name, model, prompt_tokens, completion_tokens, source, metadata? }
-```
+- `POST /admin/usage` · `GET /admin/usage/summary?date=YYYY-MM-DD`
+- migration: RITS `017_llm_usage_events.sql`（Supabase で適用）
+- 詳細: 兄弟リポ RITS の `docs/llm-usage-api-planned.md`

@@ -14,6 +14,8 @@ import {
   startHearingFlow,
 } from "../services/growth_orchestrator.js";
 import { runImprovementCapsuleAnalysisJob } from "../services/improvement_capsule_service.js";
+import { getUserMemory } from "../db/user_memory_repo.js";
+import { getLineUserProfile } from "../db/line_user_profiles_repo.js";
 
 const patchSuggestionBody = z
   .object({
@@ -111,6 +113,28 @@ export function createAdminApp(): Hono {
       params
     );
     return c.json({ parent_brand: VELIORA_PARENT_BRAND, items: r.rows });
+  });
+
+  /** ユーザー長期記憶（near.near_user_memory + 手動 memo） */
+  app.get("/user-memory", async (c) => {
+    const lineUserId = c.req.query("line_user_id")?.trim();
+    if (!lineUserId) return c.json({ error: "line_user_id required" }, 400);
+    const pool = getPool();
+    const [memory, profile] = await Promise.all([
+      getUserMemory(pool, lineUserId),
+      getLineUserProfile(pool, lineUserId),
+    ]);
+    return c.json({
+      line_user_id: lineUserId,
+      memory,
+      profile: profile
+        ? {
+            display_name: profile.displayName,
+            memo: profile.memo,
+            last_seen_at: profile.lastSeenAt,
+          }
+        : null,
+    });
   });
 
   /** Veliora 名前空間の未対応依頼ビュー（実体は near.near_unsupported_requests） */

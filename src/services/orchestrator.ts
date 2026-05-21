@@ -23,7 +23,10 @@ import {
   loadRecentAssistantMessages,
   loadRecentUserMessages,
 } from "./conversation_context.js";
-import { resolveDisplayNameCacheOnly } from "../lib/lineUserProfile.js";
+import { resolveDisplayName, resolveDisplayNameCacheOnly } from "../lib/lineUserProfile.js";
+import { lineCallerSalutation, prefixLineReplyWithCaller } from "../lib/lineCallerAddress.js";
+import type { LineRespondReason } from "../channels/line/respondReason.js";
+import { shouldAddressCallerByLineName } from "../channels/line/respondReason.js";
 import { getUserRole } from "../db/user_roles_repo.js";
 import { hasRole, insufficientRoleMessage, requiredRoleForIntent } from "../lib/permissions.js";
 import {
@@ -48,6 +51,12 @@ import { shouldInvokeNearAgent } from "../orchestrator/routingDecision.js";
 import { runThinRouterPhase } from "../orchestrator/thinRouter.js";
 import { runNearAgentTurn } from "../agent/runner.js";
 import { composeNearReplyUnified } from "../agent/compose/nearComposer.js";
+import type { ComposeInput } from "./reply_composer.js";
+import { looksLikeTrivialLinePing } from "../channels/line/trivialPing.js";
+import {
+  loadUserMemoryPromptBlock,
+  maybeConsolidateUserMemoryAfterReply,
+} from "./user_memory_service.js";
 import { tryHandlePendingToolConfirmation } from "./pending_tool_confirm_handler.js";
 import { tryHandlePendingClarification } from "./pending_clarification_handler.js";
 import {
@@ -84,6 +93,14 @@ async function saveIntentRun(
   );
 }
 
+type UserMemoryOutboundOpts = {
+  memorySubjectLineUserId: string;
+  actorDisplayName?: string;
+  userText: string;
+  recentUserMessages: string[];
+  recentAssistantMessages: string[];
+};
+
 async function replyLineAndRememberOutbound(
   db: Db,
   ctx: { channel: string; channelUserId: string; groupId?: string | null; inboundMessageId: number },
@@ -92,7 +109,8 @@ async function replyLineAndRememberOutbound(
   finalText: string,
   log: ReturnType<typeof getLogger>,
   capsuleSnap?: ImprovementRoutingSnapshot | null,
-  routingTraceId?: string | null
+  routingTraceId?: string | null,
+  userMemoryOpts?: UserMemoryOutboundOpts | null
 ): Promise<void> {
   const sent = await replyOrPush(replyToken, lineUserId, finalText);
   try {
@@ -135,6 +153,18 @@ async function replyLineAndRememberOutbound(
       nearReply: finalText,
       snap: capsuleSnap,
     }).catch((e) => log.warn({ err: e }, "recordImprovementCandidatesIfEligible failed"));
+  }
+  if (userMemoryOpts && ctx.inboundMessageId > 0) {
+    void maybeConsolidateUserMemoryAfterReply({
+      db,
+      memorySubjectLineUserId: userMemoryOpts.memorySubjectLineUserId,
+      displayName: userMemoryOpts.actorDisplayName,
+      inboundMessageId: ctx.inboundMessageId,
+      userText: userMemoryOpts.userText,
+      nearReply: finalText,
+      recentUserMessages: userMemoryOpts.recentUserMessages,
+      recentAssistantMessages: userMemoryOpts.recentAssistantMessages,
+    }).catch((e) => log.warn({ err: e }, "maybeConsolidateUserMemoryAfterReply failed"));
   }
 }
 
@@ -181,15 +211,6 @@ function looksLikeShortEntityReply(text: string): boolean {
   return /(です|だよ|です。|だよ。|です！|だよ！)$/.test(t) || /^[A-Za-z0-9][A-Za-z0-9 _-]{1,24}$/.test(t);
 }
 
-/** 挨拶・呼びかけのみ（直前が誤った確認文でも clarify で止めない） */
-function looksLikeTrivialLinePing(text: string): boolean {
-  const t = text.normalize("NFKC").trim();
-  if (t.length === 0 || t.length > 32) return false;
-  return /^(にあ|ニア|ねあ|nea|near|こんにちは|こんばんは|おはよう|おーい|おつ|おつかれ|よう|はろー|hello|hi|やあ|やー)$/iu.test(
-    t
-  );
-}
-
 function buildBroadConsultationFallbackDraft(): string {
   return (
     "もちろんお手伝いできます。何を整理したいか、もう少し教えてもらえますか？\n" +
@@ -206,15 +227,35 @@ export async function handleLineTextMessage(input: {
   text: string;
   inboundMessageId: number;
   lineSourceType?: string;
+  lineRespondReason?: LineRespondReason;
 }): Promise<void> {
   const log = getLogger();
-  const { db, replyToken, channelUserId, actorUserId, groupId, text, inboundMessageId, lineSourceType } = input;
+  const {
+    db,
+    replyToken,
+    channelUserId,
+    actorUserId,
+    groupId,
+    text,
+    inboundMessageId,
+    lineSourceType,
+    lineRespondReason,
+  } = input;
 
-  // キャッシュのみ参照（LINE API を同期で呼ばない）。
-  // 実際の取得は index.ts の fireAndForgetRefreshProfile が非同期で行う。
-  const actorDisplayName = actorUserId
-    ? (await resolveDisplayNameCacheOnly(db, actorUserId).catch(() => null)) ?? undefined
-    : undefined;
+  const addressByLineName = shouldAddressCallerByLineName(lineRespondReason);
+  let actorDisplayName: string | undefined;
+  if (actorUserId) {
+    if (groupId || addressByLineName) {
+      actorDisplayName =
+        (await resolveDisplayName(db, actorUserId, groupId).catch(() => null)) ?? undefined;
+    } else {
+      actorDisplayName =
+        (await resolveDisplayNameCacheOnly(db, actorUserId).catch(() => null)) ??
+        (await resolveDisplayName(db, actorUserId).catch(() => null)) ??
+        undefined;
+    }
+  }
+
   const channel = "line";
   const env = getEnv();
   // groupId をコンテキストに含め、返答保存時にも紐付ける
@@ -252,6 +293,29 @@ export async function handleLineTextMessage(input: {
     log.warn({ err: ctxErr }, "load recent conversation context failed; continuing without context");
   }
 
+  const memorySubjectLineUserId = actorUserId ?? channelUserId;
+  let userMemoryBlock = "";
+  try {
+    userMemoryBlock = await loadUserMemoryPromptBlock(db, memorySubjectLineUserId, actorDisplayName);
+  } catch (memErr) {
+    log.warn({ err: memErr }, "loadUserMemoryPromptBlock failed; continuing without long-term memory");
+  }
+  const userMemoryOpts: UserMemoryOutboundOpts = {
+    memorySubjectLineUserId,
+    actorDisplayName,
+    userText: text,
+    recentUserMessages,
+    recentAssistantMessages,
+  };
+  const composeCtx = (
+    partial: Omit<ComposeInput, "actorDisplayName" | "lineRespondReason" | "userMemoryBlock">
+  ): ComposeInput => ({
+    actorDisplayName,
+    lineRespondReason,
+    userMemoryBlock,
+    ...partial,
+  });
+
   let routingTraceId: string | null = null;
   try {
     routingTraceId = await createRoutingTrace(db, { channelUserId, inboundMessageId, userMessage: text });
@@ -259,6 +323,34 @@ export async function handleLineTextMessage(input: {
     log.warn({ err: e }, "createRoutingTrace failed");
   }
   const actorRole = await getUserRole(db, actorUserId ?? channelUserId).catch(() => "guest" as const);
+
+  if (addressByLineName && looksLikeTrivialLinePing(text)) {
+    const sal = lineCallerSalutation(actorDisplayName);
+    const draft = sal
+      ? `${sal}、はい、NEARです。何かお手伝いできることはありますか？`
+      : "はい、NEARです。何かお手伝いできることはありますか？";
+    let finalText = draft;
+    try {
+      finalText = await composeNearReplyUnified(
+        composeCtx({ draft, situation: "followup", userMessage: text })
+      );
+    } catch (ce) {
+      log.warn({ err: ce }, "composeNearReplyUnified failed (trivial hail)");
+    }
+    capSnap.routeTaken = "line_name_hail";
+    await replyLineAndRememberOutbound(
+      db,
+      outboundCtx,
+      replyToken,
+      channelUserId,
+      finalText,
+      log,
+      capSnap,
+      routingTraceId,
+      userMemoryOpts
+    );
+    return;
+  }
 
   const thin = await runThinRouterPhase({
     db,
@@ -286,7 +378,7 @@ export async function handleLineTextMessage(input: {
         log.warn({ err: e }, "merge thin routingTracePatch failed")
       );
     }
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log, capSnap, routingTraceId);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, thin.finalText, log, capSnap, routingTraceId, userMemoryOpts);
     return;
   }
   if (routingTraceId && thin.routingTracePatch) {
@@ -322,7 +414,7 @@ export async function handleLineTextMessage(input: {
       capSnap.usedLlmFallback = false;
       capSnap.usedGrowthPipeline = false;
       capSnap.preGrowthCategory = null;
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap, routingTraceId);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingClarification.finalText, log, capSnap, routingTraceId, userMemoryOpts);
       return;
     }
     if ("forceIntent" in pendingClarification && pendingClarification.forceIntent) {
@@ -350,7 +442,7 @@ export async function handleLineTextMessage(input: {
       capSnap.usedLlmFallback = false;
       capSnap.usedGrowthPipeline = false;
       capSnap.preGrowthCategory = null;
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap, routingTraceId);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, pendingHit.finalText, log, capSnap, routingTraceId, userMemoryOpts);
       return;
     }
   } else {
@@ -363,6 +455,7 @@ export async function handleLineTextMessage(input: {
         userText: text,
         recentUserMessages,
         recentAssistantMessages,
+        userMemoryBlock,
       });
 
       if (interpretation.mode === "edit_previous_output" && interpretation.confidence >= 0.48) {
@@ -376,13 +469,13 @@ export async function handleLineTextMessage(input: {
             });
             let finalText = edited;
             try {
-              finalText = await composeNearReplyUnified({ actorDisplayName,
+              finalText = await composeNearReplyUnified(composeCtx({
                 draft: edited,
                 situation: "success",
                 userMessage: text,
                 recentUserMessages,
                 recentAssistantMessages,
-              });
+              }));
             } catch (ce) {
               log.warn({ err: ce }, "composeNearReplyUnified failed (secretary edit path)");
             }
@@ -395,7 +488,7 @@ export async function handleLineTextMessage(input: {
             capSnap.usedLlmFallback = false;
             capSnap.usedGrowthPipeline = false;
             capSnap.preGrowthCategory = null;
-            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
             return;
           } catch (e) {
             log.warn({ err: e }, "secretary edit_previous_output failed; continuing to intent routing");
@@ -462,13 +555,13 @@ export async function handleLineTextMessage(input: {
             });
             let finalText = clarifyDraft;
             try {
-              finalText = await composeNearReplyUnified({ actorDisplayName,
+              finalText = await composeNearReplyUnified(composeCtx({
                 draft: clarifyDraft,
                 situation: "followup",
                 userMessage: text,
                 recentUserMessages,
                 recentAssistantMessages,
-              });
+              }));
             } catch (ce) {
               log.warn({ err: ce }, "composeNearReplyUnified failed (secretary clarify path)");
             }
@@ -481,7 +574,7 @@ export async function handleLineTextMessage(input: {
             capSnap.usedLlmFallback = false;
             capSnap.usedGrowthPipeline = false;
             capSnap.preGrowthCategory = null;
-            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+            await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
             return;
           } catch (e) {
             log.warn({ err: e }, "secretary clarify_missing_info failed; continuing to intent routing");
@@ -705,7 +798,7 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = false;
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log, capSnap, routingTraceId);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, denyText, log, capSnap, routingTraceId, userMemoryOpts);
     return;
   }
 
@@ -749,14 +842,13 @@ export async function handleLineTextMessage(input: {
     }
     let finalText = draft;
     try {
-      finalText = await composeNearReplyUnified({
-        actorDisplayName,
+      finalText = await composeNearReplyUnified(composeCtx({
         draft,
         situation: "unsupported",
         userMessage: text,
         recentUserMessages,
         recentAssistantMessages,
-      });
+      }));
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReplyUnified failed (growth extension path)");
     }
@@ -765,7 +857,7 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = true;
     capSnap.preGrowthCategory = "growth_explicit";
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
     return;
   }
 
@@ -783,6 +875,7 @@ export async function handleLineTextMessage(input: {
         userText: text,
         recentUserMessages,
         recentAssistantMessages,
+        userMemoryBlock,
       },
         env.NEAR_AGENT_TIMEOUT_MS
       );
@@ -800,13 +893,13 @@ export async function handleLineTextMessage(input: {
         let finalText = trimmed;
         if (!env.NEAR_AGENT_SKIP_COMPOSE) {
           try {
-            finalText = await composeNearReplyUnified({ actorDisplayName,
+            finalText = await composeNearReplyUnified(composeCtx({
               draft: trimmed,
               situation: agentResult.composeSituation,
               userMessage: text,
               recentUserMessages,
               recentAssistantMessages,
-            });
+            }));
           } catch (ce) {
             log.warn({ err: ce }, "composeNearReplyUnified failed (near agent path)");
           }
@@ -816,7 +909,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = false;
         capSnap.usedGrowthPipeline = false;
         capSnap.preGrowthCategory = null;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
         await maybeRecordAgentPathGrowthSignals({
           db,
           channel,
@@ -877,14 +970,13 @@ export async function handleLineTextMessage(input: {
         }
         let finalText = draft;
         try {
-          finalText = await composeNearReplyUnified({
-            actorDisplayName,
+          finalText = await composeNearReplyUnified(composeCtx({
             draft,
             situation: "unsupported",
             userMessage: text,
             recentUserMessages,
             recentAssistantMessages,
-          });
+          }));
         } catch (ce) {
           log.warn({ err: ce }, "composeNearReplyUnified failed (unsupported growth path)");
         }
@@ -893,7 +985,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = false;
         capSnap.usedGrowthPipeline = true;
         capSnap.preGrowthCategory = preGrowth.category;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
         return;
       }
 
@@ -911,14 +1003,13 @@ export async function handleLineTextMessage(input: {
         const extDraft = buildExternalCapabilityNeededReply();
         let finalText = extDraft;
         try {
-          finalText = await composeNearReplyUnified({
-            actorDisplayName,
+          finalText = await composeNearReplyUnified(composeCtx({
             draft: extDraft,
             situation: "success",
             userMessage: text,
             recentUserMessages,
             recentAssistantMessages,
-          });
+          }));
         } catch (ce) {
           log.warn({ err: ce }, "composeNearReplyUnified failed (external tool needed path)");
         }
@@ -927,7 +1018,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = false;
         capSnap.usedGrowthPipeline = false;
         capSnap.preGrowthCategory = preGrowth.category;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
         return;
       }
 
@@ -937,17 +1028,19 @@ export async function handleLineTextMessage(input: {
             userText: text,
             recentUserMessages,
             recentAssistantMessages,
+            userMemoryBlock,
           });
           let finalText = fb.draft;
           try {
-            finalText = await composeNearReplyUnified({
-              actorDisplayName,
-              draft: fb.draft,
-              situation: "success",
-              userMessage: text,
-              recentUserMessages,
-              recentAssistantMessages,
-            });
+            finalText = await composeNearReplyUnified(
+              composeCtx({
+                draft: fb.draft,
+                situation: "success",
+                userMessage: text,
+                recentUserMessages,
+                recentAssistantMessages,
+              })
+            );
           } catch (ce) {
             log.warn({ err: ce }, "composeNearReplyUnified failed (llm fallback path)");
           }
@@ -956,7 +1049,7 @@ export async function handleLineTextMessage(input: {
           capSnap.usedLlmFallback = true;
           capSnap.usedGrowthPipeline = false;
           capSnap.preGrowthCategory = preGrowth.category;
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
           return;
         } catch (fe) {
           log.warn({ err: fe }, "llm fallback path failed; falling back to growth or clarify");
@@ -992,14 +1085,13 @@ export async function handleLineTextMessage(input: {
         }
         let finalText = draft;
         try {
-          finalText = await composeNearReplyUnified({
-            actorDisplayName,
+          finalText = await composeNearReplyUnified(composeCtx({
             draft,
             situation: "unsupported",
             userMessage: text,
             recentUserMessages,
             recentAssistantMessages,
-          });
+          }));
         } catch (ce) {
           log.warn({ err: ce }, "composeNearReplyUnified failed (post-llm growth path)");
         }
@@ -1008,7 +1100,7 @@ export async function handleLineTextMessage(input: {
         capSnap.usedLlmFallback = true;
         capSnap.usedGrowthPipeline = true;
         capSnap.preGrowthCategory = preGrowth.category;
-        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+        await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
         return;
       }
 
@@ -1035,14 +1127,15 @@ export async function handleLineTextMessage(input: {
       const draft = buildUnknownClarifyReply();
       let finalText = draft;
       try {
-        finalText = await composeNearReplyUnified({
-          actorDisplayName,
-          draft,
-          situation: "followup",
-          userMessage: text,
-          recentUserMessages,
-          recentAssistantMessages,
-        });
+        finalText = await composeNearReplyUnified(
+          composeCtx({
+            draft,
+            situation: "followup",
+            userMessage: text,
+            recentUserMessages,
+            recentAssistantMessages,
+          })
+        );
       } catch (ce) {
         log.warn({ err: ce }, "composeNearReplyUnified failed (unknown clarify path)");
       }
@@ -1051,7 +1144,7 @@ export async function handleLineTextMessage(input: {
       capSnap.usedLlmFallback = false;
       capSnap.usedGrowthPipeline = true;
       capSnap.preGrowthCategory = preGrowth.category;
-      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+      await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
       return;
     }
 
@@ -1140,6 +1233,7 @@ export async function handleLineTextMessage(input: {
           userText: text,
           recentUserMessages,
           recentAssistantMessages,
+          userMemoryBlock,
         },
           env.NEAR_AGENT_TIMEOUT_MS
         );
@@ -1148,13 +1242,13 @@ export async function handleLineTextMessage(input: {
           let finalText = retried;
           if (!env.NEAR_AGENT_SKIP_COMPOSE) {
             try {
-              finalText = await composeNearReplyUnified({ actorDisplayName,
+              finalText = await composeNearReplyUnified(composeCtx({
                 draft: retried,
                 situation: agentRetry.composeSituation,
                 userMessage: text,
                 recentUserMessages,
                 recentAssistantMessages,
-              });
+              }));
             } catch (ce) {
               log.warn({ err: ce }, "composeNearReplyUnified failed (faq deflection retry path)");
             }
@@ -1164,7 +1258,7 @@ export async function handleLineTextMessage(input: {
           capSnap.usedLlmFallback = false;
           capSnap.usedGrowthPipeline = false;
           capSnap.preGrowthCategory = null;
-          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+          await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
           await maybeRecordAgentPathGrowthSignals({
             db,
             channel,
@@ -1205,13 +1299,13 @@ export async function handleLineTextMessage(input: {
       finalText = `${finalText}\n\n※ このご要望は、成長候補として記録し、開発側で検討できるよう控えました。`;
     }
     try {
-      finalText = await composeNearReplyUnified({ actorDisplayName,
+      finalText = await composeNearReplyUnified(composeCtx({
         draft: finalText,
         situation,
         userMessage: text,
         recentUserMessages,
         recentAssistantMessages,
-      });
+      }));
     } catch (ce) {
       log.warn({ err: ce }, "composeNearReplyUnified failed, sending draft as-is");
     }
@@ -1220,20 +1314,20 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = Boolean(growthGateForAck);
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
   } catch (e) {
     log.error({ err: e }, "orchestrator pipeline error");
     const draft =
       "申し訳ございません、少し調子が悪いようです。お手数ですが、もう一度お試しください。";
     let finalText = draft;
     try {
-      finalText = await composeNearReplyUnified({ actorDisplayName,
+      finalText = await composeNearReplyUnified(composeCtx({
         draft,
         situation: "error",
         userMessage: text,
         recentUserMessages,
         recentAssistantMessages,
-      });
+      }));
     } catch {
       /* draft のまま */
     }
@@ -1241,6 +1335,6 @@ export async function handleLineTextMessage(input: {
     capSnap.usedLlmFallback = false;
     capSnap.usedGrowthPipeline = false;
     capSnap.preGrowthCategory = null;
-    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId);
+    await replyLineAndRememberOutbound(db, outboundCtx, replyToken, channelUserId, finalText, log, capSnap, routingTraceId, userMemoryOpts);
   }
 }

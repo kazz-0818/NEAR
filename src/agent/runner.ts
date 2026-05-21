@@ -39,6 +39,9 @@ function buildAgentUserContent(input: NearAgentTurnInput): string {
     .join("\n\n");
 
   const blocks: string[] = [];
+  if (input.userMemoryBlock?.trim()) {
+    blocks.push(input.userMemoryBlock.trim());
+  }
   if (prevU) blocks.push(`【このトークで先のユーザー発言（古い順・抜粋）】\n${prevU}`);
   if (prevA) blocks.push(`【NEAR の直近の返答（古い順・抜粋）】\n${prevA}`);
   blocks.push(`【今回のユーザー発言】\n${input.userText.trim()}`);

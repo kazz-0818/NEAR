@@ -15,6 +15,7 @@
 | 061 | `061_veriora_backfill_messages_optional.sql` | line_events → messages |
 | 062 | `062_security_hardening_public_api.sql` | RLS, security_invoker VIEWs |
 | 063 | `063_simplify_unified_line_log.sql` | 統一 `veliora.line_messages`、public NEAR VIEW 削除 |
+| 064 | `064_near_user_memory.sql` | ユーザー長期記憶テーブル |
 
 他リポジトリは **同一 SQL** を別連番で同梱（SERA `016`–`026` 等）。詳細は [`supabase-simplification.md`](supabase-simplification.md)。
 

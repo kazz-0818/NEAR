@@ -22,13 +22,15 @@
 | [`docs/supabase-schema.md`](docs/supabase-schema.md) | `veriora` schema・既存テーブル対応表 |
 | [`docs/migration-plan.md`](docs/migration-plan.md) | migration 053–063 適用手順 |
 | [`docs/supabase-simplification.md`](docs/supabase-simplification.md) | Table Editor 整理・LINE ログ env |
+| [`docs/near-user-memory.md`](docs/near-user-memory.md) | ユーザー長期記憶（学習） |
 | [`docs/agent-foldering.md`](docs/agent-foldering.md) | `src/agents/{agentKey}/` 構成 |
 
 ## Agent registry（コード）
 
 - TypeScript サービス: `src/agents/`（`types.ts`, `registry.ts`, `index.ts`）+ `src/agents/{near,sera,lira,rits,lram}/`
 - LIRA（Python）: `app/agents/` + `app/agents/{agentKey}/`
-- Canonical DB: `src/services/supabase/`（LINE ログ: `VERIORA_CANONICAL_LINE_LOG` / `VERIORA_LEGACY_VELIORA_LINE_LOG`、[`supabase-simplification.md`](docs/supabase-simplification.md)）
+- Canonical DB: `src/services/supabase/`（LINE ログ・[`supabase-simplification.md`](docs/supabase-simplification.md)）
+- ユーザー長期記憶: `src/services/user_memory_*.ts`（[`near-user-memory.md`](docs/near-user-memory.md)、既定 ON）
 
 **現状**: 実行経路からは参照しない前提で追加されています（統一基盤の置き場）。Phase 3 以降で `getEnv` やルーティングから段階的に接続します。
 

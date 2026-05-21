@@ -25,6 +25,7 @@ export type InterpretSecretaryRequestInput = {
   userText: string;
   recentUserMessages: string[];
   recentAssistantMessages: string[];
+  userMemoryBlock?: string;
 };
 
 /**
@@ -59,7 +60,11 @@ export async function interpretSecretaryRequest(
     .map((s, i) => `${i + 1}. ${truncate(s, 8000)}`)
     .join("\n\n---\n\n");
 
+  const memoryBlock = input.userMemoryBlock?.trim()
+    ? `${input.userMemoryBlock.trim()}\n\n`
+    : "";
   const userContent =
+    memoryBlock +
     `【今回のユーザー発言】\n${userBlock}\n\n` +
     (prevUser ? `【このトークで先のユーザー発言（古い順・抜粋）】\n${prevUser}\n\n` : "") +
     `【NEAR の直近の返答（古い順・編集対象になりうる）】\n${prevAsst || "(なし)"}\n\n` +

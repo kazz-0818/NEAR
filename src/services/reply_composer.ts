@@ -3,6 +3,8 @@ import { getEnv } from "../config/env.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
 import { recordLlmUsage, usageFromChatCompletion } from "../lib/llmUsage.js";
+import type { LineRespondReason } from "../channels/line/respondReason.js";
+import { shouldAddressCallerByLineName } from "../channels/line/respondReason.js";
 
 let personaCache: string | null = null;
 
@@ -25,6 +27,10 @@ export type ComposeInput = {
   recentAssistantMessages?: string[];
   /** 発言者の表示名（LINE Profile）。自然な呼びかけに使う（任意） */
   actorDisplayName?: string;
+  /** 長期ユーザー記憶ブロック（任意） */
+  userMemoryBlock?: string;
+  /** グループでの応答理由（名前呼び・メンション時は表示名で呼びかける） */
+  lineRespondReason?: LineRespondReason;
 };
 
 function temperatureForSituation(s: ComposeInput["situation"]): number {
@@ -69,20 +75,29 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
 
   try {
     const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-    const userBits: string[] = [
+    const userBits: string[] = [];
+    if (input.userMemoryBlock?.trim()) {
+      userBits.push(input.userMemoryBlock.trim(), "");
+    }
+    userBits.push(
       `状況: ${input.situation}`,
       "次のドラフトは骨子です。NEARの口調で1通にまとめてください。",
       "- 事実・約束・次のアクション・列挙する内容はドラフトどおり。",
       "- 表現・導入・つかみ・軽いユーモアや一言ツッコミは毎回変えてよい。決まり文句だけの返答は避ける。",
       "- ユーザーの発言があれば、長くならない範囲で軽く拾ってよい。",
-      "- 読みやすいよう改行を入れる。",
-    ];
+      "- 読みやすいよう改行を入れる。"
+    );
     if (input.actorDisplayName?.trim()) {
-      userBits.push(
-        "",
-        `ユーザーの表示名: ${input.actorDisplayName.trim()}`,
-        "- 自然な流れで名前を呼んでよい（毎回冒頭に付けなくてもよい。文中に1回入れる程度）。"
-      );
+      userBits.push("", `ユーザーのLINE表示名: ${input.actorDisplayName.trim()}`);
+      if (shouldAddressCallerByLineName(input.lineRespondReason)) {
+        userBits.push(
+          "- ボットがグループで呼びかけられた返信です。最初の一文で必ずこのLINE表示名で呼びかけてから本題に入る（例: 「〇〇さん、承知しました。」）。"
+        );
+      } else {
+        userBits.push(
+          "- 自然な流れで名前を呼んでよい（毎回冒頭に付けなくてもよい。文中に1回入れる程度）。"
+        );
+      }
     }
     if (input.userMessage?.trim()) {
       userBits.push("", `ユーザー発言: ${input.userMessage.trim()}`);
@@ -169,12 +184,16 @@ export async function composeNearReplyLight(input: ComposeInput): Promise<string
 
   try {
     const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-    const userBits: string[] = [
+    const userBits: string[] = [];
+    if (input.userMemoryBlock?.trim()) {
+      userBits.push(input.userMemoryBlock.trim(), "");
+    }
+    userBits.push(
       `状況: ${input.situation}`,
       "次のドラフトはユーザーへの返信本文です。**内容・数値・固有名・箇条書きの事実は1文字も変えず**、改行と丁寧さだけ整えてください。",
       "- 新しい情報・前置き・「調べたところ」などの追加は禁止。",
-      "- ドラフトが既に丁寧なら、ほぼそのままでよい。",
-    ];
+      "- ドラフトが既に丁寧なら、ほぼそのままでよい。"
+    );
     if (input.userMessage?.trim()) {
       userBits.push("", `ユーザー発言（参考のみ）: ${input.userMessage.trim()}`);
     }

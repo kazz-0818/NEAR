@@ -22,6 +22,7 @@ import {
 } from "./channels/line/groupMention.js";
 import { fireAndForgetObserveLineGroup } from "./services/line_group_observation.js";
 import { fireAndForgetRefreshProfile } from "./lib/lineUserProfile.js";
+import { resolveLineRespondReason } from "./channels/line/respondReason.js";
 import { upsertUserRole } from "./db/user_roles_repo.js";
 import { getDeployedAtIso } from "./lib/buildInfo.js";
 import {
@@ -241,6 +242,17 @@ async function lineMessagingWebhook(c: Context) {
     const groupId = getLineGroupOrRoomId(source);
     fireAndForgetRefreshProfile(db, userId, groupId);
 
+    const lineRespondReason = resolveLineRespondReason({
+      source,
+      message,
+      botUserId: envLine.LINE_BOT_USER_ID,
+      text,
+      isGrowthCapsule:
+        Boolean(envLine.ADMIN_LINE_USER_ID) &&
+        userId === envLine.ADMIN_LINE_USER_ID &&
+        isConfiguredGrowthApprovalGroup(source, envLine.GROWTH_APPROVAL_GROUP_ID),
+    });
+
     await handleLineTextMessage({
       db,
       replyToken,
@@ -250,6 +262,7 @@ async function lineMessagingWebhook(c: Context) {
       text,
       inboundMessageId: inboundId,
       lineSourceType: typeof source?.type === "string" ? source.type : undefined,
+      lineRespondReason,
     });
   }
 

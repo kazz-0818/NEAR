@@ -14,6 +14,7 @@ export async function runLlmFallbackAnswer(input: {
   userText: string;
   recentUserMessages?: string[];
   recentAssistantMessages?: string[];
+  userMemoryBlock?: string;
 }): Promise<{ draft: string }> {
   const env = getEnv();
   const log = getLogger();
@@ -25,6 +26,9 @@ export async function runLlmFallbackAnswer(input: {
   ]);
 
   const chunks: string[] = [];
+  if (input.userMemoryBlock?.trim()) {
+    chunks.push(input.userMemoryBlock.trim(), "");
+  }
   const prev = input.recentUserMessages?.filter((s) => s.trim().length > 0) ?? [];
   const asst = input.recentAssistantMessages?.filter((s) => s.trim().length > 0) ?? [];
   if (prev.length > 0) {

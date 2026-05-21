@@ -13,6 +13,8 @@ export type NearAgentToolContext = {
   userText: string;
   recentUserMessages: string[];
   recentAssistantMessages: string[];
+  /** 長期ユーザー記憶（プロンプト用ブロック） */
+  userMemoryBlock?: string;
 };
 
 export type NearAgentTurnInput = NearAgentToolContext;

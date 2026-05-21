@@ -605,6 +605,50 @@ const envSchema = z.object({
       const n = parseInt(s, 10);
       return Number.isFinite(n) && n >= 1 && n <= 120 ? n : 10;
     }),
+  /** false / 0 でユーザー長期記憶を無効（読取・更新とも） */
+  NEAR_USER_MEMORY_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s !== "false" && s !== "0"),
+  /** false / 0 で会話後の LLM 記憶更新を止める（読取のみ） */
+  NEAR_USER_MEMORY_CONSOLIDATE_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s !== "false" && s !== "0"),
+  /** 前回更新から何ターン空けるか（1=毎ターン） */
+  NEAR_USER_MEMORY_CONSOLIDATE_EVERY_N_TURNS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 1;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 1 && n <= 20 ? n : 1;
+    }),
+  NEAR_USER_MEMORY_MIN_USER_CHARS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 4;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 0 && n <= 200 ? n : 4;
+    }),
+  NEAR_USER_MEMORY_MAX_FACTS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 24;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 4 && n <= 48 ? n : 24;
+    }),
+  NEAR_USER_MEMORY_MODEL: z.string().optional(),
+  NEAR_USER_MEMORY_MAX_OUTPUT_TOKENS: z
+    .string()
+    .optional()
+    .transform((s) => {
+      if (s == null || s.trim() === "") return 700;
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) && n >= 200 && n <= 2000 ? n : 700;
+    }),
   /** true / 1 で veriora.messages へ書き込み（既定 ON）。false / 0 で OFF */
   VERIORA_CANONICAL_LINE_LOG: z
     .string()

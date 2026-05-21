@@ -12,6 +12,17 @@ import {
   applyReminderTimeUpdate,
 } from "./conversationTurnResolver.js";
 
+/** applyReminderTimeUpdate の「過去時刻」判定用に Date.now を固定 */
+function withFixedNow<T>(fixedIsoUtc: string, fn: () => T): T {
+  const realNow = Date.now;
+  Date.now = () => new Date(fixedIsoUtc).getTime();
+  try {
+    return fn();
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 // ────────────────────────────────────────────────────────────────
 // extractReminderTimeUpdateText
 // ────────────────────────────────────────────────────────────────
@@ -83,25 +94,24 @@ test("CTR-10: 「リマインド一覧だして」は時間更新ではない", 
 // ────────────────────────────────────────────────────────────────
 
 test("CTR-11: applyReminderTimeUpdate - 同日の14:00 に変更", () => {
-  // 元: 2026-05-12 13:00 JST (= 2026-05-12T04:00:00Z)
-  const referenceDate = new Date("2026-05-12T04:00:00Z");
-  // 新: 14:00 JST
-  const newDate = applyReminderTimeUpdate(referenceDate, "14:00");
-  assert.ok(newDate !== null, "applyReminderTimeUpdate should return a Date");
-  // 14:00 JST = 05:00 UTC
-  const hour = newDate!.getUTCHours();
-  assert.equal(hour, 5, "14:00 JST は UTC 05:00 であるべき");
-  const min = newDate!.getUTCMinutes();
-  assert.equal(min, 0, "00分であるべき");
+  withFixedNow("2026-05-12T03:00:00Z", () => {
+    // 元: 2026-05-12 13:00 JST (= 2026-05-12T04:00:00Z)
+    const referenceDate = new Date("2026-05-12T04:00:00Z");
+    const newDate = applyReminderTimeUpdate(referenceDate, "14:00");
+    assert.ok(newDate !== null, "applyReminderTimeUpdate should return a Date");
+    assert.equal(newDate!.getUTCHours(), 5, "14:00 JST は UTC 05:00 であるべき");
+    assert.equal(newDate!.getUTCMinutes(), 0, "00分であるべき");
+  });
 });
 
 test("CTR-12: applyReminderTimeUpdate - 14時半 → 14:30 JST", () => {
-  const referenceDate = new Date("2026-05-12T04:00:00Z"); // 13:00 JST
-  const newDate = applyReminderTimeUpdate(referenceDate, "14時半");
-  assert.ok(newDate !== null);
-  // 14:30 JST = 05:30 UTC
-  assert.equal(newDate!.getUTCHours(), 5);
-  assert.equal(newDate!.getUTCMinutes(), 30);
+  withFixedNow("2026-05-12T03:00:00Z", () => {
+    const referenceDate = new Date("2026-05-12T04:00:00Z"); // 13:00 JST
+    const newDate = applyReminderTimeUpdate(referenceDate, "14時半");
+    assert.ok(newDate !== null);
+    assert.equal(newDate!.getUTCHours(), 5);
+    assert.equal(newDate!.getUTCMinutes(), 30);
+  });
 });
 
 test("CTR-13: applyReminderTimeUpdate - 過去時刻は null を返す", () => {

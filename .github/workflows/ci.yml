@@ -15,6 +15,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+      LINE_CHANNEL_SECRET: ci-line-channel-secret-placeholder
+      LINE_CHANNEL_ACCESS_TOKEN: ci-line-channel-access-token-placeholder
+      OPENAI_API_KEY: sk-ci-openai-placeholder
+      ADMIN_API_KEY: ci-admin-api-key-placeholder
     steps:
       - uses: actions/checkout@v4
 

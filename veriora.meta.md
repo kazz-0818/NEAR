@@ -35,7 +35,8 @@ registry / `053_veriora_core_schema.sql` のハッシュが 5 リポで一致す
 | 4 | legacy LINE ログ OFF | **運用**（本番 env） |
 | 5 | NEAR handoff ヒント → `veriora.agent_handoff_logs` | 実装済み |
 | 6 | RITS → `veriora.messages` 複写 | 実装済み（`DATABASE_URL` 要） |
-| 7–8 | LRAM 取次ぎ・管理 UI 統一 | 別 PR で拡張可 |
+| 7 | NEAR→LRAM `/internal/handoff/near` | 実装済み（env 要） |
+| 8 | `/admin/veliora/line-messages`（LRAM 追加、SERA/NEAR 既存） | 実装済み |
 
 ## コミット
 

@@ -2,6 +2,7 @@ import type { Db } from "../db/client.js";
 import { getVerioraAgentByKey } from "../agents/registry.js";
 import { getLogger } from "./logger.js";
 import { getAgentByKey, saveHandoffLog } from "../services/supabase/index.js";
+import { notifyLramHandoff } from "./verioraHandoffNotify.js";
 
 /** registry handoffRules と整合するキーワードヒント */
 const HANDOFF_HINTS: readonly { agentKey: string; pattern: RegExp }[] = [
@@ -39,12 +40,21 @@ export async function recordVerioraHandoffHint(
     const toAgent = await getAgentByKey(db, targetKey);
     if (!fromAgent || !toAgent) return;
 
+    const summary = `${nearDef.code}→${targetDef.code}: ${input.userText.slice(0, 200)}`;
     await saveHandoffLog(db, {
       fromAgentId: fromAgent.id,
       toAgentId: toAgent.id,
       handoffReason: `hint:${input.intent}`,
-      summary: `${nearDef.code}→${targetDef.code}: ${input.userText.slice(0, 200)}`,
+      summary,
     });
+    if (targetKey === "lram") {
+      void notifyLramHandoff({
+        userText: input.userText,
+        intent: input.intent,
+        channelUserId: input.channelUserId,
+        summary,
+      }).catch(() => undefined);
+    }
   } catch (e) {
     getLogger().warn({ err: e, targetKey }, "recordVerioraHandoffHint failed (non-fatal)");
   }

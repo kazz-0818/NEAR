@@ -81,4 +81,14 @@ export const NEAR_ENV_ALIASES: readonly EnvAliasRule[] = [
     legacy: ["VERIORA_GITHUB_TOKEN"],
     deprecatedLegacy: true,
   },
+  {
+    canonical: "NEAR_LRAM_BASE_URL",
+    legacy: ["LRAM_BASE_URL", "LRAM_PUBLIC_BASE_URL"],
+    deprecatedLegacy: true,
+  },
+  {
+    canonical: "VERIORA_HANDOFF_SECRET",
+    legacy: ["NEAR_HANDOFF_SECRET", "LRAM_HANDOFF_SECRET"],
+    deprecatedLegacy: true,
+  },
 ];

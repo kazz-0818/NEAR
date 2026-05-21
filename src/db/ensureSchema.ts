@@ -68,6 +68,7 @@ const MIGRATION_FILES = [
   "059_veriora_compatibility_views.sql",
   "060_veriora_seed_agents.sql",
   "061_veriora_backfill_messages_optional.sql",
+  "062_security_hardening_public_api.sql",
 ] as const;
 
 /** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */

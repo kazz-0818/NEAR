@@ -59,7 +59,9 @@
 
 ## RLS
 
-新規 `veriora.*` テーブルは RLS 有効。**サーバーは `service_role` / postgres 接続**想定。既存 RLS ポリシーは変更していません。
+`near.*` / `sera.*` / `veriora.*` / RITS `public.*`（共有 DB）は **RLS 有効・ポリシーなし**（anon/authenticated は deny）。**サーバーは `service_role` / postgres**。
+
+`public.*` 互換 VIEW は migration **062** で `security_invoker = true`（caller の RLS を継承）。
 
 ## コードからの利用
 

@@ -21,14 +21,14 @@
         "BRAVO 記事・WordPress 下書き・編集は LRAM に渡す"
       ],
       "capabilities": [
-        { "id": "tasks", "label": "タスクの記録（やることリストに追加）", "status": "live", "since": "2025-01" },
+        { "id": "tasks", "label": "タスクの記録", "status": "live", "since": "2025-01" },
         { "id": "memo", "label": "メモの保存", "status": "live", "since": "2025-01" },
-        { "id": "remind", "label": "リマインドの受付", "status": "live", "since": "2025-01" },
+        { "id": "remind", "label": "タスクのリマインド通知", "status": "live", "since": "2025-01" },
         { "id": "summary", "label": "短い文章の要約・整理", "status": "live", "since": "2025-02" },
         { "id": "chat", "label": "幅広いチャット相談（学習・仕事・雑談）", "status": "live", "since": "2025-02" },
         { "id": "sheets", "label": "Googleスプレッドシートの参照と分析", "status": "live", "since": "2025-03" },
-        { "id": "calendar", "label": "Googleカレンダー（primary）の予定一覧・追加", "status": "live", "since": "2025-04" },
-        { "id": "routing", "label": "SERA / LIRA / RITS / LRAM への取次ぎと文脈引き継ぎ", "status": "live", "since": "2025-06" },
+        { "id": "calendar", "label": "Googleカレンダーの予定一覧・追加", "status": "live", "since": "2025-04" },
+        { "id": "routing", "label": "各エージェントへの取次ぎと文脈引き継ぎ", "status": "live", "since": "2025-06" },
         { "id": "growth", "label": "未対応・成長シグナルの記録と進化フロー", "status": "evolved", "since": "2025-09", "highlight": true },
         { "id": "lram-handoff", "label": "LRAM 向け BRAVO / 記事キーワードの内部ハンドオフ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "admin-line", "label": "統一 LINE 履歴の管理 API 連携", "status": "planned" }

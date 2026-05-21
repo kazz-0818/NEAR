@@ -1,5 +1,4 @@
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
+import { useRef } from "react";
 import type { ShowcaseAgent } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
 import { scrollToAgentSection } from "../lib/agents";
@@ -72,23 +71,6 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const reduced = useReducedMotion();
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]));
   const ordered = RING_ORDER.map((id) => byId[id]).filter(Boolean) as ShowcaseAgent[];
-
-  useEffect(() => {
-    if (reduced || !wrapRef.current) return;
-
-    const ctx = gsap.context(() => {
-      gsap.from(".member-orbit-avatar", {
-        scale: 0,
-        opacity: 0,
-        duration: 0.7,
-        stagger: 0.08,
-        ease: "back.out(1.6)",
-        delay: 0.15,
-      });
-    }, wrapRef);
-
-    return () => ctx.revert();
-  }, [reduced]);
 
   if (reduced) {
     return (

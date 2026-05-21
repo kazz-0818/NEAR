@@ -42,23 +42,23 @@ function splitOrbitRings(caps: ShowcaseCapability[]) {
 }
 
 function orbitLayout(count: number, mode: "single" | "dual") {
-  const compact = count > 7;
+  const dense = count > 7;
   if (mode === "single") {
     return {
       innerR: 0,
-      outerR: Math.min(200, 118 + count * 10),
+      outerR: Math.min(188, 108 + count * 9),
       fieldClass:
         count > 5
-          ? "max-w-[min(100%,26rem)] sm:max-w-[30rem] md:max-w-[34rem]"
-          : "max-w-[min(100%,22rem)] sm:max-w-[26rem] md:max-w-[30rem]",
-      compact,
+          ? "max-w-[min(100%,24rem)] sm:max-w-[28rem] md:max-w-[32rem]"
+          : "max-w-[min(100%,20rem)] sm:max-w-[24rem] md:max-w-[28rem]",
+      dense,
     };
   }
   return {
-    innerR: 128,
-    outerR: Math.min(228, 188 + Math.max(0, count - INNER_RING_MAX) * 6),
-    fieldClass: "max-w-[min(100%,28rem)] sm:max-w-[34rem] md:max-w-[38rem]",
-    compact: true,
+    innerR: 118,
+    outerR: Math.min(208, 168 + Math.max(0, count - INNER_RING_MAX) * 5),
+    fieldClass: "max-w-[min(100%,26rem)] sm:max-w-[30rem] md:max-w-[34rem]",
+    dense: true,
   };
 }
 
@@ -68,10 +68,10 @@ interface OrbitChipProps {
   index: number;
   total: number;
   radiusPx: number;
-  compact?: boolean;
+  dense?: boolean;
 }
 
-function OrbitChip({ cap, accent, index, total, radiusPx, compact }: OrbitChipProps) {
+function OrbitChip({ cap, accent, index, total, radiusPx, dense }: OrbitChipProps) {
   const angleDeg = (index / total) * 360 - 90;
 
   return (
@@ -86,34 +86,34 @@ function OrbitChip({ cap, accent, index, total, radiusPx, compact }: OrbitChipPr
       }
     >
       <div
-        className={`orbit-cap-inner w-max ${compact ? "max-w-[9rem] sm:max-w-[9.5rem]" : "max-w-[11rem] sm:max-w-[12.5rem]"}`}
+        className={`orbit-cap-inner w-max ${dense ? "max-w-[7.5rem] sm:max-w-[8rem]" : "max-w-[8.25rem] sm:max-w-[9rem]"}`}
       >
         <div
-          className={`orbit-chip-panel rounded-lg border shadow-lg ${compact ? "px-2 py-1.5" : "px-2.5 py-2 sm:px-3"}`}
+          className={`orbit-chip-panel rounded-md border shadow-lg ${dense ? "px-1.5 py-1" : "px-2 py-1 sm:px-2 sm:py-1.5"}`}
           style={{
             borderColor: cap.highlight ? `${accent}66` : "rgba(255,255,255,0.1)",
-            boxShadow: cap.highlight ? `0 0 20px ${accent}33` : undefined,
+            boxShadow: cap.highlight ? `0 0 16px ${accent}28` : undefined,
             pointerEvents: "auto",
           }}
         >
           {cap.highlight && (
             <span
-              className="mb-0.5 block font-display text-[7px] tracking-widest uppercase sm:text-[8px]"
+              className="mb-0.5 block font-display text-[6px] tracking-widest uppercase sm:text-[7px]"
               style={{ color: accent }}
             >
               NEW
             </span>
           )}
           <p
-            className={`leading-snug text-slate-200 ${compact ? "text-[9px] line-clamp-2" : "text-[10px] sm:text-[11px]"}`}
+            className={`leading-snug text-slate-200 line-clamp-2 ${dense ? "text-[8px]" : "text-[8px] sm:text-[9px]"}`}
           >
             {cap.label}
           </p>
           <div
-            className={`mt-1 flex flex-wrap items-center gap-1 uppercase ${compact ? "text-[7px]" : "text-[8px] sm:text-[9px]"}`}
+            className={`mt-0.5 flex flex-wrap items-center gap-1 uppercase ${dense ? "text-[6px]" : "text-[7px] sm:text-[8px]"}`}
           >
             <span
-              className="rounded px-1 py-0.5 font-display"
+              className="rounded px-1 py-px font-display"
               style={{
                 background: cap.status === "planned" ? "rgba(148,163,184,0.12)" : `${accent}20`,
                 color: cap.status === "planned" ? "#94a3b8" : accent,
@@ -121,7 +121,7 @@ function OrbitChip({ cap, accent, index, total, radiusPx, compact }: OrbitChipPr
             >
               {STATUS_LABEL[cap.status]}
             </span>
-            {cap.since && !compact && <span className="text-slate-600">since {cap.since}</span>}
+            {cap.since && <span className="text-slate-600">since {cap.since}</span>}
           </div>
         </div>
       </div>
@@ -166,8 +166,8 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
 
   const iconSize =
     caps.length > 7
-      ? "h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32"
-      : "h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36";
+      ? "h-[5.5rem] w-[5.5rem] sm:h-24 sm:w-24 md:h-28 md:w-28"
+      : "h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32";
 
   return (
     <div className="w-full">
@@ -199,7 +199,7 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
             index={i}
             total={inner.length}
             radiusPx={layout.innerR}
-            compact={layout.compact}
+            dense={layout.dense}
           />
         ))}
         {outer.map((cap, i) => (
@@ -210,13 +210,13 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
             index={i}
             total={outer.length}
             radiusPx={layout.outerR}
-            compact={layout.compact}
+            dense={layout.dense}
           />
         ))}
 
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
           <div
-            className="absolute -inset-3 rounded-full opacity-30"
+            className="absolute -inset-2 rounded-full opacity-30"
             style={{ border: `1px solid ${agent.accent}44` }}
           />
           <AgentIcon

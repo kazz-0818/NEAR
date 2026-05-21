@@ -132,7 +132,7 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
             <h3
               className="mb-4 text-center font-display text-xs tracking-[0.25em] text-slate-500 uppercase lg:mb-6"
             >
-              Capabilities — 軌道で稼働
+              Capabilities
             </h3>
             <OrbitingCapabilities agent={agent} />
             <p className="mx-auto mt-8 max-w-md text-center text-sm leading-relaxed text-slate-500">

@@ -324,7 +324,8 @@ export async function handleLineTextMessage(input: {
   }
   const actorRole = await getUserRole(db, actorUserId ?? channelUserId).catch(() => "guest" as const);
 
-  if (addressByLineName && looksLikeTrivialLinePing(text)) {
+  // グループ: メンション or 名前呼び（ニア/にあ/NEAR）。1:1: 挨拶のみでも応答。
+  if (looksLikeTrivialLinePing(text) && (addressByLineName || !groupId)) {
     const sal = lineCallerSalutation(actorDisplayName);
     const draft = sal
       ? `${sal}、はい、NEARです。何かお手伝いできることはありますか？`

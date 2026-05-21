@@ -32,7 +32,7 @@ export function textMessageMentionsBot(
  */
 export function textContainsNearNameReferral(raw: string): boolean {
   const n = raw.normalize("NFKC");
-  if (n.includes("ニア")) return true;
+  if (n.includes("ニア") || n.includes("にあ") || n.includes("ねあ")) return true;
   return /(^|[^A-Za-z0-9])NEAR([^A-Za-z0-9]|$)/i.test(n);
 }
 
@@ -48,7 +48,7 @@ export function stripBotNamePrefix(text: string): string {
   // LINE グループのメンション形式: @{任意の表示名} (例: @NEAR-ニア-)
   t = t.replace(/^@[^\s　,、，。！!？?\u0000-\u001f\u007f]+\s*/u, "").trimStart();
   // 「ニア」「NEAR」単体の呼びかけ
-  t = t.replace(/^(?:ニア|NEAR)\s*[、,，　\s]*(?=\S)/iu, "").trimStart();
+  t = t.replace(/^(?:ニア|にあ|ねあ|NEAR)\s*[、,，　\s]*(?=\S)/iu, "").trimStart();
   // バッククォートで囲まれたロール名を展開（「`member`」→「member」）
   t = t.replace(/^`([^`]+)`$/u, "$1").trimStart();
   return t;

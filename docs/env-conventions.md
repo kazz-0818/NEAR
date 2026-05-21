@@ -88,6 +88,14 @@
 
 - `VERIORA_CRON_SECRET` または既存の `CRON_SECRET` を維持し alias
 
+### LINE 横断ログ（NEAR / SERA）
+
+- `VERIORA_CANONICAL_LINE_LOG` — `veriora.messages` へ書き込み（既定 ON）
+- `VERIORA_LEGACY_VELIORA_LINE_LOG` — `veliora.line_message_events` へ書き込み（既定 ON、検証後 `false` で停止）
+- `VERIORA_CORE_DUAL_WRITE` — **非推奨**。`true` のとき canonical を強制 ON（`VERIORA_CANONICAL_LINE_LOG=false` 時のみ有効）
+
+詳細: [`supabase-simplification.md`](supabase-simplification.md)
+
 ## 非推奨（deprecated）の扱い
 
 - **削除しない**。`docs/env-conventions.md` または各サービスの README に「非推奨。代替は ○○」と書く。

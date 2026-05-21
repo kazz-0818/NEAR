@@ -1,5 +1,5 @@
 import type { Db } from "./client.js";
-import { getEnv } from "../config/env.js";
+import { getEnv, type Env } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import { saveMessageFromLineEvent } from "../services/supabase/repositories/messages.js";
 import { VELIORA_AGENT_NEAR, buildVelioraConversationKey } from "../veliora/constants.js";
@@ -21,17 +21,48 @@ type AppendInput = {
   legacyRowId?: number | null;
 };
 
+function shouldWriteCanonical(env: Env, legacyRowId: number | null | undefined): boolean {
+  if (legacyRowId == null) return false;
+  if (env.VERIORA_CANONICAL_LINE_LOG) return true;
+  return env.VERIORA_CORE_DUAL_WRITE;
+}
+
 /**
  * Veliora 共通 LINE ログへ追記。失敗しても本処理は継続（警告ログのみ）。
+ * 正典は veriora.messages。veliora.line_message_events は VERIORA_LEGACY_VELIORA_LINE_LOG で制御。
  */
 export async function appendVelioraNearLineEvent(db: Db, input: AppendInput): Promise<void> {
   const log = getLogger();
+  const env = getEnv();
   const conversationKey = buildVelioraConversationKey(
     VELIORA_AGENT_NEAR,
     input.channel,
     input.lineUserId,
     input.groupId
   );
+
+  if (shouldWriteCanonical(env, input.legacyRowId)) {
+    try {
+      await saveMessageFromLineEvent(db, {
+        agentKey: VELIORA_AGENT_NEAR,
+        conversationKey,
+        direction: input.direction,
+        lineUserId: input.lineUserId,
+        groupId: input.groupId,
+        bodyText: input.bodyText,
+        messageType: input.messageType,
+        rawPayload: input.rawPayload,
+        legacySchema: input.legacySchema,
+        legacyTable: input.legacyTable,
+        legacyRowId: input.legacyRowId!,
+      });
+    } catch (e) {
+      log.warn({ err: e }, "veriora.messages canonical write failed (non-fatal)");
+    }
+  }
+
+  if (!env.VERIORA_LEGACY_VELIORA_LINE_LOG) return;
+
   try {
     await db.query(
       `INSERT INTO veliora.line_message_events (
@@ -56,26 +87,6 @@ export async function appendVelioraNearLineEvent(db: Db, input: AppendInput): Pr
       ]
     );
   } catch (e) {
-    log.warn({ err: e }, "appendVelioraNearLineEvent failed (non-fatal)");
-    return;
-  }
-
-  if (!getEnv().VERIORA_CORE_DUAL_WRITE || input.legacyRowId == null) return;
-  try {
-    await saveMessageFromLineEvent(db, {
-      agentKey: VELIORA_AGENT_NEAR,
-      conversationKey,
-      direction: input.direction,
-      lineUserId: input.lineUserId,
-      groupId: input.groupId,
-      bodyText: input.bodyText,
-      messageType: input.messageType,
-      rawPayload: input.rawPayload,
-      legacySchema: input.legacySchema,
-      legacyTable: input.legacyTable,
-      legacyRowId: input.legacyRowId,
-    });
-  } catch (e) {
-    log.warn({ err: e }, "veriora.messages dual-write failed (non-fatal)");
+    log.warn({ err: e }, "appendVelioraNearLineEvent legacy veliora write failed (non-fatal)");
   }
 }

@@ -603,7 +603,17 @@ const envSchema = z.object({
       const n = parseInt(s, 10);
       return Number.isFinite(n) && n >= 1 && n <= 120 ? n : 10;
     }),
-  /** true / 1 で veliora.line_message_events に加え veriora.messages へデュアル書き込み（既定オフ） */
+  /** true / 1 で veriora.messages へ書き込み（既定 ON）。false / 0 で OFF */
+  VERIORA_CANONICAL_LINE_LOG: z
+    .string()
+    .optional()
+    .transform((s) => s !== "false" && s !== "0"),
+  /** true / 1 で veliora.line_message_events へ書き込み（既定 ON）。false / 0 でレガシー停止 */
+  VERIORA_LEGACY_VELIORA_LINE_LOG: z
+    .string()
+    .optional()
+    .transform((s) => s !== "false" && s !== "0"),
+  /** @deprecated VERIORA_CANONICAL_LINE_LOG を使う。true のとき canonical を強制 ON */
   VERIORA_CORE_DUAL_WRITE: z
     .string()
     .optional()

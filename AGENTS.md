@@ -20,14 +20,15 @@
 | [`docs/db-conventions.md`](docs/db-conventions.md) | DB / テーブル命名規約 |
 | [`docs/new-agent-checklist.md`](docs/new-agent-checklist.md) | 新規 AI エージェント追加手順 |
 | [`docs/supabase-schema.md`](docs/supabase-schema.md) | `veriora` schema・既存テーブル対応表 |
-| [`docs/migration-plan.md`](docs/migration-plan.md) | migration 053–061 適用手順 |
+| [`docs/migration-plan.md`](docs/migration-plan.md) | migration 053–063 適用手順 |
+| [`docs/supabase-simplification.md`](docs/supabase-simplification.md) | Table Editor 整理・LINE ログ env |
 | [`docs/agent-foldering.md`](docs/agent-foldering.md) | `src/agents/{agentKey}/` 構成 |
 
 ## Agent registry（コード）
 
 - TypeScript サービス: `src/agents/`（`types.ts`, `registry.ts`, `index.ts`）+ `src/agents/{near,sera,lira,rits,lram}/`
 - LIRA（Python）: `app/agents/` + `app/agents/{agentKey}/`
-- Canonical DB: `src/services/supabase/`（`VERIORA_CORE_DUAL_WRITE` で LINE ログの任意デュアル書き込み）
+- Canonical DB: `src/services/supabase/`（LINE ログ: `VERIORA_CANONICAL_LINE_LOG` / `VERIORA_LEGACY_VELIORA_LINE_LOG`、[`supabase-simplification.md`](docs/supabase-simplification.md)）
 
 **現状**: 実行経路からは参照しない前提で追加されています（統一基盤の置き場）。Phase 3 以降で `getEnv` やルーティングから段階的に接続します。
 

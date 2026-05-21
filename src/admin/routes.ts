@@ -53,7 +53,8 @@ export function createAdminApp(): Hono {
     );
     return c.json({
       items: r.rows,
-      veliora_hint: "全 AI 横断の履歴は GET /admin/veliora/line-messages（veliora.line_messages）を参照",
+      veliora_hint:
+        "全 AI 横断の履歴は GET /admin/veliora/line-messages（veliora.line_messages = veriora + legacy 統合 VIEW）",
     });
   });
 
@@ -69,7 +70,7 @@ export function createAdminApp(): Hono {
   });
 
   /**
-   * Veliora OS 統一 LINE 履歴（near + sera 等の line_message_events を集約したビュー）。
+   * Veliora OS 統一 LINE 履歴（063: veriora.messages + 未ミラー veliora.line_message_events）。
    * Query: agent_code, line_user_id, group_id, conversation_key, direction, limit
    */
   app.get("/veliora/line-messages", async (c) => {

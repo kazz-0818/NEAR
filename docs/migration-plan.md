@@ -13,8 +13,10 @@
 | 059 | `059_veriora_compatibility_views.sql` | compat VIEWs |
 | 060 | `060_veriora_seed_agents.sql` | seed 5 agents |
 | 061 | `061_veriora_backfill_messages_optional.sql` | line_events → messages |
+| 062 | `062_security_hardening_public_api.sql` | RLS, security_invoker VIEWs |
+| 063 | `063_simplify_unified_line_log.sql` | 統一 `veliora.line_messages`、public NEAR VIEW 削除 |
 
-他リポジトリは **同一 SQL** を別連番で同梱（SERA `016`–`024` 等）。
+他リポジトリは **同一 SQL** を別連番で同梱（SERA `016`–`026` 等）。詳細は [`supabase-simplification.md`](supabase-simplification.md)。
 
 ## ローカル / staging
 

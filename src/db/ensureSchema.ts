@@ -58,6 +58,7 @@ const MIGRATION_FILES = [
   "049_public_legacy_near_views.sql",
   "050_near_merge_public_legacy_data.sql",
   "051_near_search_path_fix_and_veliora_backfill.sql",
+  "052_near_fix_public_view_conflicts.sql",
 ] as const;
 
 /** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */
@@ -118,7 +119,12 @@ export async function ensureSchema(): Promise<void> {
   for (const name of pending) {
     const sqlPath = join(__dirname, "migrations", name);
     const sql = await readFile(sqlPath, "utf-8");
-    await pool.query(sql);
+    try {
+      await pool.query(sql);
+    } catch (err) {
+      log.error({ err, migration: name }, "ensureSchema: migration failed");
+      throw new Error(`migration failed: ${name}`, { cause: err });
+    }
     await pool.query(
       "INSERT INTO public.near_schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
       [name]

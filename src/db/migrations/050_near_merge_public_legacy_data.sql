@@ -34,6 +34,26 @@ AS $$
 $$;
 
 -- 動的 SQL 用: 列があれば l.<col>、なければ default 式を返す
+CREATE OR REPLACE FUNCTION near._archive_public_base_table(p_rel text)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  archive_name text;
+  n int := 0;
+BEGIN
+  WHILE near._is_base_table('public', p_rel) LOOP
+    n := n + 1;
+    archive_name := p_rel || '_archived_' || n::text;
+    WHILE near._is_base_table('public', archive_name) LOOP
+      n := n + 1;
+      archive_name := p_rel || '_archived_' || n::text;
+    END LOOP;
+    EXECUTE format('ALTER TABLE public.%I RENAME TO %I', p_rel, archive_name);
+    RAISE NOTICE 'near_merge: archived public.% → %', p_rel, archive_name;
+  END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION near._legacy_col_expr(
   p_schema text, p_rel text, p_col text, p_expr text, p_default text
 )
@@ -438,7 +458,6 @@ END $$;
 DO $$
 DECLARE
   rel_name text;
-  archive_name text;
 BEGIN
   FOREACH rel_name IN ARRAY ARRAY[
     'inbound_messages', 'near_inbound_messages',
@@ -454,13 +473,7 @@ BEGIN
     'implementation_suggestions', 'near_implementation_suggestions'
   ]
   LOOP
-    IF near._is_base_table('public', rel_name) THEN
-      archive_name := rel_name || '_archived_050';
-      IF NOT near._is_base_table('public', archive_name) THEN
-        EXECUTE format('ALTER TABLE public.%I RENAME TO %I', rel_name, archive_name);
-        RAISE NOTICE 'near_merge: archived public.% → %', rel_name, archive_name;
-      END IF;
-    END IF;
+    PERFORM near._archive_public_base_table(rel_name);
   END LOOP;
 END $$;
 

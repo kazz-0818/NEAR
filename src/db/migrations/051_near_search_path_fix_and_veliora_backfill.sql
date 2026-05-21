@@ -17,6 +17,26 @@ AS $$
   );
 $$;
 
+CREATE OR REPLACE FUNCTION near._archive_public_base_table(p_rel text)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  archive_name text;
+  n int := 0;
+BEGIN
+  WHILE near._is_base_table('public', p_rel) LOOP
+    n := n + 1;
+    archive_name := p_rel || '_archived_' || n::text;
+    WHILE near._is_base_table('public', archive_name) LOOP
+      n := n + 1;
+      archive_name := p_rel || '_archived_' || n::text;
+    END LOOP;
+    EXECUTE format('ALTER TABLE public.%I RENAME TO %I', p_rel, archive_name);
+    RAISE NOTICE '051: archived public.% → %', p_rel, archive_name;
+  END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION near._legacy_col_expr(
   p_schema text, p_rel text, p_col text, p_expr text, p_default text
 )
@@ -37,7 +57,6 @@ DO $$
 DECLARE
   src_schema text;
   src_rel text;
-  archive_name text;
   row_count bigint;
 BEGIN
   IF NOT near._is_base_table('near', 'near_inbound_messages') THEN
@@ -79,11 +98,7 @@ BEGIN
       src_schema, src_rel
     );
 
-    archive_name := src_rel || '_archived_051';
-    IF NOT near._is_base_table(src_schema, archive_name) THEN
-      EXECUTE format('ALTER TABLE %I.%I RENAME TO %I', src_schema, src_rel, archive_name);
-      RAISE NOTICE '051: archived %.% → %', src_schema, src_rel, archive_name;
-    END IF;
+    PERFORM near._archive_public_base_table(src_rel);
   END LOOP;
 END $$;
 

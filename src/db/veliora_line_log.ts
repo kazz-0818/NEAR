@@ -1,5 +1,7 @@
 import type { Db } from "./client.js";
+import { getEnv } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
+import { saveMessageFromLineEvent } from "../services/supabase/repositories/messages.js";
 import { VELIORA_AGENT_NEAR, buildVelioraConversationKey } from "../veliora/constants.js";
 
 export type VelioraLineDirection = "inbound" | "outbound";
@@ -55,5 +57,25 @@ export async function appendVelioraNearLineEvent(db: Db, input: AppendInput): Pr
     );
   } catch (e) {
     log.warn({ err: e }, "appendVelioraNearLineEvent failed (non-fatal)");
+    return;
+  }
+
+  if (!getEnv().VERIORA_CORE_DUAL_WRITE || input.legacyRowId == null) return;
+  try {
+    await saveMessageFromLineEvent(db, {
+      agentKey: VELIORA_AGENT_NEAR,
+      conversationKey,
+      direction: input.direction,
+      lineUserId: input.lineUserId,
+      groupId: input.groupId,
+      bodyText: input.bodyText,
+      messageType: input.messageType,
+      rawPayload: input.rawPayload,
+      legacySchema: input.legacySchema,
+      legacyTable: input.legacyTable,
+      legacyRowId: input.legacyRowId,
+    });
+  } catch (e) {
+    log.warn({ err: e }, "veriora.messages dual-write failed (non-fatal)");
   }
 }

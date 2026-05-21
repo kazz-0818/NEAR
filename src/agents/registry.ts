@@ -7,6 +7,7 @@ import type { AgentDefinition } from "./types.js";
 export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
   {
     id: "near",
+    agentKey: "near",
     code: "NEAR",
     kana: "ニア",
     department: "秘書部",
@@ -50,6 +51,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
   },
   {
     id: "sera",
+    agentKey: "sera",
     code: "SERA",
     kana: "セラ",
     department: "マーケ部",
@@ -89,6 +91,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
   },
   {
     id: "lira",
+    agentKey: "lira",
     code: "LIRA",
     kana: "リラ",
     department: "経理部",
@@ -127,6 +130,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
   },
   {
     id: "rits",
+    agentKey: "rits",
     code: "RITS",
     kana: "リツ",
     department: "AI人事部",
@@ -163,6 +167,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
   },
   {
     id: "lram",
+    agentKey: "lram",
     code: "LRAM",
     kana: "ラム",
     department: "編集部",
@@ -210,6 +215,11 @@ const byCode = new Map<string, AgentDefinition>(
 
 export function getVerioraAgentById(id: string): AgentDefinition | undefined {
   return byId.get(id.trim().toLowerCase());
+}
+
+/** `agentKey` は `id` と同義 */
+export function getVerioraAgentByKey(agentKey: string): AgentDefinition | undefined {
+  return getVerioraAgentById(agentKey);
 }
 
 export function getVerioraAgentByCode(code: string): AgentDefinition | undefined {

@@ -45,7 +45,9 @@
 
 参照 API（例）:
 
-- TypeScript: `getVerioraAgentById("near")`, `getVerioraAgentByCode("NEAR")`
+- TypeScript: `getVerioraAgentById("near")`, `getVerioraAgentByKey("near")`, `getVerioraAgentByCode("NEAR")`
+- Postgres 正典: `veriora.*`（migration 053–061、[`supabase-schema.md`](supabase-schema.md)）
+- Repository: `src/services/supabase/`（稼働経路は既定オフ、`VERIORA_CORE_DUAL_WRITE` で任意デュアル書き込み）
 - Python: `get_veriora_agent_by_id("near")`
 
 ## 禁止事項・承認フロー（要約）

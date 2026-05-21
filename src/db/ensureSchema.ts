@@ -59,6 +59,15 @@ const MIGRATION_FILES = [
   "050_near_merge_public_legacy_data.sql",
   "051_near_search_path_fix_and_veliora_backfill.sql",
   "052_near_fix_public_view_conflicts.sql",
+  "053_veriora_core_schema.sql",
+  "054_veriora_conversations_messages.sql",
+  "055_veriora_routing_audit.sql",
+  "056_veriora_quality_improvement.sql",
+  "057_veriora_unsupported_compat.sql",
+  "058_veriora_lram_article_tables.sql",
+  "059_veriora_compatibility_views.sql",
+  "060_veriora_seed_agents.sql",
+  "061_veriora_backfill_messages_optional.sql",
 ] as const;
 
 /** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */

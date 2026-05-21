@@ -1,0 +1,35 @@
+import type { VerioraDb } from "../client.js";
+import { VERIORA_TABLES } from "../schema.js";
+
+export type VerioraAgentRow = {
+  id: string;
+  agent_key: string;
+  code: string;
+  kana: string;
+  department: string;
+  display_name: string;
+  role: string;
+  description: string | null;
+  enabled: boolean;
+};
+
+export async function getAgentByKey(db: VerioraDb, agentKey: string): Promise<VerioraAgentRow | null> {
+  const r = await db.query<VerioraAgentRow>(
+    `SELECT id, agent_key, code, kana, department, display_name, role, description, enabled
+     FROM ${VERIORA_TABLES.aiAgents}
+     WHERE agent_key = $1 AND enabled = true
+     LIMIT 1`,
+    [agentKey.trim().toLowerCase()]
+  );
+  return r.rows[0] ?? null;
+}
+
+export async function listAgents(db: VerioraDb): Promise<VerioraAgentRow[]> {
+  const r = await db.query<VerioraAgentRow>(
+    `SELECT id, agent_key, code, kana, department, display_name, role, description, enabled
+     FROM ${VERIORA_TABLES.aiAgents}
+     WHERE enabled = true
+     ORDER BY agent_key`
+  );
+  return r.rows;
+}

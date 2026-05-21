@@ -603,6 +603,11 @@ const envSchema = z.object({
       const n = parseInt(s, 10);
       return Number.isFinite(n) && n >= 1 && n <= 120 ? n : 10;
     }),
+  /** true / 1 で veliora.line_message_events に加え veriora.messages へデュアル書き込み（既定オフ） */
+  VERIORA_CORE_DUAL_WRITE: z
+    .string()
+    .optional()
+    .transform((s) => s === "true" || s === "1"),
 });
 
 export type Env = z.infer<typeof envSchema>;

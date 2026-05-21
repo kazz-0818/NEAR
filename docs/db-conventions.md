@@ -13,7 +13,7 @@
 3. **エージェント固有の実テーブル**は、既存パターンに合わせる:
    - NEAR: `near` schema + `near_*` テーブル（例: `near.near_inbound_messages`）
    - SERA: `sera` schema + `sera_*` テーブル
-4. **横断（組織共通）のログ・マスタ**は、既存の Postgres **`veliora` schema**（レガシー綴り）を現状の接続先とする。将来 **Veriora** 表記へ寄せる場合は **新 schema ではなく VIEW / synonym から着手**する（本 Phase では rename しない）。
+4. **横断（組織共通）のログ・マスタ**は、既存の Postgres **`veliora` schema**（レガシー綴り）に加え、新規正典は **`veriora` schema**（UUID `ai_agents` 等）。詳細は [`supabase-schema.md`](supabase-schema.md)。`veliora` は DROP せず VIEW で併存。
 
 ## 既存の「正」となるオブジェクト（参照のみ）
 

@@ -175,6 +175,47 @@ body {
   animation: member-float 4s ease-in-out infinite;
 }
 
+@keyframes olympic-float {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-8px);
+  }
+}
+
+.olympic-float {
+  animation: olympic-float 4.5s ease-in-out infinite;
+}
+
+/* 能力チップ — アイコン周りをぐるぐる（文字は正立） */
+@keyframes orbit-cap-spin {
+  from {
+    transform: rotate(var(--start, 0deg)) translateX(var(--r)) rotate(calc(-1 * var(--start, 0deg)));
+  }
+  to {
+    transform: rotate(calc(var(--start, 0deg) + 360deg)) translateX(var(--r))
+      rotate(calc(-1 * var(--start, 0deg) - 360deg));
+  }
+}
+
+.orbit-cap {
+  animation: orbit-cap-spin var(--dur, 60s) linear infinite;
+  transform: rotate(var(--start, 0deg)) translateX(var(--r)) rotate(calc(-1 * var(--start, 0deg)));
+  margin-left: -5.5rem;
+  margin-top: -2rem;
+}
+
+.orbit-cap:hover .orbit-cap-inner {
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.06);
+}
+
+.orbit-cap-inner {
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);
@@ -253,7 +294,16 @@ body {
   }
 
   .member-orbit-spin,
-  .member-orbit-spin-rev {
+  .member-orbit-spin-rev,
+  .olympic-float,
+  .orbit-cap {
     animation: none !important;
+  }
+
+  .orbit-cap {
+    transform: none !important;
+    position: static !important;
+    margin: 0 0 0.5rem 0 !important;
+    max-width: 100% !important;
   }
 }

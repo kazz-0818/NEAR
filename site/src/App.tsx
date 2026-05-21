@@ -88,9 +88,14 @@ function HeroAnimations() {
         { y: 0, opacity: 1, duration: 0.6, ease, delay: 0.18 },
       );
       gsap.fromTo(
+        ".hero-stage",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease, delay: 0.15 },
+      );
+      gsap.fromTo(
         ".hero-footer",
         { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.65, ease, delay: 0.28 },
+        { y: 0, opacity: 1, duration: 0.65, ease, delay: 0.35 },
       );
       gsap.to(".hero-cta-arrow", {
         y: 4,

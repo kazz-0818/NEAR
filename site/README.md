@@ -109,6 +109,6 @@ npm run build
 
 ## 技術スタック
 
-Vite + React + TypeScript、Tailwind CSS 4、GSAP、Lenis、React Three Fiber
+Vite + React + TypeScript、Tailwind CSS 4、GSAP、Lenis
 
-`prefers-reduced-motion: reduce` では 3D・慣性スクロールを抑えます。
+`prefers-reduced-motion: reduce` では慣性スクロールを抑えます。

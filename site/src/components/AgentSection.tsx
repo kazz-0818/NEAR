@@ -2,8 +2,7 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { ShowcaseAgent } from "../types/showcase";
-import { AgentIcon } from "./AgentIcon";
-import { CapabilityGrid } from "./CapabilityGrid";
+import { OrbitingCapabilities } from "./OrbitingCapabilities";
 import { EvolutionTimeline } from "./EvolutionTimeline";
 import { agentSectionId } from "../lib/agents";
 import { useReducedMotion } from "../hooks/useReducedMotion";
@@ -17,7 +16,6 @@ interface AgentSectionProps {
 
 export function AgentSection({ agent, index }: AgentSectionProps) {
   const ref = useRef<HTMLElement>(null);
-  const iconWrapRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const isEven = index % 2 === 0;
 
@@ -34,33 +32,32 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
 
       gsap.fromTo(
         ref.current!.querySelectorAll(".agent-reveal"),
-        { y: 56, opacity: 0 },
+        { y: 48, opacity: 0 },
         {
           y: 0,
           opacity: 1,
-          duration: 0.9,
-          stagger: 0.12,
+          duration: 0.85,
+          stagger: 0.1,
           ease: "power3.out",
           scrollTrigger: { trigger: ref.current, start: "top 78%" },
         },
       );
 
       gsap.fromTo(
-        ref.current!.querySelectorAll(".cap-card"),
-        { y: 32, opacity: 0 },
+        ref.current!.querySelector(".orbit-field"),
+        { scale: 0.85, opacity: 0 },
         {
-          y: 0,
+          scale: 1,
           opacity: 1,
-          duration: 0.55,
-          stagger: 0.06,
-          ease: "power2.out",
-          scrollTrigger: { trigger: ref.current, start: "top 62%" },
+          duration: 1,
+          ease: "power3.out",
+          scrollTrigger: { trigger: ref.current, start: "top 72%" },
         },
       );
 
       gsap.fromTo(
         ref.current!.querySelectorAll(".evo-item"),
-        { x: isEven ? -24 : 24, opacity: 0 },
+        { x: isEven ? -20 : 20, opacity: 0 },
         {
           x: 0,
           opacity: 1,
@@ -70,19 +67,6 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
           scrollTrigger: { trigger: ref.current, start: "top 55%" },
         },
       );
-
-      if (iconWrapRef.current) {
-        gsap.to(iconWrapRef.current, {
-          scrollTrigger: {
-            trigger: ref.current,
-            start: "top bottom",
-            end: "bottom top",
-            scrub: 1.2,
-          },
-          y: isEven ? -30 : 30,
-          ease: "none",
-        });
-      }
     }, ref);
 
     return () => ctx.revert();
@@ -107,70 +91,53 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
         }}
       />
 
-      <div className="relative mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-16">
-        <div className={`agent-reveal flex flex-col gap-6 ${isEven ? "" : "lg:order-2"}`}>
-          <div
-            ref={iconWrapRef}
-            className="agent-icon-orbit relative mx-auto w-fit md:mx-0"
+      <div className="relative mx-auto max-w-6xl">
+        <div className={`agent-reveal mb-8 lg:mb-10 ${isEven ? "" : "lg:text-right"}`}>
+          <span
+            className="agent-code-badge inline-block origin-left rounded px-3 py-1 font-display text-[10px] tracking-[0.35em] uppercase lg:origin-right"
+            style={{ background: `${agent.accent}18`, color: agent.accent }}
           >
-            <div
-              className="absolute -inset-4 rounded-full opacity-60"
-              style={{
-                background: `conic-gradient(from 0deg, ${agent.accent}, transparent, ${agent.accent})`,
-                animation: reduced ? undefined : "spin-slow 8s linear infinite",
-              }}
-            />
-            <AgentIcon
-              agentId={agent.id}
-              alt={agent.displayName}
-              glow={agent.accent}
-              className="relative mx-auto h-44 w-44 md:h-56 md:w-56"
-            />
-          </div>
-          <div>
-            <span
-              className="agent-code-badge inline-block origin-left rounded px-3 py-1 font-display text-[10px] tracking-[0.35em] uppercase"
-              style={{ background: `${agent.accent}18`, color: agent.accent }}
-            >
-              {agent.code}
-            </span>
-            <p
-              className="mt-3 font-display text-xs tracking-[0.3em] uppercase"
-              style={{ color: agent.accent }}
-            >
-              {agent.department}
-            </p>
-            <h2 className="mt-2 font-display text-2xl font-bold text-white md:text-4xl">
-              {agent.displayName}
-            </h2>
-            <p className="mt-3 text-sm text-slate-400 md:text-base">{agent.role}</p>
-          </div>
-          <p className="text-sm leading-relaxed text-slate-400 md:text-base">{agent.description}</p>
+            {agent.code}
+          </span>
+          <p
+            className="mt-3 font-display text-xs tracking-[0.3em] uppercase"
+            style={{ color: agent.accent }}
+          >
+            {agent.department}
+          </p>
+          <h2 className="mt-2 font-display text-2xl font-bold text-white md:text-4xl">
+            {agent.displayName}
+          </h2>
+          <p className="mt-3 text-sm text-slate-400 md:text-base">{agent.role}</p>
         </div>
 
-        <div className={`space-y-10 ${isEven ? "" : "lg:order-1"}`}>
-          <div className="agent-reveal">
+        <div className="agent-reveal grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-16 lg:items-start">
+          <div className={isEven ? "" : "lg:order-2"}>
             <h3
-              className="mb-5 flex items-center gap-3 font-display text-sm tracking-[0.25em] uppercase"
-              style={{ color: agent.accent }}
+              className="mb-4 text-center font-display text-xs tracking-[0.25em] text-slate-500 uppercase lg:mb-6"
             >
-              <span className="h-px flex-1 max-w-[3rem]" style={{ background: agent.accent }} />
-              Capabilities
+              Capabilities — 軌道で稼働
             </h3>
-            <CapabilityGrid capabilities={agent.capabilities} accent={agent.accent} />
+            <OrbitingCapabilities agent={agent} />
+            <p className="mx-auto mt-8 max-w-md text-center text-sm leading-relaxed text-slate-500">
+              {agent.description}
+            </p>
           </div>
-          <div className="agent-reveal glass-panel agent-panel-glow relative overflow-hidden rounded-2xl p-6 md:p-8">
-            <div
-              className="pointer-events-none absolute -top-20 -right-20 h-40 w-40 rounded-full blur-3xl"
-              style={{ background: `${agent.accent}15` }}
-            />
-            <h3
-              className="relative mb-6 font-display text-sm tracking-[0.25em] uppercase"
-              style={{ color: agent.accent }}
-            >
-              Evolution Log
-            </h3>
-            <EvolutionTimeline entries={agent.evolutionLog} accent={agent.accent} />
+
+          <div className={`agent-reveal ${isEven ? "" : "lg:order-1"}`}>
+            <div className="glass-panel agent-panel-glow relative overflow-hidden rounded-2xl p-6 md:p-8">
+              <div
+                className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full blur-3xl"
+                style={{ background: `${agent.accent}15` }}
+              />
+              <h3
+                className="relative mb-6 font-display text-sm tracking-[0.25em] uppercase"
+                style={{ color: agent.accent }}
+              >
+                Evolution Log
+              </h3>
+              <EvolutionTimeline entries={agent.evolutionLog} accent={agent.accent} />
+            </div>
           </div>
         </div>
       </div>

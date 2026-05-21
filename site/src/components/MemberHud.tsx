@@ -1,5 +1,4 @@
 import type { ShowcaseAgent } from "../types/showcase";
-import { AgentIcon } from "./AgentIcon";
 import { agentSectionId, scrollToId } from "../lib/agents";
 import { RING_ORDER } from "../lib/colors";
 
@@ -7,6 +6,7 @@ interface MemberHudProps {
   agents: ShowcaseAgent[];
 }
 
+/** 下部: テキストのみ（アイコンは OlympicMemberRings 側） */
 export function MemberHud({ agents }: MemberHudProps) {
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]));
 
@@ -20,28 +20,10 @@ export function MemberHud({ agents }: MemberHudProps) {
             key={id}
             type="button"
             onClick={() => scrollToId(agentSectionId(agent))}
-            className="group flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 backdrop-blur-md transition hover:border-white/25 hover:bg-white/5 sm:px-4 sm:py-2"
-            style={
-              {
-                ["--accent" as string]: agent.accent,
-              } as React.CSSProperties
-            }
+            className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 font-display text-[10px] tracking-[0.12em] uppercase backdrop-blur-md transition hover:border-white/25 hover:bg-white/5 sm:px-4 sm:py-2"
           >
-            <AgentIcon
-              agentId={agent.id}
-              alt={agent.code}
-              glow={agent.accent}
-              className="h-8 w-8 shrink-0 rounded-full sm:h-9 sm:w-9"
-            />
-            <span
-              className="font-display text-[10px] tracking-[0.15em] uppercase sm:text-xs"
-              style={{ color: agent.accent }}
-            >
-              {agent.code}
-            </span>
-            <span className="hidden text-[10px] text-slate-500 sm:inline">
-              {agent.department}
-            </span>
+            <span style={{ color: agent.accent }}>{agent.code}</span>
+            <span className="ml-1.5 text-slate-500">{agent.department}</span>
           </button>
         );
       })}

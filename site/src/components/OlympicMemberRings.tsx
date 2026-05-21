@@ -3,22 +3,56 @@ import gsap from "gsap";
 import type { ShowcaseAgent } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
 import { agentSectionId, scrollToId } from "../lib/agents";
+import { RING_ORDER } from "../lib/colors";
+import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
-/** オリンピック五輪配置: 上段3・下段2（重なり） */
-const OLYMPIC_SLOTS: ReadonlyArray<{
-  id: string;
-  left: string;
-  top: string;
-  z: number;
-  delay: number;
-}> = [
-  { id: "near", left: "4%", top: "2%", z: 2, delay: 0 },
-  { id: "sera", left: "36%", top: "0%", z: 4, delay: 0.15 },
-  { id: "lram", left: "68%", top: "2%", z: 3, delay: 0.3 },
-  { id: "lira", left: "18%", top: "44%", z: 5, delay: 0.45 },
-  { id: "rits", left: "50%", top: "44%", z: 6, delay: 0.6 },
-];
+const ORBIT_RADIUS = 138;
+const ORBIT_DURATION = 72;
+
+interface MemberOrbitItemProps {
+  agent: ShowcaseAgent;
+  index: number;
+  total: number;
+}
+
+function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
+  const angle = (index / total) * 360 - 90;
+
+  return (
+    <div
+      className="member-orbit-slot absolute left-0 top-0"
+      style={{ ["--angle" as string]: `${angle}deg` } as React.CSSProperties}
+    >
+      <button
+        type="button"
+        className="member-orbit-upright z-10 flex flex-col items-center transition-transform duration-300 hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        onClick={() => scrollToId(agentSectionId(agent))}
+      >
+        <div
+          className="relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
+          style={{
+            borderColor: agent.accent,
+            boxShadow: `0 0 24px ${agent.accent}55`,
+          }}
+        >
+          <AgentIcon
+            agentId={agent.id}
+            alt={agent.displayName}
+            glow={agent.accent}
+            className="h-[82%] w-[82%] rounded-full"
+          />
+        </div>
+        <span
+          className="mt-2 font-display text-[9px] tracking-[0.2em] uppercase sm:text-[10px]"
+          style={{ color: agent.accent }}
+        >
+          {agent.code}
+        </span>
+      </button>
+    </div>
+  );
+}
 
 interface OlympicMemberRingsProps {
   agents: ShowcaseAgent[];
@@ -26,85 +60,81 @@ interface OlympicMemberRingsProps {
 
 export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  usePauseAnimationsOffscreen(wrapRef);
   const reduced = useReducedMotion();
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]));
+  const ordered = RING_ORDER.map((id) => byId[id]).filter(Boolean) as ShowcaseAgent[];
 
   useEffect(() => {
     if (reduced || !wrapRef.current) return;
 
     const ctx = gsap.context(() => {
-      gsap.from(".olympic-ring-btn", {
+      gsap.from(".member-orbit-upright", {
         scale: 0,
         opacity: 0,
-        duration: 0.75,
-        stagger: 0.1,
-        ease: "back.out(1.8)",
-        delay: 0.2,
+        duration: 0.7,
+        stagger: 0.08,
+        ease: "back.out(1.6)",
+        delay: 0.15,
       });
     }, wrapRef);
 
     return () => ctx.revert();
   }, [reduced]);
 
-  return (
-    <div
-      ref={wrapRef}
-      className="olympic-rings relative mx-auto h-[11.5rem] w-full max-w-[22rem] sm:h-[13rem] sm:max-w-[26rem] md:h-[15rem] md:max-w-[30rem]"
-      aria-label="Veliora メンバー — クリックで詳細"
-    >
-      {/* 装飾用の薄いリング（アイコン背面） */}
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-20"
-        viewBox="0 0 300 160"
-        aria-hidden
-      >
-        <circle cx="55" cy="52" r="42" fill="none" stroke="#f472b6" strokeWidth="2" />
-        <circle cx="150" cy="48" r="42" fill="none" stroke="#facc15" strokeWidth="2" />
-        <circle cx="245" cy="52" r="42" fill="none" stroke="#f97316" strokeWidth="2" />
-        <circle cx="100" cy="108" r="42" fill="none" stroke="#c4b5fd" strokeWidth="2" />
-        <circle cx="195" cy="108" r="42" fill="none" stroke="#22c55e" strokeWidth="2" />
-      </svg>
-
-      {OLYMPIC_SLOTS.map((slot) => {
-        const agent = byId[slot.id];
-        if (!agent) return null;
-
-        return (
+  if (reduced) {
+    return (
+      <div className="flex flex-wrap justify-center gap-4 py-4">
+        {ordered.map((agent) => (
           <button
-            key={slot.id}
+            key={agent.id}
             type="button"
-            className="olympic-ring-btn olympic-float group absolute -translate-x-1/2 -translate-y-1/2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-            style={{
-              left: slot.left,
-              top: slot.top,
-              zIndex: slot.z,
-              animationDelay: `${slot.delay}s`,
-            }}
             onClick={() => scrollToId(agentSectionId(agent))}
+            className="flex flex-col items-center gap-1"
           >
-            <div
-              className="relative flex h-[4.75rem] w-[4.75rem] flex-col items-center justify-center rounded-full border-[3px] bg-[#050508]/80 shadow-lg backdrop-blur-sm transition duration-300 group-hover:scale-110 sm:h-[5.5rem] sm:w-[5.5rem] md:h-[6.25rem] md:w-[6.25rem]"
-              style={{
-                borderColor: agent.accent,
-                boxShadow: `0 0 28px ${agent.accent}44, inset 0 0 20px ${agent.accent}11`,
-              }}
-            >
-              <AgentIcon
-                agentId={agent.id}
-                alt={agent.displayName}
-                glow={agent.accent}
-                className="h-[78%] w-[78%] rounded-full"
-              />
-            </div>
-            <span
-              className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap font-display text-[9px] tracking-[0.2em] uppercase sm:text-[10px]"
-              style={{ color: agent.accent }}
-            >
+            <AgentIcon
+              agentId={agent.id}
+              alt={agent.code}
+              glow={agent.accent}
+              className="h-14 w-14 rounded-full"
+            />
+            <span className="font-display text-[10px] uppercase" style={{ color: agent.accent }}>
               {agent.code}
             </span>
           </button>
-        );
-      })}
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={wrapRef}
+      className="member-orbit-field relative mx-auto aspect-square w-full max-w-[20rem] sm:max-w-[24rem] md:max-w-[28rem]"
+      aria-label="Veliora メンバー — クリックで詳細"
+      style={
+        {
+          ["--dur" as string]: `${ORBIT_DURATION}s`,
+          ["--r" as string]: `${ORBIT_RADIUS}px`,
+        } as React.CSSProperties
+      }
+    >
+      <div
+        className="rainbow-ring pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20"
+        style={{
+          boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)",
+        }}
+      />
+
+      <div className="member-orbit-track absolute left-1/2 top-1/2">
+        {ordered.map((agent, i) => (
+          <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,12 @@
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { ShowcaseAgent } from "../types/showcase";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { MemberHud } from "./MemberHud";
 import { OlympicMemberRings } from "./OlympicMemberRings";
+
+const HeroParticle3D = lazy(() =>
+  import("./HeroParticle3D").then((m) => ({ default: m.HeroParticle3D })),
+);
 
 const HERO_BG =
   "radial-gradient(ellipse 80% 55% at 50% 42%, rgba(244,114,182,0.1), transparent 55%), radial-gradient(ellipse 50% 40% at 75% 25%, rgba(250,204,21,0.07), transparent 50%), radial-gradient(ellipse 45% 35% at 20% 70%, rgba(167,139,250,0.06), transparent 50%), #050508";
@@ -13,6 +19,21 @@ interface HeroSceneProps {
 }
 
 export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) {
+  const reduced = useReducedMotion();
+  const [show3d, setShow3d] = useState(false);
+
+  useEffect(() => {
+    if (reduced) {
+      setShow3d(false);
+      return;
+    }
+    const narrow = window.matchMedia("(max-width: 768px)");
+    const update = () => setShow3d(!narrow.matches);
+    update();
+    narrow.addEventListener("change", update);
+    return () => narrow.removeEventListener("change", update);
+  }, [reduced]);
+
   return (
     <section
       id="hero"
@@ -22,7 +43,12 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
         className="pointer-events-none absolute inset-0 z-0"
         style={{ background: HERO_BG }}
       />
-      <div className="pointer-events-none absolute inset-0 z-0 grid-bg opacity-15" />
+      {show3d && (
+        <Suspense fallback={null}>
+          <HeroParticle3D />
+        </Suspense>
+      )}
+      <div className="pointer-events-none absolute inset-0 z-[2] grid-bg opacity-10" />
 
       <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-5xl flex-col px-5 pt-[5.5rem] pb-10 sm:px-8 lg:max-w-6xl lg:px-10">
         <header className="shrink-0 text-center">

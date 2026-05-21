@@ -7,7 +7,7 @@ import { HeroScene } from "./components/HeroScene";
 import { AgentSection } from "./components/AgentSection";
 import { PhaseRoadmap } from "./components/PhaseRoadmap";
 import { SiteFooter } from "./components/SiteFooter";
-import { useSmoothScroll } from "./hooks/useSmoothScroll";
+import { useScrollTrigger } from "./hooks/useScrollTrigger";
 import { useReducedMotion } from "./hooks/useReducedMotion";
 import { AGENT_ACCENTS } from "./lib/colors";
 
@@ -135,10 +135,10 @@ function SectionDivider() {
 }
 
 export default function App() {
-  useSmoothScroll();
+  useScrollTrigger();
 
   return (
-    <div className="scanlines relative min-h-screen">
+    <div className="relative min-h-screen">
       <Nav />
       <HeroAnimations />
       <main>

@@ -17,15 +17,6 @@ html {
   scroll-behavior: smooth;
 }
 
-html.lenis,
-html.lenis body {
-  height: auto;
-}
-
-.lenis.lenis-smooth {
-  scroll-behavior: auto;
-}
-
 body {
   margin: 0;
   min-height: 100vh;
@@ -71,11 +62,26 @@ body {
 
 .glass-panel {
   background: var(--color-panel);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
     0 0 40px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.orbit-chip-panel {
+  background: rgba(12, 14, 22, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.agent-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
+.animations-paused,
+.animations-paused * {
+  animation-play-state: paused !important;
 }
 
 .agent-panel-glow {
@@ -175,44 +181,70 @@ body {
   animation: member-float 4s ease-in-out infinite;
 }
 
-@keyframes olympic-float {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) translateY(0);
-  }
-  50% {
-    transform: translate(-50%, -50%) translateY(-8px);
-  }
+/* ヒーロー: 虹色リング 1 本 */
+.rainbow-ring {
+  background: conic-gradient(
+    from 210deg,
+    #f472b6,
+    #facc15,
+    #f97316,
+    #c4b5fd,
+    #22c55e,
+    #f472b6
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.15));
+  animation: rainbow-ring-glow 6s ease-in-out infinite alternate;
 }
 
-.olympic-float {
-  animation: olympic-float 4.5s ease-in-out infinite;
-}
-
-/* 能力チップ — アイコン周りをぐるぐる（文字は正立） */
-@keyframes orbit-cap-spin {
+@keyframes rainbow-ring-glow {
   from {
-    transform: rotate(var(--start, 0deg)) translateX(var(--r)) rotate(calc(-1 * var(--start, 0deg)));
+    opacity: 0.75;
+    filter: drop-shadow(0 0 8px rgba(244, 114, 182, 0.35));
   }
   to {
-    transform: rotate(calc(var(--start, 0deg) + 360deg)) translateX(var(--r))
-      rotate(calc(-1 * var(--start, 0deg) - 360deg));
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(34, 197, 94, 0.35));
   }
 }
 
-.orbit-cap {
-  animation: orbit-cap-spin var(--dur, 60s) linear infinite;
-  transform: rotate(var(--start, 0deg)) translateX(var(--r)) rotate(calc(-1 * var(--start, 0deg)));
-  margin-left: -5.5rem;
-  margin-top: -2rem;
+/* 軌道 — 親1本 + スロット逆回転（チップごとの独立 keyframe を廃止） */
+@keyframes orbit-track-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.orbit-cap:hover .orbit-cap-inner {
-  border-color: rgba(255, 255, 255, 0.35);
-  transform: scale(1.06);
+.orbit-track,
+.member-orbit-track {
+  width: 0;
+  height: 0;
+  animation: orbit-track-spin var(--dur, 72s) linear infinite;
+  will-change: transform;
 }
 
-.orbit-cap-inner {
+.orbit-slot,
+.member-orbit-slot {
+  transform: rotate(var(--angle, 0deg)) translateX(var(--r, 138px));
+  transform-origin: 0 0;
+}
+
+.orbit-slot-upright,
+.member-orbit-upright {
+  animation: orbit-track-spin var(--dur, 72s) linear infinite reverse;
+  transform: translate(-50%, -50%);
+}
+
+.orbit-slot-upright:hover .orbit-chip-panel {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: scale(1.04);
+}
+
+.orbit-chip-panel {
   transition: transform 0.25s ease, border-color 0.25s ease;
 }
 
@@ -293,17 +325,39 @@ body {
     animation: none !important;
   }
 
-  .member-orbit-spin,
-  .member-orbit-spin-rev,
-  .olympic-float,
-  .orbit-cap {
+  .orbit-track,
+  .member-orbit-track,
+  .orbit-slot-upright,
+  .member-orbit-upright,
+  .rainbow-ring {
     animation: none !important;
   }
 
-  .orbit-cap {
-    transform: none !important;
+  .member-orbit-track {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
     position: static !important;
-    margin: 0 0 0.5rem 0 !important;
-    max-width: 100% !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .member-orbit-slot {
+    position: static !important;
+    transform: none !important;
+  }
+
+  .orbit-track {
+    display: block;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .orbit-slot {
+    position: static !important;
+    transform: none !important;
+    margin-bottom: 0.5rem;
   }
 }

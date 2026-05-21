@@ -1,6 +1,4 @@
 import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import showcaseRaw from "./data/showcase.json";
 import type { ShowcaseData } from "./types/showcase";
 import { HeroScene } from "./components/HeroScene";
@@ -8,11 +6,10 @@ import { AgentSection } from "./components/AgentSection";
 import { PhaseRoadmap } from "./components/PhaseRoadmap";
 import { SiteFooter } from "./components/SiteFooter";
 import { CosmicBackground } from "./components/CosmicBackground";
-import { useScrollTrigger } from "./hooks/useScrollTrigger";
+import { useRevealOnScroll } from "./hooks/useRevealOnScroll";
+import { useTabAnimationsPaused } from "./hooks/useTabAnimationsPaused";
 import { useReducedMotion } from "./hooks/useReducedMotion";
 import { AGENT_ACCENTS } from "./lib/colors";
-
-gsap.registerPlugin(ScrollTrigger);
 
 const data = showcaseRaw as ShowcaseData;
 const agents = data.agents.map((a) => ({
@@ -25,18 +22,17 @@ function Nav() {
   const reduced = useReducedMotion();
 
   useEffect(() => {
-    if (reduced || !navRef.current) return;
-    const st = ScrollTrigger.create({
-      start: "top -80",
-      onUpdate: (self) => {
-        const p = Math.min(self.scroll() / 200, 1);
-        gsap.to(navRef.current, {
-          backgroundColor: `rgba(5, 5, 8, ${0.55 + p * 0.35})`,
-          duration: 0.2,
-        });
-      },
-    });
-    return () => st.kill();
+    const nav = navRef.current;
+    if (!nav || reduced) return;
+
+    const onScroll = () => {
+      const p = Math.min(window.scrollY / 200, 1);
+      nav.style.backgroundColor = `rgba(5, 5, 8, ${0.55 + p * 0.35})`;
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [reduced]);
 
   return (
@@ -65,84 +61,25 @@ function Nav() {
   );
 }
 
-function HeroAnimations() {
-  const reduced = useReducedMotion();
-
-  useEffect(() => {
-    if (reduced) return;
-
-    const ctx = gsap.context(() => {
-      const ease = "power3.out";
-      gsap.fromTo(
-        ".hero-chip",
-        { y: 16, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, ease },
-      );
-      gsap.fromTo(
-        ".hero-title",
-        { y: 36, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.85, ease, delay: 0.08 },
-      );
-      gsap.fromTo(
-        ".hero-tag",
-        { y: 18, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, ease, delay: 0.18 },
-      );
-      gsap.fromTo(
-        ".hero-stage",
-        { opacity: 0 },
-        { opacity: 1, duration: 0.5, ease, delay: 0.15 },
-      );
-      gsap.fromTo(
-        ".hero-footer",
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.65, ease, delay: 0.35 },
-      );
-      gsap.to(".hero-cta-arrow", {
-        y: 4,
-        duration: 0.8,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut",
-      });
-    });
-
-    return () => ctx.revert();
-  }, [reduced]);
-
-  return null;
-}
-
 function SectionDivider() {
-  const reduced = useReducedMotion();
-  useEffect(() => {
-    if (reduced) return;
-    gsap.utils.toArray<HTMLElement>(".section-divider").forEach((el) => {
-      gsap.fromTo(
-        el,
-        { scaleX: 0 },
-        {
-          scaleX: 1,
-          scrollTrigger: { trigger: el, start: "top 92%" },
-          duration: 0.9,
-          ease: "power4.inOut",
-        },
-      );
-    });
-  }, [reduced]);
+  const ref = useRef<HTMLDivElement>(null);
+  useRevealOnScroll(ref);
+
   return (
-    <div className="section-divider mx-auto h-px w-full max-w-3xl origin-center bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+    <div
+      ref={ref}
+      className="reveal-root scroll-reveal-scale section-divider mx-auto h-px w-full max-w-3xl origin-center bg-gradient-to-r from-transparent via-white/15 to-transparent"
+    />
   );
 }
 
 export default function App() {
-  useScrollTrigger();
+  useTabAnimationsPaused();
 
   return (
     <div className="relative min-h-screen">
       <CosmicBackground />
       <Nav />
-      <HeroAnimations />
       <main className="relative z-10">
         <HeroScene
           title={data.meta.title}

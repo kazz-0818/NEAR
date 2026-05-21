@@ -1,10 +1,6 @@
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useRef } from "react";
 import type { PhaseItem } from "../types/showcase";
-import { useReducedMotion } from "../hooks/useReducedMotion";
-
-gsap.registerPlugin(ScrollTrigger);
+import { useRevealOnScroll } from "../hooks/useRevealOnScroll";
 
 const STATUS_STYLE: Record<
   PhaseItem["status"],
@@ -36,69 +32,29 @@ interface PhaseRoadmapProps {
 
 export function PhaseRoadmap({ phases }: PhaseRoadmapProps) {
   const ref = useRef<HTMLElement>(null);
-  const reduced = useReducedMotion();
-
-  useEffect(() => {
-    if (reduced || !ref.current) return;
-    const ctx = gsap.context(() => {
-      gsap.from(".roadmap-title", {
-        scrollTrigger: { trigger: ref.current, start: "top 85%" },
-        y: 50,
-        opacity: 0,
-        duration: 0.9,
-        ease: "power3.out",
-      });
-
-      gsap.from(".phase-row", {
-        scrollTrigger: { trigger: ref.current, start: "top 78%" },
-        x: -40,
-        opacity: 0,
-        duration: 0.65,
-        stagger: 0.09,
-        ease: "power3.out",
-      });
-
-      gsap.from(".phase-bar-fill", {
-        scrollTrigger: { trigger: ref.current, start: "top 70%" },
-        scaleX: 0,
-        duration: 1,
-        stagger: 0.08,
-        ease: "power4.inOut",
-      });
-
-      ref.current!.querySelectorAll(".phase-row.active-phase").forEach((el) => {
-        gsap.to(el, {
-          boxShadow: "0 0 30px rgba(34,211,238,0.15)",
-          duration: 2,
-          repeat: -1,
-          yoyo: true,
-          ease: "sine.inOut",
-        });
-      });
-    }, ref);
-    return () => ctx.revert();
-  }, [reduced]);
+  useRevealOnScroll(ref);
 
   return (
-    <section id="roadmap" ref={ref} className="relative px-6 py-28 md:py-40">
+    <section id="roadmap" ref={ref} className="reveal-root relative px-6 py-28 md:py-40">
       <div className="relative mx-auto max-w-3xl">
-        <h2 className="roadmap-title text-center font-display text-3xl font-bold text-white md:text-4xl">
+        <h2 className="scroll-reveal text-center font-display text-3xl font-bold text-white md:text-4xl">
           Phase Roadmap
         </h2>
-        <p className="roadmap-title mt-4 text-center text-sm text-slate-500">
+        <p className="scroll-reveal mt-4 text-center text-sm text-slate-500" style={{ transitionDelay: "0.06s" }}>
           Veliora 組織 OS の拡張フェーズ
         </p>
         <ul className="mt-14 space-y-4">
-          {phases.map((phase) => {
+          {phases.map((phase, i) => {
             const style = STATUS_STYLE[phase.status];
             return (
               <li
                 key={phase.id}
-                className={`phase-row glass-panel relative flex gap-4 overflow-hidden rounded-xl p-5 ${style.opacity} ${phase.status === "active" ? "active-phase border-cyan-500/20" : ""}`}
+                className={`phase-row scroll-reveal-x scroll-reveal-x-left glass-panel relative flex gap-4 overflow-hidden rounded-xl p-5 ${style.opacity} ${phase.status === "active" ? "active-phase border-cyan-500/20" : ""}`}
+                style={{ transitionDelay: `${0.1 + i * 0.07}s` }}
               >
                 <div
-                  className="phase-bar-fill absolute bottom-0 left-0 h-0.5 w-full origin-left"
-                  style={{ background: style.bar }}
+                  className="phase-bar-fill scroll-reveal-scale absolute bottom-0 left-0 h-0.5 w-full origin-left"
+                  style={{ background: style.bar, transitionDelay: `${0.14 + i * 0.07}s` }}
                 />
                 <div className="flex flex-col items-center">
                   <span className="font-display text-lg font-bold text-slate-600">

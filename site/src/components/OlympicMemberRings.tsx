@@ -7,7 +7,7 @@ import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscree
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useRingOrbitRadius } from "../hooks/useRingOrbitRadius";
 
-const ORBIT_DURATION = 72;
+const ORBIT_DURATION = 96;
 const RING_SIZE_PERCENT = 72;
 
 interface MemberOrbitItemProps {

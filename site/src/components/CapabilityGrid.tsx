@@ -1,7 +1,4 @@
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
 import type { ShowcaseCapability } from "../types/showcase";
-import { useReducedMotion } from "../hooks/useReducedMotion";
 
 const STATUS_LABEL: Record<string, string> = {
   live: "稼働中",
@@ -15,53 +12,12 @@ interface CapabilityGridProps {
 }
 
 export function CapabilityGrid({ capabilities, accent }: CapabilityGridProps) {
-  const gridRef = useRef<HTMLDivElement>(null);
-  const reduced = useReducedMotion();
-
-  useEffect(() => {
-    if (reduced || !gridRef.current) return;
-
-    const cards = gridRef.current.querySelectorAll<HTMLElement>(".cap-card");
-    const handlers: Array<{ el: HTMLElement; enter: () => void; leave: () => void }> = [];
-
-    cards.forEach((el) => {
-      const enter = () => {
-        gsap.to(el, {
-          y: -6,
-          scale: 1.02,
-          boxShadow: `0 12px 40px ${accent}22`,
-          duration: 0.35,
-          ease: "power2.out",
-        });
-      };
-      const leave = () => {
-        gsap.to(el, {
-          y: 0,
-          scale: 1,
-          boxShadow: "0 0 0 transparent",
-          duration: 0.4,
-          ease: "power2.out",
-        });
-      };
-      el.addEventListener("mouseenter", enter);
-      el.addEventListener("mouseleave", leave);
-      handlers.push({ el, enter, leave });
-    });
-
-    return () => {
-      handlers.forEach(({ el, enter, leave }) => {
-        el.removeEventListener("mouseenter", enter);
-        el.removeEventListener("mouseleave", leave);
-      });
-    };
-  }, [reduced, accent, capabilities]);
-
   return (
-    <div ref={gridRef} className="cap-grid grid gap-3 sm:grid-cols-2">
+    <div className="cap-grid grid gap-3 sm:grid-cols-2">
       {capabilities.map((cap) => (
         <div
           key={cap.id}
-          className="cap-card glass-panel group relative overflow-hidden rounded-xl p-4"
+          className="cap-card glass-panel group relative overflow-hidden rounded-xl p-4 transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02]"
           style={{
             borderColor: cap.highlight ? `${accent}55` : undefined,
           }}
@@ -94,9 +50,7 @@ export function CapabilityGrid({ capabilities, accent }: CapabilityGridProps) {
             >
               {STATUS_LABEL[cap.status]}
             </span>
-            {cap.since && (
-              <span className="text-slate-600">since {cap.since}</span>
-            )}
+            {cap.since && <span className="text-slate-600">since {cap.since}</span>}
           </div>
         </div>
       ))}

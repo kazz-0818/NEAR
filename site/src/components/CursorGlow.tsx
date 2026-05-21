@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import gsap from "gsap";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
 export function CursorGlow() {
@@ -14,11 +13,13 @@ export function CursorGlow() {
     if (!dot || !ring) return;
 
     const move = (e: MouseEvent) => {
-      gsap.to(dot, { x: e.clientX, y: e.clientY, duration: 0.12, ease: "power2.out" });
-      gsap.to(ring, { x: e.clientX, y: e.clientY, duration: 0.35, ease: "power3.out" });
+      const x = e.clientX;
+      const y = e.clientY;
+      dot.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+      ring.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
     };
 
-    window.addEventListener("mousemove", move);
+    window.addEventListener("mousemove", move, { passive: true });
     return () => window.removeEventListener("mousemove", move);
   }, [reduced]);
 
@@ -28,12 +29,12 @@ export function CursorGlow() {
     <>
       <div
         ref={ringRef}
-        className="pointer-events-none fixed top-0 left-0 z-[9990] h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-400/20 mix-blend-screen"
+        className="pointer-events-none fixed top-0 left-0 z-[9990] h-16 w-16 rounded-full border border-cyan-400/20 mix-blend-screen will-change-transform"
         aria-hidden
       />
       <div
         ref={dotRef}
-        className="pointer-events-none fixed top-0 left-0 z-[9991] h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/80 mix-blend-screen blur-[2px]"
+        className="pointer-events-none fixed top-0 left-0 z-[9991] h-2 w-2 rounded-full bg-cyan-400/80 mix-blend-screen blur-[2px] will-change-transform"
         aria-hidden
       />
     </>

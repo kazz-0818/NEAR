@@ -10,7 +10,7 @@ const STATUS_LABEL: Record<string, string> = {
   planned: "計画中",
 };
 
-const ORBIT_DURATION_SEC = 88;
+const ORBIT_DURATION_SEC = 112;
 const INNER_RING_MAX = 5;
 const SINGLE_RING_MAX = 6;
 

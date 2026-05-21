@@ -1,14 +1,10 @@
-import { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useRef } from "react";
 import type { ShowcaseAgent } from "../types/showcase";
 import { OrbitingCapabilities } from "./OrbitingCapabilities";
 import { EvolutionTimeline } from "./EvolutionTimeline";
 import { agentSectionId } from "../lib/agents";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
-import { useReducedMotion } from "../hooks/useReducedMotion";
-
-gsap.registerPlugin(ScrollTrigger);
+import { useRevealOnScroll } from "../hooks/useRevealOnScroll";
 
 interface AgentSectionProps {
   agent: ShowcaseAgent;
@@ -18,67 +14,14 @@ interface AgentSectionProps {
 export function AgentSection({ agent, index }: AgentSectionProps) {
   const ref = useRef<HTMLElement>(null);
   usePauseAnimationsOffscreen(ref);
-  const reduced = useReducedMotion();
+  useRevealOnScroll(ref);
   const isEven = index % 2 === 0;
-
-  useEffect(() => {
-    if (reduced || !ref.current) return;
-
-    const ctx = gsap.context(() => {
-      gsap.from(ref.current!.querySelector(".agent-code-badge"), {
-        scrollTrigger: { trigger: ref.current, start: "top 82%" },
-        scaleX: 0,
-        duration: 0.6,
-        ease: "power4.out",
-      });
-
-      gsap.fromTo(
-        ref.current!.querySelectorAll(".agent-reveal"),
-        { y: 48, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.85,
-          stagger: 0.1,
-          ease: "power3.out",
-          scrollTrigger: { trigger: ref.current, start: "top 78%" },
-        },
-      );
-
-      gsap.fromTo(
-        ref.current!.querySelector(".orbit-field"),
-        { scale: 0.85, opacity: 0 },
-        {
-          scale: 1,
-          opacity: 1,
-          duration: 1,
-          ease: "power3.out",
-          scrollTrigger: { trigger: ref.current, start: "top 72%" },
-        },
-      );
-
-      gsap.fromTo(
-        ref.current!.querySelectorAll(".evo-item"),
-        { x: isEven ? -20 : 20, opacity: 0 },
-        {
-          x: 0,
-          opacity: 1,
-          duration: 0.5,
-          stagger: 0.1,
-          ease: "power2.out",
-          scrollTrigger: { trigger: ref.current, start: "top 55%" },
-        },
-      );
-    }, ref);
-
-    return () => ctx.revert();
-  }, [reduced, agent.id, isEven]);
 
   return (
     <section
       id={agentSectionId(agent)}
       ref={ref}
-      className="agent-section relative scroll-mt-[5.5rem] overflow-hidden px-5 py-20 sm:px-8 sm:py-28 lg:py-32"
+      className="agent-section reveal-root relative scroll-mt-[5.5rem] overflow-hidden px-5 py-20 sm:px-8 sm:py-28 lg:py-32"
     >
       <div
         className="agent-bg-drift pointer-events-none absolute inset-0 z-[1]"
@@ -95,43 +38,47 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
 
       <div className="relative z-10 mx-auto max-w-6xl">
         <div
-          className={`agent-section-head agent-reveal mb-8 lg:mb-10 ${isEven ? "" : "lg:text-right"}`}
+          className={`agent-section-head scroll-reveal mb-8 lg:mb-10 ${isEven ? "" : "lg:text-right"}`}
         >
           <span
-            className="agent-code-badge inline-block origin-left rounded px-3 py-1 font-display text-[10px] tracking-[0.35em] uppercase lg:origin-right"
+            className="agent-code-badge scroll-reveal-scale inline-block origin-left rounded px-3 py-1 font-display text-[10px] tracking-[0.35em] uppercase lg:origin-right"
             style={{ background: `${agent.accent}18`, color: agent.accent }}
           >
             {agent.code}
           </span>
           <p
-            className="mt-3 font-display text-xs tracking-[0.3em] uppercase"
-            style={{ color: agent.accent }}
+            className="scroll-reveal mt-3 font-display text-xs tracking-[0.3em] uppercase"
+            style={{ color: agent.accent, transitionDelay: "0.06s" }}
           >
             {agent.department}
           </p>
-          <h2 className="mt-2 font-display text-2xl font-bold text-white md:text-4xl">
+          <h2 className="scroll-reveal mt-2 font-display text-2xl font-bold text-white md:text-4xl" style={{ transitionDelay: "0.1s" }}>
             {agent.displayName}
           </h2>
-          <p className="mt-3 text-sm text-slate-400 md:text-base">{agent.role}</p>
+          <p className="scroll-reveal mt-3 text-sm text-slate-400 md:text-base" style={{ transitionDelay: "0.14s" }}>
+            {agent.role}
+          </p>
         </div>
 
-        <div className="agent-reveal grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-16 lg:items-start">
-          <div className={isEven ? "" : "lg:order-2"}>
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-16 lg:items-start">
+          <div className={`scroll-reveal ${isEven ? "" : "lg:order-2"}`} style={{ transitionDelay: "0.08s" }}>
             <h3
               className="mb-4 text-center font-display text-xs tracking-[0.25em] text-slate-500 uppercase lg:mb-6"
             >
               Capabilities
             </h3>
-            <OrbitingCapabilities agent={agent} />
+            <div className="scroll-reveal-zoom">
+              <OrbitingCapabilities agent={agent} />
+            </div>
             <p className="mx-auto mt-8 max-w-md text-center text-sm leading-relaxed text-slate-500">
               {agent.description}
             </p>
           </div>
 
-          <div className={`agent-reveal ${isEven ? "" : "lg:order-1"}`}>
+          <div className={`scroll-reveal ${isEven ? "" : "lg:order-1"}`} style={{ transitionDelay: "0.16s" }}>
             <div className="glass-panel agent-panel-glow relative overflow-hidden rounded-2xl p-6 md:p-8">
               <div
-                className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full blur-3xl"
+                className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full blur-2xl"
                 style={{ background: `${agent.accent}15` }}
               />
               <h3
@@ -140,7 +87,7 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
               >
                 Evolution Log
               </h3>
-              <EvolutionTimeline entries={agent.evolutionLog} accent={agent.accent} />
+              <EvolutionTimeline entries={agent.evolutionLog} accent={agent.accent} evoFromLeft={isEven} />
             </div>
           </div>
         </div>

@@ -17,16 +17,16 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
     >
       <div className="relative z-10 mx-auto flex min-h-[100svh] w-full max-w-5xl flex-col px-5 pt-[5.5rem] pb-10 sm:px-8 lg:max-w-6xl lg:px-10">
         <header className="shrink-0 text-center">
-          <p className="hero-chip mb-2 font-display text-[10px] tracking-[0.45em] text-slate-400 uppercase sm:text-xs">
+          <p className="hero-enter-chip hero-chip mb-2 font-display text-[10px] tracking-[0.45em] text-slate-400 uppercase sm:text-xs">
             Organization OS
           </p>
           <h1
-            className="hero-title font-display text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl"
+            className="hero-enter-title hero-title font-display text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl"
             style={{ textShadow: "0 0 48px rgba(255,255,255,0.12)" }}
           >
             {title}
           </h1>
-          <p className="hero-tag mt-3 font-display text-xs tracking-[0.18em] text-slate-400 sm:text-sm lg:text-base">
+          <p className="hero-enter-tag hero-tag mt-3 font-display text-xs tracking-[0.18em] text-slate-400 sm:text-sm lg:text-base">
             {tagline}
           </p>
         </header>
@@ -35,7 +35,7 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
           <OlympicMemberRings agents={agents} />
         </div>
 
-        <footer className="hero-footer shrink-0 space-y-5 border-t border-white/5 pt-6 sm:pt-8">
+        <footer className="hero-enter-footer hero-footer shrink-0 space-y-5 border-t border-white/5 pt-6 sm:pt-8">
           <MemberHud agents={agents} />
           <p className="hero-sub mx-auto max-w-lg text-center text-xs leading-relaxed text-slate-500 sm:text-sm">
             {subtitle}

@@ -3,13 +3,18 @@ import type { EvolutionEntry } from "../types/showcase";
 interface EvolutionTimelineProps {
   entries: EvolutionEntry[];
   accent: string;
+  evoFromLeft?: boolean;
 }
 
-export function EvolutionTimeline({ entries, accent }: EvolutionTimelineProps) {
+export function EvolutionTimeline({ entries, accent, evoFromLeft = true }: EvolutionTimelineProps) {
   return (
     <ol className="evo-list relative space-y-8 border-l border-white/10 pl-6">
       {entries.map((entry, i) => (
-        <li key={`${entry.date}-${entry.title}`} className="evo-item relative">
+        <li
+          key={`${entry.date}-${entry.title}`}
+          className={`evo-item scroll-reveal-x relative ${evoFromLeft ? "scroll-reveal-x-left" : "scroll-reveal-x-right"}`}
+          style={{ transitionDelay: `${0.12 + i * 0.08}s` }}
+        >
           <span
             className="absolute -left-[1.65rem] top-1.5 h-3 w-3 rounded-full"
             style={{

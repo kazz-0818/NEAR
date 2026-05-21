@@ -9,9 +9,7 @@ export function SiteFooter({ className = "" }: SiteFooterProps) {
         Veliora Showcase
       </p>
       <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-slate-600">
-        本サイトはポートフォリオ用のデモです。LINE 連携・本番 API・データ操作は含みません。
-        能力一覧は <code className="text-cyan-800">site/src/data/showcase.json</code>{" "}
-        を編集して更新してください。
+        本サイトはポートフォリオ用です。
       </p>
       <p className="mt-6 text-[10px] text-slate-700">
         © Veliora Organization OS — Demonstration only

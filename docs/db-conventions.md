@@ -62,6 +62,7 @@
 
 - **正（実テーブル）**: スキーマ **`near`** の `near_*`（例: `near.near_inbound_messages`, `near.near_user_google_oauth_accounts`）。
 - **互換（読み取り専用 VIEW）**: スキーマ **`public`** に、旧名（`inbound_messages`, `user_google_oauth_accounts` など）の VIEW がある（migration `049_public_legacy_near_views.sql`）。**中身は `near.*` と同じ**で、空に見えていたのは実テーブルが `near` に移ったため。
+- **public に残った旧実テーブルの統合**: migration `050_near_merge_public_legacy_data.sql` が、`public` にフォルダ分け前のまま残った実テーブル行を `near.*` へマージし、重複は自然キーでスキップしたうえで旧テーブルを DROP して VIEW を再作成する（冪等）。
 - **データが本当に無い**場合: Render 再作成で **`DATABASE_URL` が別 Supabase** になっていることが多い（NEAR は会話・連携行を自動削除しない）。
 
 ## migration 時の注意

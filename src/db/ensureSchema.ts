@@ -56,6 +56,7 @@ const MIGRATION_FILES = [
   "047_near_repair_public_stragglers.sql",
   "048_rename_near_schema_migrations.sql",
   "049_public_legacy_near_views.sql",
+  "050_near_merge_public_legacy_data.sql",
 ] as const;
 
 /** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */

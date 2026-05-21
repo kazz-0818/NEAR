@@ -72,6 +72,8 @@ DECLARE
   src_schema text;
   src_rel text;
   ins_count bigint;
+  ch_expr text;
+  uid_expr text;
 BEGIN
   IF NOT near._is_base_table('near', 'near_inbound_messages') THEN
     RAISE NOTICE 'near_merge: skip (near.near_inbound_messages missing)';
@@ -390,6 +392,17 @@ BEGIN
       ) AS t(s, r)
     LOOP
       IF NOT near._is_base_table(src_schema, src_rel) THEN CONTINUE; END IF;
+      -- RITS 等の別スキーマ public.unsupported_requests（channel / original_message なし）は触らない
+      IF NOT near._legacy_has_column(src_schema, src_rel, 'original_message') THEN
+        RAISE NOTICE 'near_merge: skip %.% (not NEAR legacy shape)', src_schema, src_rel;
+        CONTINUE;
+      END IF;
+
+      ch_expr := near._legacy_col_expr(src_schema, src_rel, 'channel', 'l.channel', '''line''');
+      uid_expr := near._legacy_col_expr(
+        src_schema, src_rel, 'channel_user_id', 'l.channel_user_id',
+        near._legacy_col_expr(src_schema, src_rel, 'line_user_id', 'l.line_user_id', '''unknown''')
+      );
 
       IF near._legacy_has_column(src_schema, src_rel, 'inbound_message_id') THEN
         EXECUTE format(
@@ -400,18 +413,18 @@ BEGIN
             inbound_message_id, created_at
           )
           SELECT
-            l.channel, l.channel_user_id, l.original_message, l.detected_intent, l.why_unsupported,
+            %s, %s, l.original_message, l.detected_intent, l.why_unsupported,
             l.suggested_implementation_category, l.priority, l.status, l.notes, l.confidence,
             m.near_id, l.created_at
           FROM %I.%I l
           LEFT JOIN _near_inbound_id_map m ON m.legacy_id = l.inbound_message_id
           WHERE NOT EXISTS (
             SELECT 1 FROM near.near_unsupported_requests u
-            WHERE u.channel = l.channel AND u.channel_user_id = l.channel_user_id
+            WHERE u.channel = (%s) AND u.channel_user_id = (%s)
               AND u.original_message = l.original_message AND u.created_at = l.created_at
           )
           $q$,
-          src_schema, src_rel
+          ch_expr, uid_expr, src_schema, src_rel, ch_expr, uid_expr
         );
       ELSE
         EXECUTE format(
@@ -422,17 +435,17 @@ BEGIN
             inbound_message_id, created_at
           )
           SELECT
-            l.channel, l.channel_user_id, l.original_message, l.detected_intent, l.why_unsupported,
+            %s, %s, l.original_message, l.detected_intent, l.why_unsupported,
             l.suggested_implementation_category, l.priority, l.status, l.notes, l.confidence,
             NULL, l.created_at
           FROM %I.%I l
           WHERE NOT EXISTS (
             SELECT 1 FROM near.near_unsupported_requests u
-            WHERE u.channel = l.channel AND u.channel_user_id = l.channel_user_id
+            WHERE u.channel = (%s) AND u.channel_user_id = (%s)
               AND u.original_message = l.original_message AND u.created_at = l.created_at
           )
           $q$,
-          src_schema, src_rel
+          ch_expr, uid_expr, src_schema, src_rel, ch_expr, uid_expr
         );
       END IF;
 
@@ -442,13 +455,13 @@ BEGIN
         SELECT l.id, u.id
         FROM %I.%I l
         INNER JOIN near.near_unsupported_requests u
-          ON u.channel = l.channel
-         AND u.channel_user_id = l.channel_user_id
+          ON u.channel = (%s)
+         AND u.channel_user_id = (%s)
          AND u.original_message = l.original_message
          AND u.created_at = l.created_at
         ON CONFLICT (legacy_id) DO NOTHING
         $q$,
-        src_schema, src_rel
+        src_schema, src_rel, ch_expr, uid_expr
       );
     END LOOP;
 
@@ -506,6 +519,12 @@ BEGIN
     'implementation_suggestions', 'near_implementation_suggestions'
   ]
   LOOP
+    IF rel_name IN ('unsupported_requests', 'near_unsupported_requests')
+       AND near._is_base_table('public', rel_name)
+       AND NOT near._legacy_has_column('public', rel_name, 'original_message') THEN
+      RAISE NOTICE 'near_merge: leave public.% (RITS / non-NEAR unsupported_requests)', rel_name;
+      CONTINUE;
+    END IF;
     PERFORM near._archive_public_base_table(rel_name);
   END LOOP;
 END $$;

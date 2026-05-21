@@ -6,9 +6,9 @@ import { scrollToAgentSection } from "../lib/agents";
 import { RING_ORDER } from "../lib/colors";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useRingOrbitRadius } from "../hooks/useRingOrbitRadius";
 
 const ORBIT_DURATION = 72;
-/** 虹色リング（.member-orbit-ring-wrap）の幅に対する割合 — CSS と一致 */
 const RING_SIZE_PERCENT = 72;
 
 interface MemberOrbitItemProps {
@@ -22,19 +22,19 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
 
   return (
     <div
-      className="member-orbit-slot absolute left-0 top-0"
-      style={{ ["--angle" as string]: `${angle}deg` } as React.CSSProperties}
+      className="member-orbit-item absolute left-1/2 top-1/2"
+      style={
+        {
+          ["--start" as string]: `${angle}deg`,
+          ["--dur" as string]: `${ORBIT_DURATION}s`,
+        } as React.CSSProperties
+      }
     >
-      <div
-        className="member-orbit-upright-static"
-        style={{ transform: `rotate(${-angle}deg)` }}
+      <button
+        type="button"
+        className="member-orbit-btn z-10 flex flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        onClick={() => scrollToAgentSection(agent)}
       >
-        <div className="member-orbit-upright-spin">
-          <button
-            type="button"
-            className="member-orbit-btn z-10 flex flex-col items-center transition-transform duration-300 hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            onClick={() => scrollToAgentSection(agent)}
-          >
         <div
           className="member-orbit-avatar relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[5rem] sm:w-[5rem] md:h-[5.75rem] md:w-[5.75rem]"
           style={{
@@ -55,9 +55,7 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
         >
           {agent.code}
         </span>
-          </button>
-        </div>
-      </div>
+      </button>
     </div>
   );
 }
@@ -68,6 +66,8 @@ interface OlympicMemberRingsProps {
 
 export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const orbitRadiusPx = useRingOrbitRadius(ringRef);
   usePauseAnimationsOffscreen(wrapRef);
   const reduced = useReducedMotion();
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]));
@@ -120,23 +120,26 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
       ref={wrapRef}
       className="member-orbit-field relative mx-auto aspect-square w-full max-w-[22rem] sm:max-w-[27rem] md:max-w-[32rem]"
       aria-label="Veliora メンバー — クリックで詳細"
-      style={
-        {
-          ["--dur" as string]: `${ORBIT_DURATION}s`,
-        } as React.CSSProperties
-      }
     >
-      <div className="member-orbit-ring-wrap" style={{ width: `${RING_SIZE_PERCENT}%` }}>
+      <div
+        ref={ringRef}
+        className="member-orbit-ring-wrap"
+        style={
+          {
+            width: `${RING_SIZE_PERCENT}%`,
+            ["--orbit-r" as string]: `${orbitRadiusPx}px`,
+            ["--dur" as string]: `${ORBIT_DURATION}s`,
+          } as React.CSSProperties
+        }
+      >
         <div className="rainbow-ring pointer-events-none absolute inset-0 rounded-full" aria-hidden />
         <div
           className="pointer-events-none absolute inset-0 rounded-full opacity-20"
           style={{ boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)" }}
         />
-        <div className="member-orbit-track">
-          {ordered.map((agent, i) => (
-            <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
-          ))}
-        </div>
+        {ordered.map((agent, i) => (
+          <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
+        ))}
       </div>
     </div>
   );

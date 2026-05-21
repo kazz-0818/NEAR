@@ -247,15 +247,23 @@ body {
   container-type: size;
 }
 
-.member-orbit-ring-wrap .member-orbit-track {
-  position: absolute;
-  left: 50%;
-  top: 50%;
+/* メンバー — 虹色リングの線の中央を周回（--orbit-r は JS でリング幅から算出） */
+@keyframes member-orbit-spin {
+  from {
+    transform: rotate(var(--start, 0deg)) translateX(var(--orbit-r, 130px))
+      rotate(calc(-1 * var(--start, 0deg)));
+  }
+  to {
+    transform: rotate(calc(var(--start, 0deg) + 360deg)) translateX(var(--orbit-r, 130px))
+      rotate(calc(-1 * var(--start, 0deg) - 360deg));
+  }
 }
 
-.member-orbit-ring-wrap .member-orbit-slot {
-  /* リング線の中央（mask 5px 幅の中心） */
-  transform: rotate(var(--angle, 0deg)) translateX(calc(50cqs - 2.5px));
+.member-orbit-item {
+  width: 0;
+  height: 0;
+  animation: member-orbit-spin var(--dur, 72s) linear infinite;
+  transform-origin: 0 0;
 }
 
 .rainbow-ring {
@@ -302,10 +310,6 @@ body {
   will-change: transform;
 }
 
-.member-orbit-slot {
-  transform-origin: 0 0;
-}
-
 /* 能力チップ — 1 枚ずつ回転+逆回転で常に正立 */
 @keyframes orbit-cap-spin {
   from {
@@ -327,15 +331,6 @@ body {
 
 .orbit-cap-inner {
   transform: translate(-50%, -50%);
-}
-
-.member-orbit-upright-static {
-  transform-origin: 0 0;
-}
-
-.member-orbit-upright-spin {
-  animation: orbit-track-spin var(--dur, 72s) linear infinite reverse;
-  transform-origin: 0 0;
 }
 
 .member-orbit-btn {
@@ -461,12 +456,8 @@ body {
   }
 
   .orbit-cap,
-  .member-orbit-upright-spin,
+  .member-orbit-item,
   .rainbow-ring {
-    animation: none !important;
-  }
-
-  .member-orbit-ring-wrap .member-orbit-track {
     animation: none !important;
   }
 
@@ -475,24 +466,18 @@ body {
     width: 100% !important;
     transform: none !important;
     margin: 0 auto;
-  }
-
-  .member-orbit-ring-wrap .member-orbit-track {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 1rem;
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
-    width: auto !important;
-    height: auto !important;
-    animation: none !important;
   }
 
-  .member-orbit-ring-wrap .member-orbit-slot {
+  .member-orbit-item {
     position: static !important;
-    transform: none !important;
+    width: auto !important;
+    height: auto !important;
+    left: auto !important;
+    top: auto !important;
   }
 
   .orbit-cap {

@@ -1,7 +1,9 @@
 import { config as loadDotenv } from "dotenv";
 import { z } from "zod";
+import { applyEnvAliases, NEAR_ENV_ALIASES } from "./envAlias.js";
 
 loadDotenv();
+applyEnvAliases(NEAR_ENV_ALIASES, { service: "near" });
 
 /** Render / .env 貼り付けで末尾改行が混ざると LINE 署名が一致しない */
 const trimSecret = z.string().min(1).transform((s) => s.trim());

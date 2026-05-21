@@ -2,6 +2,8 @@
 
 正典は **`veriora` schema**（UUID ベース）。レガシー **`veliora` schema**（LINE イベント・text `agent_code`）は削除せず併存します。
 
+**両 schema に似た名前のテーブルがある場合** → [`veliora-veriora-schema-map.md`](veliora-veriora-schema-map.md) を参照。
+
 ## エージェントマスタ
 
 | テーブル | 説明 |

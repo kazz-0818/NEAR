@@ -10,7 +10,9 @@
     "migrate": "tsx src/db/run-migrate.ts",
     "db:url": "node scripts/supabase-database-url.mjs",
     "db:test": "node scripts/supabase-database-url.mjs --test",
-    "llm:ping": "node scripts/llm-ping.mjs"
+    "llm:ping": "node scripts/llm-ping.mjs",
+    "test": "tsx --test src/**/*.test.ts",
+    "verify:veriora-sync": "node scripts/verify-veriora-sync.mjs"
   },
   "engines": {
     "node": ">=20"

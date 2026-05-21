@@ -28,3 +28,10 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Veriora cross-repo sync
+        run: npm run verify:veriora-sync
+        continue-on-error: true

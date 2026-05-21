@@ -40,7 +40,7 @@
 ## Agent registry の使い方（現状と今後）
 
 - **現状（Phase 1〜2）**: 型と定数データとしてリポジトリに同梱。**既存のルーティングや DB 書き込みからは参照しない**（インポートされていない状態を維持）。
-- **Phase 3**: `getEnv()` に **互換 alias**（旧名 → 新名）を追加し、`.env.example` と Zod schema を同期。
+- **Phase 3**: `getEnv()` に **互換 alias**（legacy → canonical）を追加し、`.env.example` と Zod schema を同期。**実装済み**（各リポ `envAlias.ts` / LIRA `config_env_alias.py`）。
 - **Phase 4 以降**: ルーティング・ログ・RITS 取り込みが registry の `code` / `id` と一致するよう段階接続。
 
 参照 API（例）:
@@ -61,7 +61,7 @@
 | 0 | 現状調査 |
 | 1 | ドキュメント整備（本リリース相当） |
 | 2 | agent registry 追加（実行経路非接続） |
-| 3 | env 互換（alias・`.env.example` 同期） |
+| 3 | env 互換（alias・`.env.example` 同期） — **コード実装済み** |
 | 4 | ログ形式・横断会話ログの統一 |
 | 5 | ルーティング / ハンドオフ整理 |
 | 6 | RITS 監査の自動化・日次レポート |

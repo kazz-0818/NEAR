@@ -8,9 +8,11 @@ const ICON_MAP: Record<string, string> = {
   lram: "LRAM",
 };
 
+/** Vite base（GitHub Pages では `/NEAR/`）を含むパス */
 export function iconBase(agentId: string): string {
   const code = ICON_MAP[agentId] ?? agentId.toUpperCase();
-  return `/icons/${code}_ICON`;
+  const base = import.meta.env.BASE_URL;
+  return `${base}icons/${code}_ICON`;
 }
 
 export function agentSectionId(agent: ShowcaseAgent): string {

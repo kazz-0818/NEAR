@@ -21,10 +21,13 @@ function HeroCanvas({ agents }: { agents: ShowcaseAgent[] }) {
         alpha: true,
         powerPreference: "high-performance",
       }}
-      style={{ position: "absolute", inset: 0 }}
+      style={{ position: "absolute", inset: 0, background: "transparent" }}
       eventPrefix="client"
+      onCreated={({ gl, scene }) => {
+        gl.setClearColor(0x000000, 0);
+        scene.background = null;
+      }}
     >
-      <color attach="background" args={["#050508"]} />
       <Suspense fallback={null}>
         <FlyingAgents3D agents={agents} />
       </Suspense>
@@ -52,7 +55,10 @@ function StaticMemberRow({ agents }: { agents: ShowcaseAgent[] }) {
               glow={agent.accent}
               className="h-16 w-16 rounded-full"
             />
-            <span className="font-display text-[10px] tracking-widest uppercase" style={{ color: agent.accent }}>
+            <span
+              className="font-display text-[10px] tracking-widest uppercase"
+              style={{ color: agent.accent }}
+            >
               {agent.code}
             </span>
           </button>
@@ -61,6 +67,9 @@ function StaticMemberRow({ agents }: { agents: ShowcaseAgent[] }) {
     </div>
   );
 }
+
+const HERO_BG =
+  "radial-gradient(ellipse 80% 55% at 50% 42%, rgba(244,114,182,0.1), transparent 55%), radial-gradient(ellipse 50% 40% at 75% 25%, rgba(250,204,21,0.07), transparent 50%), radial-gradient(ellipse 45% 35% at 20% 70%, rgba(167,139,250,0.06), transparent 50%), #050508";
 
 interface HeroSceneProps {
   title: string;
@@ -73,23 +82,10 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
   const reduced = useReducedMotion();
 
   return (
-    <section
-      id="hero"
-      className="relative min-h-[100svh] overflow-hidden"
-    >
-      <div className="absolute inset-0">
-        {!reduced ? (
-          <HeroCanvas agents={agents} />
-        ) : (
-          <div
-            className="h-full w-full"
-            style={{
-              background:
-                "radial-gradient(ellipse 70% 50% at 50% 45%, rgba(244,114,182,0.08), transparent 60%), radial-gradient(ellipse 40% 30% at 70% 30%, rgba(250,204,21,0.06), transparent)",
-            }}
-          />
-        )}
-        <div className="pointer-events-none absolute inset-0 grid-bg opacity-20" />
+    <section id="hero" className="relative min-h-[100svh] overflow-hidden bg-[#050508]">
+      <div className="absolute inset-0 z-0" style={{ background: HERO_BG }}>
+        {!reduced && <HeroCanvas agents={agents} />}
+        <div className="pointer-events-none absolute inset-0 grid-bg opacity-15" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-5xl flex-col px-5 pt-[5.5rem] pb-10 sm:px-8 lg:max-w-6xl lg:px-10">
@@ -101,7 +97,7 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
             className="hero-title font-display text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl"
             style={{ textShadow: "0 0 48px rgba(255,255,255,0.12)" }}
           >
-            <span className="hero-glitch">{title}</span>
+            {title}
           </h1>
           <p className="hero-tag mt-2 font-display text-xs tracking-[0.18em] text-slate-400 sm:text-sm lg:text-base">
             {tagline}
@@ -111,7 +107,7 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
         <div className="hero-stage relative min-h-0 flex-1">
           {reduced && <StaticMemberRow agents={agents} />}
           {!reduced && (
-            <p className="pointer-events-none absolute bottom-4 left-0 right-0 text-center font-display text-[9px] tracking-[0.35em] text-slate-600 uppercase sm:text-[10px]">
+            <p className="pointer-events-none absolute right-0 bottom-4 left-0 text-center font-display text-[9px] tracking-[0.35em] text-slate-500 uppercase sm:text-[10px]">
               メンバーは宙に浮遊 — クリックで詳細
             </p>
           )}

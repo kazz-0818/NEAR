@@ -1,4 +1,4 @@
-import { useRef, useMemo, Suspense } from "react";
+import { useRef, useMemo, Suspense, Component, type ReactNode } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture, Billboard } from "@react-three/drei";
 import * as THREE from "three";
@@ -87,7 +87,10 @@ function AgentsInner({ agents }: { agents: ShowcaseAgent[] }) {
     () => Object.fromEntries(agents.map((a) => [a.id, a])),
     [agents],
   );
-  const urls = RING_ORDER.map((id) => `${iconBase(id)}.webp`);
+  const urls = useMemo(
+    () => RING_ORDER.map((id) => `${iconBase(id)}.webp`),
+    [],
+  );
   const textures = useTexture(urls);
   const ordered = RING_ORDER.map((id) => byId[id]).filter(Boolean) as ShowcaseAgent[];
 
@@ -121,8 +124,8 @@ function CenterCore() {
 
 function LightParticles() {
   const ref = useRef<THREE.Points>(null);
-  const count = 480;
   const positions = useMemo(() => {
+    const count = 320;
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
       arr[i * 3] = (Math.random() - 0.5) * 12;
@@ -140,16 +143,13 @@ function LightParticles() {
   return (
     <points ref={ref}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.03}
+        size={0.035}
         color="#94a3b8"
         transparent
-        opacity={0.5}
+        opacity={0.45}
         sizeAttenuation
         depthWrite={false}
       />
@@ -162,8 +162,8 @@ function SoftParallax() {
   const target = useRef({ x: 0, y: 0 });
 
   useFrame((state) => {
-    const mx = state.pointer.x * 0.2;
-    const my = state.pointer.y * 0.12;
+    const mx = state.pointer.x * 0.15;
+    const my = state.pointer.y * 0.08;
     target.current.x += (mx - target.current.x) * 0.04;
     target.current.y += (my - target.current.y) * 0.04;
     camera.position.x = target.current.x;
@@ -172,6 +172,22 @@ function SoftParallax() {
   });
 
   return null;
+}
+
+class AgentsErrorBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
 }
 
 interface FlyingAgents3DProps {
@@ -186,9 +202,11 @@ export function FlyingAgents3D({ agents }: FlyingAgents3DProps) {
       <LightParticles />
       <CenterCore />
       <SoftParallax />
-      <Suspense fallback={null}>
-        <AgentsInner agents={agents} />
-      </Suspense>
+      <AgentsErrorBoundary>
+        <Suspense fallback={null}>
+          <AgentsInner agents={agents} />
+        </Suspense>
+      </AgentsErrorBoundary>
     </>
   );
 }

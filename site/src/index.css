@@ -35,6 +35,16 @@ body {
   overflow-x: hidden;
 }
 
+/* GSAP 入場前も文字が見える（真っ暗化防止） */
+.hero-chip,
+.hero-title,
+.hero-tag,
+.hero-footer,
+.hero-sub,
+.hero-cta {
+  opacity: 1;
+}
+
 #root {
   min-height: 100vh;
 }

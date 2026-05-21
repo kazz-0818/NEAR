@@ -34,8 +34,10 @@ npm run preview   # 本番ビルドのローカル確認
 
 1. **`site/` をコミットして `main` に push**（初回のみ。下記「初回 push」参照）
 2. GitHub → **Settings** → **Pages**
-3. **Source** を **GitHub Actions** にする
+3. **Source** を **GitHub Actions** にする（未設定だと deploy が `HttpError: Not Found` で失敗します）
 4. `main` に push するとワークフローが走り、数分後に公開されます
+
+初回だけ Actions の **Deploy Veriora site** を **Re-run all jobs** してもよいです。
 
 **公開 URL（既定）:** `https://kazz-0818.github.io/NEAR/`
 

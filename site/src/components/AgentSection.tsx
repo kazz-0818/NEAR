@@ -32,33 +32,44 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
         ease: "power4.out",
       });
 
-      gsap.from(ref.current!.querySelectorAll(".agent-reveal"), {
-        scrollTrigger: { trigger: ref.current, start: "top 78%" },
-        y: 56,
-        opacity: 0,
-        duration: 0.9,
-        stagger: 0.12,
-        ease: "power3.out",
-      });
+      gsap.fromTo(
+        ref.current!.querySelectorAll(".agent-reveal"),
+        { y: 56, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.9,
+          stagger: 0.12,
+          ease: "power3.out",
+          scrollTrigger: { trigger: ref.current, start: "top 78%" },
+        },
+      );
 
-      gsap.from(ref.current!.querySelectorAll(".cap-card"), {
-        scrollTrigger: { trigger: ref.current, start: "top 62%" },
-        y: 32,
-        opacity: 0,
-        rotationX: -12,
-        duration: 0.55,
-        stagger: 0.06,
-        ease: "power2.out",
-      });
+      gsap.fromTo(
+        ref.current!.querySelectorAll(".cap-card"),
+        { y: 32, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.55,
+          stagger: 0.06,
+          ease: "power2.out",
+          scrollTrigger: { trigger: ref.current, start: "top 62%" },
+        },
+      );
 
-      gsap.from(ref.current!.querySelectorAll(".evo-item"), {
-        scrollTrigger: { trigger: ref.current, start: "top 55%" },
-        x: isEven ? -24 : 24,
-        opacity: 0,
-        duration: 0.5,
-        stagger: 0.1,
-        ease: "power2.out",
-      });
+      gsap.fromTo(
+        ref.current!.querySelectorAll(".evo-item"),
+        { x: isEven ? -24 : 24, opacity: 0 },
+        {
+          x: 0,
+          opacity: 1,
+          duration: 0.5,
+          stagger: 0.1,
+          ease: "power2.out",
+          scrollTrigger: { trigger: ref.current, start: "top 55%" },
+        },
+      );
 
       if (iconWrapRef.current) {
         gsap.to(iconWrapRef.current, {

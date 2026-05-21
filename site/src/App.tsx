@@ -70,23 +70,38 @@ function HeroAnimations() {
   useEffect(() => {
     if (reduced) return;
 
-    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-    tl.from(".hero-chip", { y: 16, opacity: 0, duration: 0.6 })
-      .from(".hero-title", { y: 40, opacity: 0, duration: 0.9 }, "-=0.35")
-      .from(".hero-tag", { y: 20, opacity: 0, duration: 0.6 }, "-=0.5")
-      .from(".hero-footer", { y: 24, opacity: 0, duration: 0.7 }, "-=0.3");
-
-    gsap.to(".hero-cta-arrow", {
-      y: 4,
-      duration: 0.8,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
+    const ctx = gsap.context(() => {
+      const ease = "power3.out";
+      gsap.fromTo(
+        ".hero-chip",
+        { y: 16, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, ease },
+      );
+      gsap.fromTo(
+        ".hero-title",
+        { y: 36, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.85, ease, delay: 0.08 },
+      );
+      gsap.fromTo(
+        ".hero-tag",
+        { y: 18, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, ease, delay: 0.18 },
+      );
+      gsap.fromTo(
+        ".hero-footer",
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.65, ease, delay: 0.28 },
+      );
+      gsap.to(".hero-cta-arrow", {
+        y: 4,
+        duration: 0.8,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
     });
 
-    return () => {
-      tl.kill();
-    };
+    return () => ctx.revert();
   }, [reduced]);
 
   return null;

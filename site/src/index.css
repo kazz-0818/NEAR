@@ -92,7 +92,6 @@ body {
   }
 }
 
-.hero-space-fallback,
 .agent-space-fallback {
   background:
     radial-gradient(ellipse 120% 80% at 50% -20%, rgba(56, 189, 248, 0.28), transparent 50%),
@@ -450,7 +449,6 @@ body {
   .member-line-flow,
   .agent-bg-drift,
   .evo-latest,
-  .hero-space-fallback::after,
   .agent-space-fallback::after {
     animation: none !important;
   }

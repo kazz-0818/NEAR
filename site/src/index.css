@@ -79,6 +79,15 @@ body {
   contain-intrinsic-size: auto 900px;
 }
 
+/* エージェント節 — 宇宙空間（3D オフ時のフォールバック） */
+.agent-space-fallback {
+  background:
+    radial-gradient(ellipse 100% 70% at 50% -10%, rgba(56, 78, 120, 0.22), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 80% 90%, rgba(30, 20, 60, 0.18), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 10% 60%, rgba(15, 40, 55, 0.12), transparent 45%),
+    #030308;
+}
+
 .animations-paused,
 .animations-paused * {
   animation-play-state: paused !important;
@@ -219,7 +228,6 @@ body {
   }
 }
 
-.orbit-track,
 .member-orbit-track {
   width: 0;
   height: 0;
@@ -227,19 +235,49 @@ body {
   will-change: transform;
 }
 
-.orbit-slot,
 .member-orbit-slot {
   transform: rotate(var(--angle, 0deg)) translateX(var(--r, 138px));
   transform-origin: 0 0;
 }
 
-.orbit-slot-upright,
-.member-orbit-upright {
-  animation: orbit-track-spin var(--dur, 72s) linear infinite reverse;
+/* 能力チップ — 1 枚ずつ回転+逆回転で常に正立 */
+@keyframes orbit-cap-spin {
+  from {
+    transform: rotate(var(--start, 0deg)) translateX(var(--r, 158px))
+      rotate(calc(-1 * var(--start, 0deg)));
+  }
+  to {
+    transform: rotate(calc(var(--start, 0deg) + 360deg)) translateX(var(--r, 158px))
+      rotate(calc(-1 * var(--start, 0deg) - 360deg));
+  }
+}
+
+.orbit-cap {
+  width: 0;
+  height: 0;
+  animation: orbit-cap-spin var(--dur, 88s) linear infinite;
+  transform-origin: 0 0;
+}
+
+.orbit-cap-inner {
   transform: translate(-50%, -50%);
 }
 
-.orbit-slot-upright:hover .orbit-chip-panel {
+.member-orbit-upright-static {
+  transform-origin: 0 0;
+}
+
+.member-orbit-upright-spin {
+  animation: orbit-track-spin var(--dur, 72s) linear infinite reverse;
+  transform-origin: 0 0;
+}
+
+.member-orbit-btn {
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+}
+
+.orbit-cap-inner:hover .orbit-chip-panel {
   border-color: rgba(255, 255, 255, 0.3) !important;
   transform: scale(1.04);
 }
@@ -325,10 +363,9 @@ body {
     animation: none !important;
   }
 
-  .orbit-track,
+  .orbit-cap,
   .member-orbit-track,
-  .orbit-slot-upright,
-  .member-orbit-upright,
+  .member-orbit-upright-spin,
   .rainbow-ring {
     animation: none !important;
   }
@@ -348,16 +385,14 @@ body {
     transform: none !important;
   }
 
-  .orbit-track {
-    display: block;
+  .orbit-cap {
     position: static !important;
     width: auto !important;
     height: auto !important;
+    margin: 0 auto 0.5rem;
   }
 
-  .orbit-slot {
-    position: static !important;
+  .orbit-cap-inner {
     transform: none !important;
-    margin-bottom: 0.5rem;
   }
 }

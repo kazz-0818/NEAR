@@ -24,11 +24,16 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
       className="member-orbit-slot absolute left-0 top-0"
       style={{ ["--angle" as string]: `${angle}deg` } as React.CSSProperties}
     >
-      <button
-        type="button"
-        className="member-orbit-upright z-10 flex flex-col items-center transition-transform duration-300 hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-        onClick={() => scrollToId(agentSectionId(agent))}
+      <div
+        className="member-orbit-upright-static"
+        style={{ transform: `rotate(${-angle}deg)` }}
       >
+        <div className="member-orbit-upright-spin">
+          <button
+            type="button"
+            className="member-orbit-btn z-10 flex flex-col items-center transition-transform duration-300 hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            onClick={() => scrollToId(agentSectionId(agent))}
+          >
         <div
           className="relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
           style={{
@@ -49,7 +54,9 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
         >
           {agent.code}
         </span>
-      </button>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -69,7 +76,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
     if (reduced || !wrapRef.current) return;
 
     const ctx = gsap.context(() => {
-      gsap.from(".member-orbit-upright", {
+      gsap.from(".member-orbit-btn", {
         scale: 0,
         opacity: 0,
         duration: 0.7,

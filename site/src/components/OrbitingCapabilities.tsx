@@ -25,10 +25,16 @@ function OrbitChip({ cap, accent, index, total }: OrbitChipProps) {
 
   return (
     <div
-      className="orbit-slot absolute left-0 top-0"
-      style={{ ["--angle" as string]: `${angleDeg}deg` } as React.CSSProperties}
+      className="orbit-cap absolute left-1/2 top-1/2"
+      style={
+        {
+          ["--start" as string]: `${angleDeg}deg`,
+          ["--r" as string]: `${ORBIT_RADIUS_PX}px`,
+          ["--dur" as string]: `${ORBIT_DURATION_SEC}s`,
+        } as React.CSSProperties
+      }
     >
-      <div className="orbit-slot-upright w-max max-w-[11rem] -translate-x-1/2 -translate-y-1/2 sm:max-w-[12.5rem]">
+      <div className="orbit-cap-inner w-max max-w-[11rem] sm:max-w-[12.5rem]">
         <div
           className="orbit-chip-panel rounded-lg border px-2.5 py-2 shadow-lg sm:px-3"
           style={{
@@ -101,23 +107,15 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
       ref={fieldRef}
       className="orbit-field relative mx-auto aspect-square w-full max-w-[min(100%,22rem)] sm:max-w-[26rem] md:max-w-[30rem]"
       aria-label={`${agent.code} の能力`}
-      style={
-        {
-          ["--dur" as string]: `${ORBIT_DURATION_SEC}s`,
-          ["--r" as string]: `${ORBIT_RADIUS_PX}px`,
-        } as React.CSSProperties
-      }
     >
       <div
         className="pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed opacity-20"
         style={{ borderColor: agent.accent }}
       />
 
-      <div className="orbit-track absolute left-1/2 top-1/2">
-        {caps.map((cap, i) => (
-          <OrbitChip key={cap.id} cap={cap} accent={agent.accent} index={i} total={caps.length} />
-        ))}
-      </div>
+      {caps.map((cap, i) => (
+        <OrbitChip key={cap.id} cap={cap} accent={agent.accent} index={i} total={caps.length} />
+      ))}
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
         <div

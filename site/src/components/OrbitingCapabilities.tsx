@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { ShowcaseAgent, ShowcaseCapability } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
@@ -11,16 +11,67 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const ORBIT_DURATION_SEC = 88;
-const ORBIT_RADIUS_PX = 158;
+const INNER_RING_MAX = 5;
+const SINGLE_RING_MAX = 6;
+
+const STATUS_ORDER: Record<string, number> = {
+  evolved: 0,
+  live: 1,
+  planned: 2,
+};
+
+function sortForOrbit(caps: ShowcaseCapability[]) {
+  return [...caps].sort((a, b) => {
+    if (a.highlight !== b.highlight) return a.highlight ? -1 : 1;
+    const sa = STATUS_ORDER[a.status] ?? 9;
+    const sb = STATUS_ORDER[b.status] ?? 9;
+    return sa - sb;
+  });
+}
+
+function splitOrbitRings(caps: ShowcaseCapability[]) {
+  const sorted = sortForOrbit(caps);
+  if (sorted.length <= SINGLE_RING_MAX) {
+    return { mode: "single" as const, inner: [] as ShowcaseCapability[], outer: sorted };
+  }
+  return {
+    mode: "dual" as const,
+    inner: sorted.slice(0, INNER_RING_MAX),
+    outer: sorted.slice(INNER_RING_MAX),
+  };
+}
+
+function orbitLayout(count: number, mode: "single" | "dual") {
+  const compact = count > 7;
+  if (mode === "single") {
+    return {
+      innerR: 0,
+      outerR: Math.min(200, 118 + count * 10),
+      fieldClass:
+        count > 5
+          ? "max-w-[min(100%,26rem)] sm:max-w-[30rem] md:max-w-[34rem]"
+          : "max-w-[min(100%,22rem)] sm:max-w-[26rem] md:max-w-[30rem]",
+      compact,
+    };
+  }
+  return {
+    innerR: 128,
+    outerR: Math.min(228, 188 + Math.max(0, count - INNER_RING_MAX) * 6),
+    fieldClass: "max-w-[min(100%,28rem)] sm:max-w-[34rem] md:max-w-[38rem]",
+    compact: true,
+  };
+}
 
 interface OrbitChipProps {
   cap: ShowcaseCapability;
   accent: string;
   index: number;
   total: number;
+  radiusPx: number;
+  compact?: boolean;
 }
 
-function OrbitChip({ cap, accent, index, total }: OrbitChipProps) {
+function OrbitChip({ cap, accent, index, total, radiusPx, compact }: OrbitChipProps) {
   const angleDeg = (index / total) * 360 - 90;
 
   return (
@@ -29,14 +80,16 @@ function OrbitChip({ cap, accent, index, total }: OrbitChipProps) {
       style={
         {
           ["--start" as string]: `${angleDeg}deg`,
-          ["--r" as string]: `${ORBIT_RADIUS_PX}px`,
+          ["--r" as string]: `${radiusPx}px`,
           ["--dur" as string]: `${ORBIT_DURATION_SEC}s`,
         } as React.CSSProperties
       }
     >
-      <div className="orbit-cap-inner w-max max-w-[11rem] sm:max-w-[12.5rem]">
+      <div
+        className={`orbit-cap-inner w-max ${compact ? "max-w-[9rem] sm:max-w-[9.5rem]" : "max-w-[11rem] sm:max-w-[12.5rem]"}`}
+      >
         <div
-          className="orbit-chip-panel rounded-lg border px-2.5 py-2 shadow-lg sm:px-3"
+          className={`orbit-chip-panel rounded-lg border shadow-lg ${compact ? "px-2 py-1.5" : "px-2.5 py-2 sm:px-3"}`}
           style={{
             borderColor: cap.highlight ? `${accent}66` : "rgba(255,255,255,0.1)",
             boxShadow: cap.highlight ? `0 0 20px ${accent}33` : undefined,
@@ -45,16 +98,22 @@ function OrbitChip({ cap, accent, index, total }: OrbitChipProps) {
         >
           {cap.highlight && (
             <span
-              className="mb-1 block font-display text-[8px] tracking-widest uppercase"
+              className="mb-0.5 block font-display text-[7px] tracking-widest uppercase sm:text-[8px]"
               style={{ color: accent }}
             >
               NEW
             </span>
           )}
-          <p className="text-[10px] leading-snug text-slate-200 sm:text-[11px]">{cap.label}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[8px] uppercase sm:text-[9px]">
+          <p
+            className={`leading-snug text-slate-200 ${compact ? "text-[9px] line-clamp-2" : "text-[10px] sm:text-[11px]"}`}
+          >
+            {cap.label}
+          </p>
+          <div
+            className={`mt-1 flex flex-wrap items-center gap-1 uppercase ${compact ? "text-[7px]" : "text-[8px] sm:text-[9px]"}`}
+          >
             <span
-              className="rounded px-1.5 py-0.5 font-display"
+              className="rounded px-1 py-0.5 font-display"
               style={{
                 background: cap.status === "planned" ? "rgba(148,163,184,0.12)" : `${accent}20`,
                 color: cap.status === "planned" ? "#94a3b8" : accent,
@@ -62,7 +121,7 @@ function OrbitChip({ cap, accent, index, total }: OrbitChipProps) {
             >
               {STATUS_LABEL[cap.status]}
             </span>
-            {cap.since && <span className="text-slate-600">since {cap.since}</span>}
+            {cap.since && !compact && <span className="text-slate-600">since {cap.since}</span>}
           </div>
         </div>
       </div>
@@ -79,6 +138,9 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
   usePauseAnimationsOffscreen(fieldRef);
   const reduced = useReducedMotion();
   const caps = agent.capabilities;
+
+  const { mode, inner, outer } = useMemo(() => splitOrbitRings(caps), [caps]);
+  const layout = useMemo(() => orbitLayout(caps.length, mode), [caps.length, mode]);
 
   if (reduced) {
     return (
@@ -102,34 +164,68 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
     );
   }
 
+  const iconSize =
+    caps.length > 7
+      ? "h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32"
+      : "h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36";
+
   return (
-    <div
-      ref={fieldRef}
-      className="orbit-field relative mx-auto aspect-square w-full max-w-[min(100%,22rem)] sm:max-w-[26rem] md:max-w-[30rem]"
-      aria-label={`${agent.code} の能力`}
-    >
+    <div className="w-full">
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[78%] w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed opacity-20"
-        style={{ borderColor: agent.accent }}
-      />
-
-      {caps.map((cap, i) => (
-        <OrbitChip key={cap.id} cap={cap} accent={agent.accent} index={i} total={caps.length} />
-      ))}
-
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+        ref={fieldRef}
+        className={`orbit-field relative mx-auto aspect-square w-full ${layout.fieldClass}`}
+        aria-label={`${agent.code} の能力`}
+      >
+        {mode === "dual" && (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed opacity-15"
+            style={{ borderColor: agent.accent }}
+          />
+        )}
         <div
-          className="absolute -inset-3 rounded-full opacity-30"
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed opacity-20"
           style={{
-            border: `1px solid ${agent.accent}44`,
+            borderColor: agent.accent,
+            width: mode === "dual" ? "88%" : "78%",
+            height: mode === "dual" ? "88%" : "78%",
           }}
         />
-        <AgentIcon
-          agentId={agent.id}
-          alt={agent.displayName}
-          glow={agent.accent}
-          className="relative h-28 w-28 rounded-full sm:h-32 sm:w-32 md:h-36 md:w-36"
-        />
+
+        {inner.map((cap, i) => (
+          <OrbitChip
+            key={cap.id}
+            cap={cap}
+            accent={agent.accent}
+            index={i}
+            total={inner.length}
+            radiusPx={layout.innerR}
+            compact={layout.compact}
+          />
+        ))}
+        {outer.map((cap, i) => (
+          <OrbitChip
+            key={cap.id}
+            cap={cap}
+            accent={agent.accent}
+            index={i}
+            total={outer.length}
+            radiusPx={layout.outerR}
+            compact={layout.compact}
+          />
+        ))}
+
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
+          <div
+            className="absolute -inset-3 rounded-full opacity-30"
+            style={{ border: `1px solid ${agent.accent}44` }}
+          />
+          <AgentIcon
+            agentId={agent.id}
+            alt={agent.displayName}
+            glow={agent.accent}
+            className={`relative rounded-full ${iconSize}`}
+          />
+        </div>
       </div>
     </div>
   );

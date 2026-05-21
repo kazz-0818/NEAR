@@ -1,5 +1,5 @@
 import type { ShowcaseAgent } from "../types/showcase";
-import { agentSectionId, scrollToId } from "../lib/agents";
+import { scrollToAgentSection } from "../lib/agents";
 import { RING_ORDER } from "../lib/colors";
 
 interface MemberHudProps {
@@ -19,7 +19,7 @@ export function MemberHud({ agents }: MemberHudProps) {
           <button
             key={id}
             type="button"
-            onClick={() => scrollToId(agentSectionId(agent))}
+            onClick={() => scrollToAgentSection(agent)}
             className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 font-display text-[10px] tracking-[0.12em] uppercase backdrop-blur-md transition hover:border-white/25 hover:bg-white/5 sm:px-4 sm:py-2"
           >
             <span style={{ color: agent.accent }}>{agent.code}</span>

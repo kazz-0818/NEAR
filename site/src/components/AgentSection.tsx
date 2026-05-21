@@ -84,7 +84,7 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
     <section
       id={agentSectionId(agent)}
       ref={ref}
-      className="agent-section relative scroll-mt-24 overflow-hidden px-5 py-20 sm:px-8 sm:py-28 lg:py-32"
+      className="agent-section relative scroll-mt-[5.5rem] overflow-hidden px-5 py-20 sm:px-8 sm:py-28 lg:py-32"
     >
       <div className="agent-space-fallback pointer-events-none absolute inset-0 z-0" aria-hidden />
       {showSpace3d && (
@@ -106,7 +106,9 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
       />
 
       <div className="relative z-10 mx-auto max-w-6xl">
-        <div className={`agent-reveal mb-8 lg:mb-10 ${isEven ? "" : "lg:text-right"}`}>
+        <div
+          className={`agent-section-head agent-reveal mb-8 lg:mb-10 ${isEven ? "" : "lg:text-right"}`}
+        >
           <span
             className="agent-code-badge inline-block origin-left rounded px-3 py-1 font-display text-[10px] tracking-[0.35em] uppercase lg:origin-right"
             style={{ background: `${agent.accent}18`, color: agent.accent }}

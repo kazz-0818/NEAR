@@ -4,13 +4,13 @@ import {
   AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
-  Color,
   DoubleSide,
   Group,
+  type Mesh,
   type Points,
 } from "three";
 import { hexToRgb } from "../../lib/hexColor";
-import { fillPositions, fillWarpStream, seededRandom } from "./cosmicUtils";
+import { fillHelixStream, fillPositions, fillWarpStream, seededRandom } from "./cosmicUtils";
 
 export type CosmicVariant = "hero" | "agent";
 
@@ -140,50 +140,72 @@ function WarpStream({ seed, accent }: { seed: number; accent: string }) {
   );
 }
 
-function EnergyRings({ accent, seed }: { accent: string; seed: number }) {
-  const g1 = useRef<Group>(null);
-  const g2 = useRef<Group>(null);
+/** 中央コアの発光（リングではなく星雲の核） */
+function NebulaCore({ accent }: { accent: string }) {
+  const outer = useRef<Mesh>(null);
+  const inner = useRef<Mesh>(null);
   const [r, g, b] = hexToRgb(accent);
-  const color = new Color(r, g, b);
 
   useFrame((state) => {
-    const e = state.clock.elapsedTime;
-    if (g1.current) {
-      g1.current.rotation.z = e * 0.12 + seed * 0.01;
-      g1.current.rotation.x = Math.PI / 2 + Math.sin(e * 0.3) * 0.08;
-    }
-    if (g2.current) {
-      g2.current.rotation.z = -e * 0.18;
-      g2.current.rotation.x = Math.PI / 2;
-      g2.current.scale.setScalar(1 + Math.sin(e * 0.5) * 0.04);
-    }
+    const pulse = 1 + Math.sin(state.clock.elapsedTime * 0.7) * 0.12;
+    if (outer.current) outer.current.scale.setScalar(pulse * 1.8);
+    if (inner.current) inner.current.scale.setScalar(pulse);
   });
 
   return (
-    <>
-      <group ref={g1} position={[0, 0, -1.5]}>
-        <mesh>
-          <torusGeometry args={[5.2, 0.018, 12, 96]} />
-          <meshBasicMaterial color={color} transparent opacity={0.55} blending={AdditiveBlending} />
-        </mesh>
-        <mesh rotation={[0, 0, Math.PI / 3]}>
-          <torusGeometry args={[4.1, 0.012, 8, 72]} />
-          <meshBasicMaterial color="#38bdf8" transparent opacity={0.35} blending={AdditiveBlending} />
-        </mesh>
-      </group>
-      <group ref={g2} position={[0, -0.2, 0]}>
-        <mesh>
-          <torusGeometry args={[3.4, 0.025, 10, 80]} />
-          <meshBasicMaterial
-            color={color}
-            transparent
-            opacity={0.7}
-            wireframe
-            blending={AdditiveBlending}
-          />
-        </mesh>
-      </group>
-    </>
+    <group position={[0, 0, -2.5]}>
+      <mesh ref={outer}>
+        <sphereGeometry args={[1.4, 24, 24]} />
+        <meshBasicMaterial
+          color={[r, g, b]}
+          transparent
+          opacity={0.08}
+          blending={AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={inner}>
+        <sphereGeometry args={[0.55, 16, 16]} />
+        <meshBasicMaterial
+          color="#e0f2fe"
+          transparent
+          opacity={0.2}
+          blending={AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/** 螺旋データストリーム（旧トーラスリングの代替） */
+function HelixStream({ accent, seed }: { accent: string; seed: number }) {
+  const ref = useRef<Points>(null);
+  const [ar, ag, ab] = hexToRgb(accent);
+  const rand = useSeedRand(seed + 53);
+  const pos = useMemo(() => fillHelixStream(rand, 360), [rand]);
+
+  useFrame((state, delta) => {
+    if (!ref.current) return;
+    ref.current.rotation.y += delta * 0.14;
+    ref.current.position.y = Math.sin(state.clock.elapsedTime * 0.35) * 0.2;
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[pos, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.055}
+        color={[ar, ag, ab]}
+        transparent
+        opacity={0.45}
+        sizeAttenuation
+        depthWrite={false}
+        blending={AdditiveBlending}
+      />
+    </points>
   );
 }
 
@@ -228,10 +250,10 @@ function WarpGrid() {
   return (
     <group ref={ref}>
       <lineSegments geometry={geometry}>
-        <lineBasicMaterial color="#22d3ee" transparent opacity={0.22} blending={AdditiveBlending} />
+        <lineBasicMaterial color="#22d3ee" transparent opacity={0.14} blending={AdditiveBlending} />
       </lineSegments>
       <lineSegments geometry={geometry} scale={[1.02, 1, 1.02]}>
-        <lineBasicMaterial color="#a78bfa" transparent opacity={0.12} blending={AdditiveBlending} />
+        <lineBasicMaterial color="#a78bfa" transparent opacity={0.07} blending={AdditiveBlending} />
       </lineSegments>
     </group>
   );
@@ -241,7 +263,7 @@ function NebulaMist({ accent, seed }: { accent: string; seed: number }) {
   const ref = useRef<Points>(null);
   const [ar, ag, ab] = hexToRgb(accent);
   const rand = useSeedRand(seed + 31);
-  const pos = useMemo(() => fillPositions(rand, 520, [18, 12, 14]), [rand]);
+  const pos = useMemo(() => fillPositions(rand, 680, [22, 14, 16]), [rand]);
 
   useFrame((state, delta) => {
     if (!ref.current) return;
@@ -255,10 +277,10 @@ function NebulaMist({ accent, seed }: { accent: string; seed: number }) {
         <bufferAttribute attach="attributes-position" args={[pos, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.12}
+        size={0.14}
         color={[ar, ag, ab]}
         transparent
-        opacity={0.35}
+        opacity={0.42}
         sizeAttenuation
         depthWrite={false}
         blending={AdditiveBlending}
@@ -311,7 +333,8 @@ export function CosmicSpaceScene({
       <CameraDrift variant={variant} />
       <HorizonPlane accent={accent} />
       <WarpGrid />
-      <EnergyRings accent={accent} seed={seed} />
+      <NebulaCore accent={accent} />
+      <HelixStream accent={accent} seed={seed} />
       <StarLayers seed={seed} dense={dense} />
       <NebulaMist accent={accent} seed={seed} />
       <WarpStream seed={seed} accent={accent} />

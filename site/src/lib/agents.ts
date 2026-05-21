@@ -19,7 +19,30 @@ export function agentSectionId(agent: ShowcaseAgent): string {
   return `agent-${agent.id}`;
 }
 
+/** 固定ナビ分を除いて、エージェント紹介ブロック先頭へスクロール */
+export function scrollToAgentSection(agent: ShowcaseAgent) {
+  const section = document.getElementById(agentSectionId(agent));
+  if (!section) return;
+
+  const target =
+    section.querySelector<HTMLElement>(".agent-section-head") ?? section;
+  const nav = document.querySelector("nav");
+  const offset = (nav?.getBoundingClientRect().height ?? 64) + 20;
+
+  const run = () => {
+    const y = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  };
+
+  run();
+  window.setTimeout(run, 450);
+}
+
 export function scrollToId(id: string) {
   const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!el) return;
+  const nav = document.querySelector("nav");
+  const offset = (nav?.getBoundingClientRect().height ?? 64) + 20;
+  const y = el.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
 }

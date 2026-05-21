@@ -237,7 +237,27 @@ body {
   animation: member-float 4s ease-in-out infinite;
 }
 
-/* ヒーロー: 虹色リング 1 本 */
+/* ヒーロー: 虹色リング＋メンバー周回（同一円の中心線上） */
+.member-orbit-ring-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  container-type: size;
+}
+
+.member-orbit-ring-wrap .member-orbit-track {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+}
+
+.member-orbit-ring-wrap .member-orbit-slot {
+  /* リング線の中央（mask 5px 幅の中心） */
+  transform: rotate(var(--angle, 0deg)) translateX(calc(50cqs - 2.5px));
+}
+
 .rainbow-ring {
   background: conic-gradient(
     from 210deg,
@@ -283,7 +303,6 @@ body {
 }
 
 .member-orbit-slot {
-  transform: rotate(var(--angle, 0deg)) translateX(var(--r, 138px));
   transform-origin: 0 0;
 }
 
@@ -442,23 +461,36 @@ body {
   }
 
   .orbit-cap,
-  .member-orbit-track,
   .member-orbit-upright-spin,
   .rainbow-ring {
     animation: none !important;
   }
 
-  .member-orbit-track {
+  .member-orbit-ring-wrap .member-orbit-track {
+    animation: none !important;
+  }
+
+  .member-orbit-ring-wrap {
+    position: static !important;
+    width: 100% !important;
+    transform: none !important;
+    margin: 0 auto;
+  }
+
+  .member-orbit-ring-wrap .member-orbit-track {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 1rem;
     position: static !important;
+    left: auto !important;
+    top: auto !important;
     width: auto !important;
     height: auto !important;
+    animation: none !important;
   }
 
-  .member-orbit-slot {
+  .member-orbit-ring-wrap .member-orbit-slot {
     position: static !important;
     transform: none !important;
   }

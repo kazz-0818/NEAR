@@ -56,7 +56,7 @@ function Nav() {
         <a href="#units" className="transition hover:text-white">
           Units
         </a>
-        <a href="#roadmap" className="hidden transition hover:text-white sm:inline">
+        <a href="#roadmap" className="transition hover:text-white">
           Roadmap
         </a>
       </div>

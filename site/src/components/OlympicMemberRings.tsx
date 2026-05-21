@@ -2,13 +2,14 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import type { ShowcaseAgent } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
-import { agentSectionId, scrollToId } from "../lib/agents";
+import { scrollToAgentSection } from "../lib/agents";
 import { RING_ORDER } from "../lib/colors";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
-const ORBIT_RADIUS = 152;
 const ORBIT_DURATION = 72;
+/** 虹色リング（.member-orbit-ring-wrap）の幅に対する割合 — CSS と一致 */
+const RING_SIZE_PERCENT = 72;
 
 interface MemberOrbitItemProps {
   agent: ShowcaseAgent;
@@ -32,10 +33,10 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
           <button
             type="button"
             className="member-orbit-btn z-10 flex flex-col items-center transition-transform duration-300 hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-            onClick={() => scrollToId(agentSectionId(agent))}
+            onClick={() => scrollToAgentSection(agent)}
           >
         <div
-          className="relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
+          className="member-orbit-avatar relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[5rem] sm:w-[5rem] md:h-[5.75rem] md:w-[5.75rem]"
           style={{
             borderColor: agent.accent,
             boxShadow: `0 0 24px ${agent.accent}55`,
@@ -96,7 +97,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
           <button
             key={agent.id}
             type="button"
-            onClick={() => scrollToId(agentSectionId(agent))}
+            onClick={() => scrollToAgentSection(agent)}
             className="flex flex-col items-center gap-1"
           >
             <AgentIcon
@@ -122,25 +123,20 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
       style={
         {
           ["--dur" as string]: `${ORBIT_DURATION}s`,
-          ["--r" as string]: `${ORBIT_RADIUS}px`,
         } as React.CSSProperties
       }
     >
-      <div
-        className="rainbow-ring pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-20"
-        style={{
-          boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)",
-        }}
-      />
-
-      <div className="member-orbit-track absolute left-1/2 top-1/2">
-        {ordered.map((agent, i) => (
-          <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
-        ))}
+      <div className="member-orbit-ring-wrap" style={{ width: `${RING_SIZE_PERCENT}%` }}>
+        <div className="rainbow-ring pointer-events-none absolute inset-0 rounded-full" aria-hidden />
+        <div
+          className="pointer-events-none absolute inset-0 rounded-full opacity-20"
+          style={{ boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)" }}
+        />
+        <div className="member-orbit-track">
+          {ordered.map((agent, i) => (
+            <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -26,6 +26,19 @@ export function fillPositions(
   return arr;
 }
 
+/** データヘリックス — 螺旋状の粒子配置 */
+export function fillHelixStream(rand: () => number, count: number) {
+  const arr = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const t = (i / count) * Math.PI * 6 + rand() * 0.4;
+    const r = 2.2 + rand() * 2.8;
+    arr[i * 3] = Math.cos(t) * r;
+    arr[i * 3 + 1] = (i / count - 0.5) * 10;
+    arr[i * 3 + 2] = Math.sin(t) * r;
+  }
+  return arr;
+}
+
 /** ワープトンネル用 — 円筒状に分布 */
 export function fillWarpStream(rand: () => number, count: number) {
   const arr = new Float32Array(count * 3);

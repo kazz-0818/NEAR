@@ -34,7 +34,7 @@ FROM (
   WHERE btrim(conversation_key) <> ''
   GROUP BY agent_code, conversation_key
 ) g
-JOIN veliora.ai_agents a ON a.agent_key = g.agent_code
+JOIN veriora.ai_agents a ON a.agent_key = g.agent_code
 JOIN veliora.line_message_events e
   ON e.agent_code = g.agent_code AND e.conversation_key = g.conversation_key
 WHERE NOT EXISTS (

@@ -7,7 +7,7 @@ import { RING_ORDER } from "../lib/colors";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
-const ORBIT_RADIUS = 138;
+const ORBIT_RADIUS = 152;
 const ORBIT_DURATION = 72;
 
 interface MemberOrbitItemProps {
@@ -49,7 +49,7 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
           />
         </div>
         <span
-          className="mt-2 font-display text-[9px] tracking-[0.2em] uppercase sm:text-[10px]"
+          className="member-orbit-label mt-2 font-display text-[10px] tracking-[0.2em] uppercase sm:text-[11px]"
           style={{ color: agent.accent }}
         >
           {agent.code}
@@ -76,7 +76,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
     if (reduced || !wrapRef.current) return;
 
     const ctx = gsap.context(() => {
-      gsap.from(".member-orbit-btn", {
+      gsap.from(".member-orbit-avatar", {
         scale: 0,
         opacity: 0,
         duration: 0.7,
@@ -117,7 +117,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   return (
     <div
       ref={wrapRef}
-      className="member-orbit-field relative mx-auto aspect-square w-full max-w-[20rem] sm:max-w-[24rem] md:max-w-[28rem]"
+      className="member-orbit-field relative mx-auto aspect-square w-full max-w-[22rem] sm:max-w-[27rem] md:max-w-[32rem]"
       aria-label="Veliora メンバー — クリックで詳細"
       style={
         {

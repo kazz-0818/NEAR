@@ -39,8 +39,9 @@ export function HeroScene({ title, tagline, subtitle, agents }: HeroSceneProps) 
       id="hero"
       className="relative flex min-h-[100svh] flex-col overflow-hidden bg-[#050508]"
     >
+      <div className="hero-space-fallback pointer-events-none absolute inset-0 z-0" aria-hidden />
       <div
-        className="pointer-events-none absolute inset-0 z-0"
+        className="pointer-events-none absolute inset-0 z-0 opacity-60"
         style={{ background: HERO_BG }}
       />
       {show3d && (

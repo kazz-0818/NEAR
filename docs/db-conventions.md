@@ -58,6 +58,12 @@
 - 記事・下書き・メディアは **`lram_*` テーブル** または `lram` schema に集約する案を採用（未作成）。
 - WP 本体は外部システムのため、**WP 側 ID・URL・revision** を Veriora DB に保存し、本文の正は WP またはオブジェクトストレージに任せる設計を推奨。
 
+## Supabase Table Editor での確認
+
+- **正（実テーブル）**: スキーマ **`near`** の `near_*`（例: `near.near_inbound_messages`, `near.near_user_google_oauth_accounts`）。
+- **互換（読み取り専用 VIEW）**: スキーマ **`public`** に、旧名（`inbound_messages`, `user_google_oauth_accounts` など）の VIEW がある（migration `049_public_legacy_near_views.sql`）。**中身は `near.*` と同じ**で、空に見えていたのは実テーブルが `near` に移ったため。
+- **データが本当に無い**場合: Render 再作成で **`DATABASE_URL` が別 Supabase** になっていることが多い（NEAR は会話・連携行を自動削除しない）。
+
 ## migration 時の注意
 
 - **冪等性**: `IF NOT EXISTS` / `CREATE OR REPLACE VIEW` を優先。

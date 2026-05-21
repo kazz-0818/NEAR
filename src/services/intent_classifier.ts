@@ -13,6 +13,7 @@ import {
   rescueBroadSimpleQuestion,
   rescueCasualShortMessage,
 } from "./intentHeuristics.js";
+import { recordLlmUsage, usageFromChatCompletion } from "../lib/llmUsage.js";
 
 let systemPromptCache: string | null = null;
 
@@ -58,6 +59,12 @@ export async function classifyIntent(
         json_schema: INTENT_JSON_SCHEMA,
       },
     });
+    const usage = usageFromChatCompletion(completion, {
+      agentName: "NEAR",
+      source: "intent_classifier",
+      model: env.OPENAI_INTENT_MODEL,
+    });
+    if (usage) recordLlmUsage(usage);
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error("Empty completion");
     const json = JSON.parse(raw) as unknown;

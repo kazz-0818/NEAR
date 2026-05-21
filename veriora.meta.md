@@ -37,6 +37,7 @@ registry / `053_veriora_core_schema.sql` のハッシュが 5 リポで一致す
 | 6 | RITS → `veriora.messages` 複写 | 実装済み（`DATABASE_URL` 要） |
 | 7 | NEAR→LRAM `/internal/handoff/near` | 実装済み（env 要） |
 | 8 | `/admin/veliora/line-messages`（LRAM 追加、SERA/NEAR 既存） | 実装済み |
+| — | LLM usage → RITS 準備 | [`docs/llm-usage-rits-prep.md`](docs/llm-usage-rits-prep.md) |
 
 ## コミット
 

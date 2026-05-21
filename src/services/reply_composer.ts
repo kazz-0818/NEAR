@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { getEnv } from "../config/env.js";
 import { loadPrompt } from "../lib/promptLoader.js";
 import { getLogger } from "../lib/logger.js";
+import { recordLlmUsage, usageFromChatCompletion } from "../lib/llmUsage.js";
 
 let personaCache: string | null = null;
 
@@ -141,6 +142,12 @@ export async function composeNearReply(input: ComposeInput): Promise<string> {
       frequency_penalty: 0.45,
       presence_penalty: 0.25,
     });
+    const usage = usageFromChatCompletion(completion, {
+      agentName: "NEAR",
+      source: "reply_composer",
+      model: env.OPENAI_INTENT_MODEL,
+    });
+    if (usage) recordLlmUsage(usage);
     const text = completion.choices[0]?.message?.content?.trim();
     if (text) return text;
   } catch (e) {
@@ -184,6 +191,12 @@ export async function composeNearReplyLight(input: ComposeInput): Promise<string
       frequency_penalty: 0.2,
       presence_penalty: 0.1,
     });
+    const usage = usageFromChatCompletion(completion, {
+      agentName: "NEAR",
+      source: "reply_composer_light",
+      model: env.OPENAI_INTENT_MODEL,
+    });
+    if (usage) recordLlmUsage(usage);
     const text = completion.choices[0]?.message?.content?.trim();
     if (text) return text;
   } catch (e) {

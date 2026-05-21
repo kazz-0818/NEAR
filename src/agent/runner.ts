@@ -9,6 +9,7 @@ import { getEnv } from "../config/env.js";
 import { insertAgentSearchRun } from "../db/agent_search_runs_repo.js";
 import { nearAgentSoftFailureMessage } from "../lib/agentReplyHeuristics.js";
 import { getLogger } from "../lib/logger.js";
+import { recordLlmUsage, usageFromResponse } from "../lib/llmUsage.js";
 import { mergeModuleSituations, type AgentComposeSituation } from "./composeSituation.js";
 import { evaluateWebSearchPolicy } from "./policies/webSearchPolicy.js";
 import { extractVisibleAssistantText } from "./responseText.js";
@@ -160,6 +161,13 @@ export async function runNearAgentTurn(input: NearAgentTurnInput): Promise<NearA
       log.error({ err: e, step }, "near agent responses.create failed");
       throw e;
     }
+
+    const usage = usageFromResponse(resp, {
+      agentName: "NEAR",
+      source: `near_agent:step${step}`,
+      model: env.OPENAI_AGENT_MODEL,
+    });
+    if (usage) recordLlmUsage(usage);
 
     previousResponseId = resp.id;
 

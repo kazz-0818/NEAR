@@ -91,4 +91,14 @@ export const NEAR_ENV_ALIASES: readonly EnvAliasRule[] = [
     legacy: ["NEAR_HANDOFF_SECRET", "LRAM_HANDOFF_SECRET"],
     deprecatedLegacy: true,
   },
+  {
+    canonical: "VERIORA_RITS_BASE_URL",
+    legacy: ["RITS_BASE_URL", "RITS_URL", "NEAR_RITS_BASE_URL"],
+    deprecatedLegacy: true,
+  },
+  {
+    canonical: "VERIORA_RITS_ADMIN_API_KEY",
+    legacy: ["RITS_ADMIN_API_KEY", "NEAR_RITS_ADMIN_API_KEY"],
+    deprecatedLegacy: true,
+  },
 ];

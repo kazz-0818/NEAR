@@ -57,6 +57,7 @@ const MIGRATION_FILES = [
   "048_rename_near_schema_migrations.sql",
   "049_public_legacy_near_views.sql",
   "050_near_merge_public_legacy_data.sql",
+  "051_near_search_path_fix_and_veliora_backfill.sql",
 ] as const;
 
 /** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */

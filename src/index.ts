@@ -31,20 +31,28 @@ import {
 } from "./lib/renderRuntime.js";
 import { createGoogleOAuthApp } from "./routes/oauthGoogle.js";
 import { getSheetsIntegrationDiagnostics } from "./lib/userGoogleSheetsClient.js";
+import { getSchemaDiagnostics } from "./db/schemaDiagnostics.js";
 
 const app = new Hono();
 const log = getLogger();
 
-app.get("/health", (c) => {
+app.get("/health", async (c) => {
   const render = getRenderRuntimeInfo();
   const publicBase = getEffectivePublicBaseUrl();
   const googleSheets = getSheetsIntegrationDiagnostics();
+  let db: Awaited<ReturnType<typeof getSchemaDiagnostics>> = null;
+  try {
+    db = await getSchemaDiagnostics(getPool());
+  } catch {
+    db = null;
+  }
   return c.json({
     ok: true,
     service: "NEAR",
     built_at: getDeployedAtIso(),
     public_base_url: publicBase ?? null,
     google_sheets: googleSheets,
+    db,
     render: render.on_render
       ? {
           external_url: render.external_url,

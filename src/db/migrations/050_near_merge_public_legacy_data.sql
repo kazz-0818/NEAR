@@ -434,10 +434,11 @@ BEGIN
   RAISE NOTICE 'near_merge: public legacy → near.* merge pass completed';
 END $$;
 
--- 統合後: public に残った実テーブルは DROP し、049 互換 VIEW で参照（データは near 側に一本化）
+-- 統合後: public の実テーブルは DROP せず archive リネーム（051 でも再処理可）
 DO $$
 DECLARE
   rel_name text;
+  archive_name text;
 BEGIN
   FOREACH rel_name IN ARRAY ARRAY[
     'inbound_messages', 'near_inbound_messages',
@@ -454,8 +455,11 @@ BEGIN
   ]
   LOOP
     IF near._is_base_table('public', rel_name) THEN
-      EXECUTE format('DROP TABLE public.%I', rel_name);
-      RAISE NOTICE 'near_merge: dropped public.%', rel_name;
+      archive_name := rel_name || '_archived_050';
+      IF NOT near._is_base_table('public', archive_name) THEN
+        EXECUTE format('ALTER TABLE public.%I RENAME TO %I', rel_name, archive_name);
+        RAISE NOTICE 'near_merge: archived public.% → %', rel_name, archive_name;
+      END IF;
     END IF;
   END LOOP;
 END $$;

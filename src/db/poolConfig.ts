@@ -1,7 +1,10 @@
 import type { PoolConfig } from "pg";
 
-/** NEAR アプリ用テーブルは near スキーマ（Supabase Table Editor の「フォルダ」に相当）。修飾なし SQL は public を先に解決し、マイグレの CREATE は従来どおり public に置く。 */
-const SEARCH_PATH_OPTIONS = "-c search_path=public,near,veliora";
+/**
+ * 修飾なし `near_inbound_messages` 等は near スキーマを優先（public に同名実テーブルが残ると誤書き込みするため）。
+ * マイグレーション SQL は `public.` / `near.` を明示している前提。
+ */
+const SEARCH_PATH_OPTIONS = "-c search_path=near,public,veliora";
 
 function mergeSearchPathIntoConnectionString(connectionString: string): string {
   const m = connectionString.match(/^(postgres(?:ql)?:\/\/[^?]+)(\?(.*))?$/i);

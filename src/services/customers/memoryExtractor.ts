@@ -2,6 +2,8 @@ import type { Db } from "../../db/client.js";
 import { redactSensitiveForMemory } from "../user_memory_prompt.js";
 import { upsertCustomerProfile } from "../supabase/repositories/customerProfiles.js";
 import { createCustomerMemoryNote } from "../supabase/repositories/customerMemoryNotes.js";
+import { updateCustomerContactFields } from "../supabase/repositories/customers.js";
+import { suggestMergeCandidatesForCustomer } from "./mergeSuggestions.js";
 import type { UpsertProfileInput } from "./types.js";
 
 const SENSITIVE_PATTERN =
@@ -11,6 +13,8 @@ const EXPLICIT_REMEMBER = /覚えて|記憶して|忘れないで|メモして�
 
 const PREFERRED_NAME = /(?:呼んで|呼び方|名前は)(.+?)(?:で|と|にして|ください|お願い)/i;
 const TONE_PREF = /(?:短く|簡潔|丁寧|カジュアル|実務的).{0,20}(?:回答|返信|説明).{0,10}(?:好む|希望|がいい|して)/i;
+const EMAIL_IN_TEXT = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+const PHONE_IN_TEXT = /(?:0\d{1,4}[-\s]?\d{1,4}[-\s]?\d{3,4}|\d{10,11})/;
 
 export type ExtractMemoryInput = {
   customerId: string;
@@ -83,6 +87,26 @@ export function extractCustomerMemoryFromMessage(input: ExtractMemoryInput): Ext
     });
   }
 
+  const emailM = text.match(EMAIL_IN_TEXT);
+  if (emailM?.[0] && explicit) {
+    items.push({
+      kind: "note",
+      confirmed: true,
+      note: `連絡メール: ${emailM[0].slice(0, 120)}`,
+      category: "連絡先",
+    });
+  }
+
+  const phoneM = text.match(PHONE_IN_TEXT);
+  if (phoneM?.[0] && explicit && !emailM) {
+    items.push({
+      kind: "note",
+      confirmed: true,
+      note: `連絡電話: ${phoneM[0].slice(0, 40)}`,
+      category: "連絡先",
+    });
+  }
+
   return items;
 }
 
@@ -92,6 +116,22 @@ export async function persistExtractedMemory(
 ): Promise<number> {
   const items = extractCustomerMemoryFromMessage(input);
   let saved = 0;
+  const raw = input.userText.trim();
+  const explicit = /覚えて|記憶して|忘れないで|メモしておいて|保存しておいて/i.test(raw);
+  if (explicit) {
+    const emailM = raw.match(EMAIL_IN_TEXT);
+    if (emailM?.[0]) {
+      await updateCustomerContactFields(db, input.customerId, {
+        email: emailM[0].toLowerCase(),
+      });
+      await suggestMergeCandidatesForCustomer(db, input.customerId);
+    }
+    const phoneM = raw.match(PHONE_IN_TEXT);
+    if (phoneM?.[0] && !emailM) {
+      await updateCustomerContactFields(db, input.customerId, { phone: phoneM[0].slice(0, 24) });
+      await suggestMergeCandidatesForCustomer(db, input.customerId);
+    }
+  }
   for (const item of items) {
     if (item.kind === "profile" && item.profile) {
       if (SENSITIVE_PATTERN.test(item.profile.profileValue)) continue;

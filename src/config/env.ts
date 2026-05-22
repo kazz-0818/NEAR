@@ -655,6 +655,11 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => s !== "false" && s !== "0"),
+  /** false / 0 で merge 候補の管理者 LINE 通知を止める（既定 ON） */
+  VERIORA_MERGE_CANDIDATE_NOTIFY: z
+    .string()
+    .optional()
+    .transform((s) => s !== "false" && s !== "0"),
 
   VERIORA_CANONICAL_LINE_LOG: z
     .string()

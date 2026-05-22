@@ -1,7 +1,13 @@
 import type { Hono } from "hono";
 import { z } from "zod";
 import { getPool } from "../db/client.js";
-import { listCustomers, getCustomerById } from "../services/supabase/repositories/customers.js";
+import {
+  listCustomers,
+  getCustomerById,
+  updateCustomerContactFields,
+  updateCustomerDisplayFields,
+} from "../services/supabase/repositories/customers.js";
+import { suggestMergeCandidatesForCustomer } from "../services/customers/mergeSuggestions.js";
 import { findCustomerByIdentity, listIdentitiesForCustomer } from "../services/supabase/repositories/customerIdentities.js";
 import {
   listCustomerProfiles,
@@ -46,6 +52,14 @@ const patchProfileBody = z
     profile_value: z.string().optional(),
     confirmed: z.boolean().optional(),
     is_sensitive: z.boolean().optional(),
+  })
+  .refine((d) => Object.keys(d).length > 0, { message: "empty patch" });
+
+const patchCustomerBody = z
+  .object({
+    email: z.string().email().nullable().optional(),
+    phone: z.string().max(32).nullable().optional(),
+    preferred_name: z.string().max(80).nullable().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, { message: "empty patch" });
 
@@ -192,6 +206,29 @@ export function registerCustomerAdminRoutes(app: Hono): void {
     const ok = await deleteCustomerMemoryNote(pool, c.req.param("id"));
     if (!ok) return c.json({ error: "not found" }, 404);
     return c.json({ ok: true });
+  });
+
+  app.patch("/customers/:id", async (c) => {
+    const body = patchCustomerBody.safeParse(await c.req.json());
+    if (!body.success) return c.json({ error: body.error.flatten() }, 400);
+    const pool = getPool();
+    const customerId = c.req.param("id");
+    const customer = await getCustomerById(pool, customerId);
+    if (!customer) return c.json({ error: "not found" }, 404);
+    if (body.data.email !== undefined || body.data.phone !== undefined) {
+      await updateCustomerContactFields(pool, customerId, {
+        email: body.data.email,
+        phone: body.data.phone,
+      });
+      await suggestMergeCandidatesForCustomer(pool, customerId);
+    }
+    if (body.data.preferred_name !== undefined) {
+      await updateCustomerDisplayFields(pool, customerId, {
+        preferredName: body.data.preferred_name,
+      });
+    }
+    const updated = await getCustomerById(pool, customerId);
+    return c.json({ ok: true, customer: updated });
   });
 
   app.patch("/customer-profiles/:id", async (c) => {

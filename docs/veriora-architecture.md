@@ -70,10 +70,11 @@
 | 1 | ドキュメント整備（本リリース相当） |
 | 2 | agent registry 追加 | **同梱済み**（一部リポで config / handoff 接続済み） |
 | 3 | env 互換（alias・`.env.example` 同期） | **コード実装済み** |
-| 4 | ログ形式・横断会話ログの統一 | 運用 env 含む（[`veriora.meta.md`](../veriora.meta.md)） |
-| 5 | ルーティング / ハンドオフ整理 | NEAR handoff **実装済み** |
-| 6 | RITS 監査の自動化・日次レポート | **実装済み**（整合性監査 doc は RITS） |
-| 7 | LRAM（WordPress・編集）本実装 | 部分実装 |
+| 4 | ログ形式・横断会話ログの統一 | **実装済み**（5部署 LINE + LIRA `/ask` → RITS） |
+| 5 | ルーティング / ハンドオフ整理 | **実装済み**（NEAR handoff・registry） |
+| 6 | RITS 監査の自動化・日次レポート | **実装済み**（顧客マスター監査節含む） |
+| 7 | LRAM（WordPress・編集）本実装 | **実装済み**（下書き・嗜好ネタ選定。本番公開は Phase 5+） |
 | 8 | 管理画面・LINE 表示の統一 | 各リポ admin **実装済み** |
+| 9–11 | ベガパンク（共通顧客マスター） | Phase 1–4 **実装済み**（[`vegapunk-plan.md`](vegapunk-plan.md)） |
 
 Phase 3 以降の詳細タスクは、実装時に `docs/veriora-architecture.md` に追記するか、NEAR の `docs/PHASE2_OPERATIONS.md` 等とリンクして管理してください。

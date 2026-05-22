@@ -205,12 +205,13 @@
     { "id": 1, "title": "ドキュメント整備", "summary": "Veriora アーキテクチャ・規約", "status": "done" },
     { "id": 2, "title": "Agent Registry", "summary": "5部署の役割定義をコード化", "status": "done" },
     { "id": 3, "title": "env 互換", "summary": "VERIORA_* / legacy alias 全リポ", "status": "done" },
-    { "id": 4, "title": "横断ログ", "summary": "会話ログ・LLM usage → RITS", "status": "active" },
-    { "id": 5, "title": "ルーティング", "summary": "NEAR handoff・registry 接続", "status": "active" },
-    { "id": 6, "title": "RITS 監査", "summary": "日次レポート・組織整合性監査", "status": "active" },
-    { "id": 7, "title": "LRAM 本実装", "summary": "WordPress・NEAR 取次ぎ", "status": "active" },
+    { "id": 4, "title": "横断ログ", "summary": "会話ログ・LLM usage → RITS（LIRA /ask 含む）", "status": "done" },
+    { "id": 5, "title": "ルーティング", "summary": "NEAR handoff・registry 接続", "status": "done" },
+    { "id": 6, "title": "RITS 監査", "summary": "日次レポート・組織整合性・顧客監査", "status": "done" },
+    { "id": 7, "title": "LRAM 本実装", "summary": "WordPress 下書き・NEAR 取次ぎ・嗜好ネタ選定", "status": "done" },
     { "id": 8, "title": "管理画面", "summary": "統一 LINE 履歴 API", "status": "done" },
     { "id": 9, "title": "ベガパンク Phase 1–2", "summary": "共通顧客マスター・migration 065–068・5部署接続", "status": "done" },
-    { "id": 10, "title": "ベガパンク Phase 3", "summary": "管理 UI・RITS 顧客監査・LIRA /ask・LRAM 記事反映・E2E 手順", "status": "done" }
+    { "id": 10, "title": "ベガパンク Phase 3", "summary": "管理 UI・RITS 顧客監査・LIRA /ask・LRAM 記事反映・E2E 手順", "status": "done" },
+    { "id": 11, "title": "ベガパンク Phase 4", "summary": "merge通知・email/phone候補・LRAMネタ選定・管理PATCH", "status": "done" }
   ]
 }

@@ -43,6 +43,21 @@ export async function getCustomerById(db: VerioraDb, customerId: string): Promis
   return r.rows[0] ?? null;
 }
 
+export async function updateCustomerContactFields(
+  db: VerioraDb,
+  customerId: string,
+  fields: { email?: string | null; phone?: string | null }
+): Promise<void> {
+  await db.query(
+    `UPDATE ${VERIORA_TABLES.customers}
+     SET email = COALESCE($2, email),
+         phone = COALESCE($3, phone),
+         updated_at = now()
+     WHERE id = $1 AND status <> 'deleted'`,
+    [customerId, fields.email ?? null, fields.phone ?? null]
+  );
+}
+
 export async function updateCustomerDisplayFields(
   db: VerioraDb,
   customerId: string,

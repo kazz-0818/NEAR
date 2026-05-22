@@ -55,12 +55,20 @@ LRAM は顧客のブランド嗜好・事業情報を `buildCustomerContextForAg
 
 `near.near_user_memory` は **削除しません**。`VERIORA_CUSTOMER_MASTER_ENABLED` 時は Veriora マスターを優先し、legacy はフォールバックします。
 
-## 今後の拡張（Phase 4 以降）
+## Phase 4 で完了した運用面
 
-- 記事ネタ選定への顧客嗜好スコアリング（LRAM）
-- merge 候補の運用通知（Slack 等）
-- 電話番号一致による merge 候補（自動統合はしない）
+- LRAM 記事ネタ一覧の顧客嗜好ソート（`rankArticleIdeasByCustomerContext`）
+- merge 候補の管理者 LINE 通知（`VERIORA_MERGE_CANDIDATE_NOTIFY`、NEAR `/admin/ui` リンク）
+- email / phone 一致による merge 候補（自動統合はしない）
+- 管理 API `PATCH /admin/customers/:id`（email / phone）
+- LIRA `POST /ask` の RITS ログ転送
+- 静的検証: `npm run verify:vegapunk-phase4`
+
+## 今後の拡張（Phase 5 以降）
+
 - 実 LINE E2E の staging 自動化
+- merge 候補の Slack 通知
+- 記事ネタの LLM リランキング（ルールベースから段階移行）
 
 ## Phase 3 で完了した運用面
 

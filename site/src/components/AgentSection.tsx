@@ -40,22 +40,13 @@ export function AgentSection({ agent, index }: AgentSectionProps) {
         <div
           className={`agent-section-head scroll-reveal mb-8 lg:mb-10 ${isEven ? "" : "lg:text-right"}`}
         >
-          <span
-            className="agent-code-badge scroll-reveal-scale inline-block origin-left rounded px-3 py-1 font-display text-[10px] tracking-[0.35em] uppercase lg:origin-right"
-            style={{ background: `${agent.accent}18`, color: agent.accent }}
+          <h2
+            className="scroll-reveal font-display text-2xl font-bold md:text-4xl"
+            style={{ color: agent.accent }}
           >
-            {agent.code}
-          </span>
-          <p
-            className="scroll-reveal mt-3 font-display text-xs tracking-[0.3em] uppercase"
-            style={{ color: agent.accent, transitionDelay: "0.06s" }}
-          >
-            {agent.department}
-          </p>
-          <h2 className="scroll-reveal mt-2 font-display text-2xl font-bold text-white md:text-4xl" style={{ transitionDelay: "0.1s" }}>
             {agent.displayName}
           </h2>
-          <p className="scroll-reveal mt-3 text-sm text-slate-400 md:text-base" style={{ transitionDelay: "0.14s" }}>
+          <p className="scroll-reveal mt-3 text-sm text-slate-400 md:text-base" style={{ transitionDelay: "0.08s" }}>
             {agent.role}
           </p>
         </div>

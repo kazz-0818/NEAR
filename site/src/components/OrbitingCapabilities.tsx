@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import type { ShowcaseAgent, ShowcaseCapability } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
+import { OrbitAgentHub } from "./OrbitAgentHub";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
@@ -145,13 +146,16 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
   if (reduced) {
     return (
       <div className="mx-auto w-full max-w-md">
-        <div className="mx-auto mb-6 h-40 w-40">
-          <AgentIcon
-            agentId={agent.id}
-            alt={agent.displayName}
-            glow={agent.accent}
-            className="h-full w-full rounded-full"
-          />
+        <div className="mx-auto mb-6 flex flex-col items-center gap-3">
+          <div className="h-40 w-40">
+            <AgentIcon
+              agentId={agent.id}
+              alt={agent.displayName}
+              glow={agent.accent}
+              className="h-full w-full rounded-full"
+            />
+          </div>
+          <p className="max-w-xs text-center text-sm text-slate-400">{agent.greeting}</p>
         </div>
         <ul className="space-y-2 text-sm text-slate-400">
           {caps.map((cap) => (
@@ -214,18 +218,7 @@ export function OrbitingCapabilities({ agent }: OrbitingCapabilitiesProps) {
           />
         ))}
 
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-          <div
-            className="absolute -inset-2 rounded-full opacity-30"
-            style={{ border: `1px solid ${agent.accent}44` }}
-          />
-          <AgentIcon
-            agentId={agent.id}
-            alt={agent.displayName}
-            glow={agent.accent}
-            className={`relative rounded-full ${iconSize}`}
-          />
-        </div>
+        <OrbitAgentHub agent={agent} iconSizeClass={iconSize} />
       </div>
     </div>
   );

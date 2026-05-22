@@ -22,6 +22,8 @@ export interface ShowcaseAgent {
   displayName: string;
   role: string;
   description: string;
+  /** 軌道中央アイコン hover / タップ時の挨拶 */
+  greeting: string;
   accent: string;
   handoffRules: string[];
   capabilities: ShowcaseCapability[];

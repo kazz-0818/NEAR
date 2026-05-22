@@ -2,7 +2,7 @@
   "meta": {
     "title": "Veriora",
     "tagline": "組織 OS — AI が部署として動く",
-    "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。"
+    "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。共通顧客マスターで記憶を横断共有。"
   },
   "agents": [
     {
@@ -34,9 +34,14 @@
         { "id": "growth", "label": "未対応・成長シグナルの記録と進化フロー", "status": "evolved", "since": "2025-09", "highlight": true },
         { "id": "lram-handoff", "label": "LRAM 向け BRAVO / 記事キーワードの内部ハンドオフ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "admin-line", "label": "統一 LINE 履歴の管理 API", "status": "evolved", "since": "2026-05" },
-        { "id": "verify-sync", "label": "5リポ正典同期の verify スクリプト（開発・CI）", "status": "evolved", "since": "2026-05" }
+        { "id": "verify-sync", "label": "5リポ正典同期の verify スクリプト（開発・CI）", "status": "evolved", "since": "2026-05" },
+        { "id": "customer-master", "label": "共通顧客マスター（identity・memory・手動 merge）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "admin-customers", "label": "顧客マスター管理 UI（/admin/ui）・管理 API", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "memory-dual", "label": "near_user_memory と Veriora マスターの併用（緊急 OFF 可）", "status": "evolved", "since": "2026-05" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "ベガパンク Phase 3 運用", "summary": "顧客一覧・merge 承認・memory 編集の管理 UI。RITS 監査サマリ表示。E2E 手順ドキュメント" },
+        { "date": "2026-05", "title": "共通顧客マスター", "summary": "veriora.customers — チャネル横断の identity・memory。SERA 由来メモを NEAR context に注入" },
         { "date": "2026-05", "title": "トークルーム表示名", "summary": "room member Profile API — グループと同様に名前呼びかけ可能" },
         { "date": "2026-05", "title": "LRAM 内部ハンドオフ", "summary": "BRAVO / WordPress 系キーワードで LRAM へ best-effort 取次ぎ（Phase 7）" },
         { "date": "2025-09", "title": "進化カプセル", "summary": "ユーザー要望から capability_registry へ能力を追加する成長フロー" },
@@ -67,9 +72,12 @@
         { "id": "line-group", "label": "グループ／ルームのゲート・表示名呼びかけ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "line-log", "label": "統一 LINE 履歴（管理 API）", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
+        { "id": "customer-resolve", "label": "sera_line identity と共有 memory の保存", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "cross-context", "label": "SERA 由来メモの NEAR / LRAM への context 共有", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "auto-post", "label": "広告出稿・実送信の自動化", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "ベガパンク接続", "summary": "LINE 応答前に customer resolve。merge は手動のみ（表示名一致は候補）" },
         { "date": "2026-05", "title": "room Profile API", "summary": "トークルームでも member 表示名を取得して返信に反映" },
         { "date": "2026-05", "title": "横断 LINE ログ", "summary": "veliora.line_messages VIEW 経由の管理 API（Phase 8）" },
         { "date": "2025-07", "title": "事実ベース分析", "summary": "未接続 API の指標捏造を禁止する分析ルールを強化" }
@@ -98,9 +106,12 @@
         { "id": "line-channel", "label": "LINE 経理チャネルでの定型応答", "status": "live", "since": "2025-06" },
         { "id": "line-group-policy", "label": "グループ LINE 方針", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
+        { "id": "customer-line", "label": "LINE 経路の customer resolve（lira_line）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "customer-ask", "label": "/ask の email・line_user_id・manual_customer_id 紐づけ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "approval", "label": "支払実行・請求書発行の確定", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "非 LINE /ask 紐づけ", "summary": "外部 ID がある場合のみ顧客 context を注入。無 ID では customer を作らない" },
         { "date": "2026-05", "title": "line-group-policy", "summary": "他部署が参照するグループ応答の正典候補ドキュメント" },
         { "date": "2025-06", "title": "LINE 経理窓口", "summary": "Python サービスとして独立デプロイ、registry 連携" },
         { "date": "2025-03", "title": "スプシ連携", "summary": "正データソースに基づく数値サマリー（推測捏造なし）" }
@@ -127,9 +138,11 @@
         { "id": "daily-auto", "label": "日次レポート生成・オーナー", "status": "evolved", "since": "2026-03", "highlight": true },
         { "id": "org-audit", "label": "組織整合性監査レポート", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-usage", "label": "全部署 LLM 使用量の集計・日次占有率", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "customer-audit", "label": "日次レポートの顧客マスター監査節（読取のみ）", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "auto-apply", "label": "本番プロンプト・RLS の自動適用", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "顧客マスター監査", "summary": "active/新規/merge候補/memory統計・複数agent接触・要確認メモを日次に出力（merge/削除はしない）" },
         { "date": "2026-05", "title": "組織整合性 × 日次", "summary": "監査 md を日次 bundle / priority_issues / LINE に自動連携" },
         { "date": "2026-05", "title": "監査と正典の分離", "summary": "RITS=監査主体、NEAR=設計正典・LLM 裏方 — ドキュメント明文化" },
         { "date": "2026-03", "title": "監査パイプライン強化", "summary": "agent_logs / agent_audits / daily_reports 台帳" },
@@ -160,9 +173,12 @@
         { "id": "line-name", "label": "グループ／トークルームで表示名プレフィックス", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "near-handoff", "label": "NEAR からの内部ハンドオフ受信", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
+        { "id": "customer-draft", "label": "記事下書きへの顧客嗜好・BRAVO 視点反映", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "customer-context", "label": "SERA / NEAR 由来 memory の lram context 参照", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "publish", "label": "WordPress 本番公開・予約投稿", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "顧客嗜好 → 記事", "summary": "buildCustomerContextForAgent を workflowDraft 経由で BRAVO 視点に反映（未確認は断定しない）" },
         { "date": "2026-05", "title": "room Profile API", "summary": "トークルーム member 表示名で「〇〇さん、」プレフィックス" },
         { "date": "2026-05", "title": "NEAR 取次ぎ接続", "summary": "POST /internal/handoff/near — 監査ログ記録（Phase 7）" },
         { "date": "2026-05", "title": "共有 docs 同期", "summary": "veriora-architecture 等を NEAR 正典と一致" },
@@ -180,7 +196,9 @@
     { "from": "lira", "to": "lram", "label": "ファクト確認" },
     { "from": "rits", "to": "near", "label": "横断監査・改善" },
     { "from": "rits", "to": "sera", "label": "整合性評価" },
-    { "from": "rits", "to": "lram", "label": "整合性評価" }
+    { "from": "rits", "to": "lram", "label": "整合性評価" },
+    { "from": "sera", "to": "near", "label": "共有 memory → NEAR context" },
+    { "from": "rits", "to": "near", "label": "顧客マスター監査（読取）" }
   ],
   "phases": [
     { "id": 0, "title": "現状調査", "summary": "既存 LINE / DB / env の棚卸し", "status": "done" },
@@ -191,6 +209,8 @@
     { "id": 5, "title": "ルーティング", "summary": "NEAR handoff・registry 接続", "status": "active" },
     { "id": 6, "title": "RITS 監査", "summary": "日次レポート・組織整合性監査", "status": "active" },
     { "id": 7, "title": "LRAM 本実装", "summary": "WordPress・NEAR 取次ぎ", "status": "active" },
-    { "id": 8, "title": "管理画面", "summary": "統一 LINE 履歴 API", "status": "done" }
+    { "id": 8, "title": "管理画面", "summary": "統一 LINE 履歴 API", "status": "done" },
+    { "id": 9, "title": "ベガパンク Phase 1–2", "summary": "共通顧客マスター・migration 065–068・5部署接続", "status": "done" },
+    { "id": 10, "title": "ベガパンク Phase 3", "summary": "管理 UI・RITS 顧客監査・LIRA /ask・LRAM 記事反映・E2E 手順", "status": "done" }
   ]
 }

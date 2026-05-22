@@ -2,7 +2,7 @@
   "meta": {
     "title": "Veriora",
     "tagline": "組織 OS — AI が部署として動く",
-    "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。NEAR が総合窓口と LLM の裏方、RITS が横断監査と日次レポートを担う。"
+    "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。"
   },
   "agents": [
     {
@@ -11,9 +11,9 @@
       "kana": "ニア",
       "department": "秘書部",
       "displayName": "NEAR-ニア-『秘書部』",
-      "role": "総合窓口・秘書・タスク整理（LLM / handoff の裏方）",
-      "description": "Veriora の一次窓口。依頼の受付・タスク整理・各専門部署への取次ぎと、強い LLM 経路での応答合成を担う。組織横断の監査レポートの主体ではない（監査は RITS）。",
-      "greeting": "お疲れ様です。秘書部 NEAR です。タスク整理と取次ぎ、いつでもどうぞ。",
+      "role": "総合窓口・秘書・タスク整理",
+      "description": "Veriora の一次窓口。依頼の受付・タスク整理・各専門部署への取次ぎと、強い LLM 経路での応答合成を担う。",
+      "greeting": "お疲れ様です。秘書部 NEAR です。タスク整理と取次ぎ、なんでもやりますよ。",
       "accent": "#f472b6",
       "handoffRules": [
         "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
@@ -50,8 +50,8 @@
       "department": "マーケ部",
       "displayName": "SERA-セラ-『マーケ部』",
       "role": "SNS・広告・集客・マーケティング支援",
-      "description": "マーケティング観点で SNS・広告・Instagram 等の分析・提案を行う。グループ／ルームではメンション・名前呼びかけで応答し、LINE 表示名で呼びかける。",
-      "greeting": "やっほー！マーケ部 SERA だよ。数字より「刺さる案」、一緒に磨こう！",
+      "description": "マーケティング観点で SNS・広告・Instagram 等の分析・提案を行う。",
+      "greeting": "こんにちは！マーケ部 SERA です。数字は嘘をつかない、一緒に磨こう！",
       "accent": "#facc15",
       "handoffRules": [
         "金額・請求・入金の確定は LIRA",
@@ -82,8 +82,8 @@
       "department": "経理部",
       "displayName": "LIRA-リラ-『経理部』",
       "role": "売上・経費・請求・入金・利益管理",
-      "description": "経理・数値の整理を担当。LINE ではグループ方針（メンション・名前呼び・引用返信）の参照実装を持ち、room 向け Profile API にも対応。",
-      "greeting": "こんにちは。経理部 LIRA です。数字は推測しません。根拠のある件だけ、丁寧にお答えします。",
+      "description": "経理・数値の整理を担当。",
+      "greeting": "こんにちは。経理部 LIRA です。経に関することは、丁寧にお答えします。",
       "accent": "#c4b5fd",
       "handoffRules": [
         "マーケ施策の効果測定の物語化は SERA",
@@ -96,7 +96,7 @@
         { "id": "payment", "label": "入金・支払スケジュールの案内と確認補助", "status": "live", "since": "2025-04" },
         { "id": "audit-meta", "label": "監査ログにメタデータを残す", "status": "live", "since": "2025-05" },
         { "id": "line-channel", "label": "LINE 経理チャネルでの定型応答", "status": "live", "since": "2025-06" },
-        { "id": "line-group-policy", "label": "グループ LINE 方針（組織参照 doc）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "line-group-policy", "label": "グループ LINE 方針", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
         { "id": "approval", "label": "支払実行・請求書発行の確定", "status": "planned" }
       ],
@@ -117,16 +117,15 @@
       "greeting": "AI人事部 RITS。組織の健康診断、実施中です。気になる挙動があれば、遠慮なくログをください。",
       "accent": "#22c55e",
       "handoffRules": [
-        "実務修正は各部署リポへ（起票理由は RITS 監査）",
-        "マーケ数値の真偽は SERA・LIRA のデータソースを参照",
-        "NEAR は LLM・取次ぎの裏方（監査レポートの出し元ではない）"
+        "実務修正は各部署リポへ",
+        "マーケ数値の真偽は SERA・LIRA のデータソースを参照"
       ],
       "capabilities": [
         { "id": "audit", "label": "エージェント会話ログの評価・リスク分類", "status": "live", "since": "2025-05" },
         { "id": "report", "label": "日次レポート（NEAR/SERA/LIRA/LRAM サマリ）", "status": "live", "since": "2025-06" },
         { "id": "improve", "label": "改善タスク・Cursor 向け指示のたたき台", "status": "live", "since": "2025-07" },
-        { "id": "daily-auto", "label": "日次レポート生成・オーナー LINE push（Cron）", "status": "evolved", "since": "2026-03", "highlight": true },
-        { "id": "org-audit", "label": "組織整合性監査レポート（veriora-consistency-audit）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "daily-auto", "label": "日次レポート生成・オーナー", "status": "evolved", "since": "2026-03", "highlight": true },
+        { "id": "org-audit", "label": "組織整合性監査レポート", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-usage", "label": "全部署 LLM 使用量の集計・日次占有率", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "auto-apply", "label": "本番プロンプト・RLS の自動適用", "status": "planned" }
       ],
@@ -157,7 +156,7 @@
         { "id": "draft", "label": "記事構成・見出し・本文のドラフト作成", "status": "live", "since": "2026-04" },
         { "id": "tone", "label": "BRAVO / ファッション文脈のトーン調整", "status": "live", "since": "2026-04" },
         { "id": "wp-meta", "label": "各ファッションサイトの最新情報調査", "status": "live", "since": "2026-04" },
-        { "id": "image-prompt", "label": "画像生成プロンプト案", "status": "live", "since": "2026-05" },
+        { "id": "image-prompt", "label": "アイキャッチ画像生成", "status": "live", "since": "2026-05" },
         { "id": "line-name", "label": "グループ／トークルームで表示名プレフィックス", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "near-handoff", "label": "NEAR からの内部ハンドオフ受信", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },

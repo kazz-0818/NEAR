@@ -37,7 +37,7 @@ export function CosmicBackground() {
     >
       <div className="cosmic-space-base absolute inset-0" />
       <div className="cosmic-space-stars absolute inset-0" />
-      {!reduced && <div className="cosmic-space-aurora absolute inset-0" />}
+      <div className="cosmic-space-aurora absolute inset-0" />
       <div className="cosmic-space-grid absolute inset-0 opacity-[0.14]" />
 
       {!reduced &&

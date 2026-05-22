@@ -15,9 +15,9 @@ export function iconBase(agentId: string): string {
   return `${base}icons/${code}_ICON`;
 }
 
-/** 組織ロゴ（public/veliora-icon-logo.png） */
-export function velioraLogoUrl(): string {
-  return `${import.meta.env.BASE_URL}veliora-icon-logo.png`;
+/** 組織ロゴ（public/veliora-icon-logo.{webp,png}） */
+export function velioraLogoBase(): string {
+  return `${import.meta.env.BASE_URL}veliora-icon-logo`;
 }
 
 export function agentSectionId(agent: ShowcaseAgent): string {

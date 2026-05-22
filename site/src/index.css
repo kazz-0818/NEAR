@@ -115,7 +115,9 @@ body {
     rgba(56, 189, 248, 0.08) 340deg,
     transparent 360deg
   );
-  animation: cosmic-aurora 18s ease-in-out infinite alternate;
+  /* 常時アニメは GPU 負荷が高いため静止表示 */
+  animation: none;
+  opacity: 0.72;
 }
 
 .cosmic-space-grid {
@@ -429,7 +431,6 @@ html.tab-animations-paused * {
   width: 0;
   height: 0;
   animation: orbit-track-spin var(--dur, 96s) linear infinite;
-  will-change: transform;
 }
 
 /* 能力チップ — 1 枚ずつ回転+逆回転で常に正立 */

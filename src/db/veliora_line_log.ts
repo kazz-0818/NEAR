@@ -2,6 +2,7 @@ import type { Db } from "./client.js";
 import { getEnv, type Env } from "../config/env.js";
 import { getLogger } from "../lib/logger.js";
 import { saveMessageFromLineEvent } from "../services/supabase/repositories/messages.js";
+import { linkConversationForAgentKey } from "../services/customers/lineResolve.js";
 import { VELIORA_AGENT_NEAR, buildVelioraConversationKey } from "../veliora/constants.js";
 
 export type VelioraLineDirection = "inbound" | "outbound";
@@ -56,6 +57,11 @@ export async function appendVelioraNearLineEvent(db: Db, input: AppendInput): Pr
         legacyTable: input.legacyTable,
         legacyRowId: input.legacyRowId!,
       });
+      void linkConversationForAgentKey(db, {
+        agentKey: VELIORA_AGENT_NEAR,
+        conversationKey,
+        lineUserId: input.lineUserId,
+      }).catch(() => undefined);
     } catch (e) {
       log.warn({ err: e }, "veriora.messages canonical write failed (non-fatal)");
     }

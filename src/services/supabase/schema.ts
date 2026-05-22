@@ -17,4 +17,11 @@ export const VERIORA_TABLES = {
   lramGeneratedArticles: `${VERIORA_SCHEMA}.lram_generated_articles`,
   lramWpPosts: `${VERIORA_SCHEMA}.lram_wp_posts`,
   messageFeed: `${VERIORA_SCHEMA}.message_feed`,
+  customers: `${VERIORA_SCHEMA}.customers`,
+  customerIdentities: `${VERIORA_SCHEMA}.customer_identities`,
+  customerProfiles: `${VERIORA_SCHEMA}.customer_profiles`,
+  customerMemoryNotes: `${VERIORA_SCHEMA}.customer_memory_notes`,
+  customerMergeCandidates: `${VERIORA_SCHEMA}.customer_merge_candidates`,
+  customerAgentContexts: `${VERIORA_SCHEMA}.customer_agent_contexts`,
+  customerConversationLinks: `${VERIORA_SCHEMA}.customer_conversation_links`,
 } as const;

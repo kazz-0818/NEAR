@@ -16,6 +16,10 @@
 | 062 | `062_security_hardening_public_api.sql` | RLS, security_invoker VIEWs |
 | 063 | `063_simplify_unified_line_log.sql` | 統一 `veliora.line_messages`、public NEAR VIEW 削除 |
 | 064 | `064_near_user_memory.sql` | ユーザー長期記憶テーブル |
+| 065 | `065_veriora_customer_core_tables.sql` | ベガパンク: customers, identities, merge_candidates |
+| 066 | `066_veriora_customer_memory_tables.sql` | profiles, memory_notes, agent_contexts, conversation_links |
+| 067 | `067_veriora_customer_indexes_rls.sql` | 索引・RLS |
+| 068 | `068_veriora_customer_backfill_optional.sql` | 既存会話の identity/link backfill（INSERT/UPDATE のみ） |
 
 他リポジトリは **同一 SQL** を別連番で同梱（SERA `016`–`026` 等）。詳細は [`supabase-simplification.md`](supabase-simplification.md)。
 

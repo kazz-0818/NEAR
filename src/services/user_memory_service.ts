@@ -7,6 +7,13 @@ import type { UserMemoryPromptContext } from "../models/userMemory.js";
 import { looksLikeTrivialLinePing } from "../channels/line/trivialPing.js";
 import { buildUserMemoryPromptBlock } from "./user_memory_prompt.js";
 import { consolidateUserMemoryWithLlm } from "./user_memory_consolidator.js";
+import {
+  buildCustomerContextPromptForAgent,
+  isCustomerMasterEnabled,
+  persistExtractedMemory,
+  resolveLineCustomerByAgentAndUserId,
+} from "./customers/index.js";
+import { upsertCustomerProfile } from "./supabase/repositories/customerProfiles.js";
 
 export async function loadUserMemoryPromptContext(
   db: Db,
@@ -46,8 +53,30 @@ export async function loadUserMemoryPromptBlock(
   memorySubjectLineUserId: string,
   displayName?: string | null
 ): Promise<string> {
+  const blocks: string[] = [];
+
+  if (isCustomerMasterEnabled()) {
+    try {
+      const customerId = await resolveLineCustomerByAgentAndUserId(
+        db,
+        "near",
+        memorySubjectLineUserId,
+        displayName
+      );
+      if (customerId) {
+        const vegapunk = await buildCustomerContextPromptForAgent(db, customerId, "near");
+        if (vegapunk.trim()) blocks.push(vegapunk.trim());
+      }
+    } catch (e) {
+      getLogger().warn({ err: e }, "buildCustomerContextPromptForAgent failed; fallback to near_user_memory");
+    }
+  }
+
   const ctx = await loadUserMemoryPromptContext(db, memorySubjectLineUserId, displayName);
-  return buildUserMemoryPromptBlock(ctx);
+  const legacy = buildUserMemoryPromptBlock(ctx);
+  if (legacy.trim()) blocks.push(legacy.trim());
+
+  return blocks.join("\n\n");
 }
 
 export function shouldConsolidateUserMemory(input: {
@@ -134,4 +163,47 @@ export async function maybeConsolidateUserMemoryAfterReply(input: {
     },
     "user memory consolidated"
   );
+
+  if (isCustomerMasterEnabled()) {
+    try {
+      const customerId = await resolveLineCustomerByAgentAndUserId(
+        input.db,
+        "near",
+        input.memorySubjectLineUserId,
+        input.displayName
+      );
+      if (customerId) {
+        if (merged.callPreference?.trim()) {
+          await upsertCustomerProfile(input.db, {
+            customerId,
+            profileType: "nickname",
+            profileKey: "preferred_name",
+            profileValue: merged.callPreference.trim(),
+            confidence: 0.85,
+            sourceAgentKey: "near",
+            confirmed: true,
+          });
+        }
+        if (merged.memorySummary.trim()) {
+          await upsertCustomerProfile(input.db, {
+            customerId,
+            profileType: "memo",
+            profileKey: "memory_summary",
+            profileValue: merged.memorySummary.trim().slice(0, 2000),
+            confidence: 0.7,
+            sourceAgentKey: "near",
+            confirmed: false,
+          });
+        }
+        void persistExtractedMemory(input.db, {
+          customerId,
+          agentKey: "near",
+          userText: input.userText,
+          assistantText: input.nearReply,
+        }).catch(() => undefined);
+      }
+    } catch (e) {
+      getLogger().warn({ err: e }, "customer master dual-write after consolidate failed");
+    }
+  }
 }

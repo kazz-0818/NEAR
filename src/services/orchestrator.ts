@@ -28,6 +28,7 @@ import {
   resolveDisplayName,
   resolveDisplayNameCacheOnly,
 } from "../lib/lineUserProfile.js";
+import { recordLineExchangeToRits } from "../lib/ritsIngest.js";
 import { lineCallerSalutation, prefixLineReplyWithCaller } from "../lib/lineCallerAddress.js";
 import type { LineRespondReason } from "../channels/line/respondReason.js";
 import { shouldAddressCallerByLineName } from "../channels/line/respondReason.js";
@@ -170,6 +171,16 @@ async function replyLineAndRememberOutbound(
       recentAssistantMessages: userMemoryOpts.recentAssistantMessages,
     }).catch((e) => log.warn({ err: e }, "maybeConsolidateUserMemoryAfterReply failed"));
   }
+
+  const userTextForRits = capsuleSnap?.userText ?? userMemoryOpts?.userText;
+  if (userTextForRits?.trim()) {
+    recordLineExchangeToRits({
+      userText: userTextForRits,
+      agentReply: finalText,
+      routeTaken: capsuleSnap?.routeTaken,
+      groupId: ctx.groupId,
+    });
+  }
 }
 
 async function runNearAgentTurnWithTimeout(
@@ -267,7 +278,14 @@ export async function handleLineTextMessage(input: {
   const channel = "line";
   const env = getEnv();
   // groupId をコンテキストに含め、返答保存時にも紐付ける
-  const outboundCtx = { channel, channelUserId, groupId, inboundMessageId };
+  const outboundCtx = {
+    channel,
+    channelUserId,
+    groupId,
+    inboundMessageId,
+    userText: text,
+    routeTaken: "pending",
+  };
   const capSnap: ImprovementRoutingSnapshot = {
     userText: text,
     parsed: null,

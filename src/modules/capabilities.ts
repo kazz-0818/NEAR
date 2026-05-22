@@ -1,28 +1,15 @@
 import type { Db } from "../db/client.js";
+import {
+  buildNearCapabilitiesHelpReply,
+  NEAR_CAPABILITY_BULLETS,
+} from "../lib/capabilitiesHelp.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
 
-/** DB 未投入時のフォールバック（near_capability_registry と同内容を維持） */
-const STATIC_CAPABILITY_LINES = [
-  "タスクの記録（やることリストに追加）",
-  "メモの保存",
-  "リマインドの受付（お時間の指定がはっきりしていると助かります）",
-  "短い文章の要約・整理",
-  "簡単な質問・雑談・学習・仕事の相談など、チャットで幅広くお答えします（スプレッドシート専用ではありません）",
-  "Googleスプレッドシートの参照と分析（サービスアカウント共有、または「Google連携」で自分の Google 権限）",
-  "Googleカレンダー（primary）の予定一覧・追加（「Google連携」でカレンダー権限を許可したうえで）",
-  "NEARができることのご案内（今お送りしている内容です）",
-];
+/** DB 未投入時のフォールバック（専門用語を避けた短文） */
+const STATIC_CAPABILITY_LINES = [...NEAR_CAPABILITY_BULLETS];
 
-export async function helpCapabilities(ctx: ModuleContext): Promise<ModuleResult> {
-  const lines = await listCapabilityLines(ctx.db);
-  const body = [
-    "はい、NEARで現在お手伝いできることは、ざっくり次のとおりです。",
-    "",
-    ...lines.map((l) => `・${l}`),
-    "",
-    "上記以外のお願いも、内容に応じてできる範囲で臨機応変にお受けします。まだ対応できない場合は記録し、できるよう改善してまいります。",
-  ].join("\n");
-  return { success: true, draft: body, situation: "success" };
+export async function helpCapabilities(_ctx: ModuleContext): Promise<ModuleResult> {
+  return { success: true, draft: buildNearCapabilitiesHelpReply(), situation: "success" };
 }
 
 /** near_capability_registry を参照。0件のときは静的フォールバック。 */

@@ -710,7 +710,7 @@ export async function handleLineTextMessage(input: {
   // 「何ができる」「使い方」系が unknown に落ちたら help_capabilities へ救済する
   if (
     parsed.intent === "unknown_custom_request" &&
-    /何ができ|できること|使い方|ヘルプ|help|何ができますか|何を手伝|何が使え|機能一覧|機能は何/iu.test(text.normalize("NFKC"))
+    /何ができ|なにができ|できること|使い方|ヘルプ|help|何ができます|何を手伝|何をしてくれ|何が使え|何が頼め|機能一覧|機能は何|できる[?？]|できますか|お願いできる|仕事は何|役割は/iu.test(text.normalize("NFKC"))
   ) {
     parsed = {
       ...parsed,

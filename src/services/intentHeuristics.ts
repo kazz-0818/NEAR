@@ -1,3 +1,4 @@
+import { CAPABILITIES_HELP_RE } from "../lib/capabilitiesHelp.js";
 import { extractSpreadsheetIdFromText } from "../lib/googleSheetsAuth.js";
 import type { ParsedIntent } from "../models/intent.js";
 import { indirectSheetReadOrReviewRequest, roughSheetsBusinessRequest } from "./sheetsIntentPatterns.js";
@@ -75,6 +76,7 @@ function matchesGreetingCore(core: string): boolean {
 }
 
 function matchesHelpCore(core: string): boolean {
+  if (CAPABILITIES_HELP_RE.test(core)) return true;
   const helps = [
     "何ができる",
     "できること",
@@ -83,10 +85,12 @@ function matchesHelpCore(core: string): boolean {
     "使い方",
     "なにができる",
     "機能",
+    "何ができますか",
+    "何を手伝",
   ];
   if (helps.includes(core)) return true;
   for (const h of helps) {
-    if (core.startsWith(h) && core.length <= h.length + 12) return true;
+    if (core.startsWith(h) && core.length <= h.length + 16) return true;
   }
   return false;
 }

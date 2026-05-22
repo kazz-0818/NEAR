@@ -26,30 +26,38 @@ jobs:
       run:
         working-directory: NEAR
     steps:
-      # verify-veriora-sync は System/ 配下の兄弟リポレイアウトを前提（NEAR の親 = workspace 直下）
+      # 横断 verify 用: workspace 直下に NEAR + 兄弟（同一 org の private リポは VERIORA_ORG_CHECKOUT_TOKEN 推奨）
       - uses: actions/checkout@v4
         with:
           path: NEAR
 
       - uses: actions/checkout@v4
+        continue-on-error: true
         with:
           repository: kazz-0818/SERA
           path: SERA
+          token: ${{ secrets.VERIORA_ORG_CHECKOUT_TOKEN || github.token }}
 
       - uses: actions/checkout@v4
+        continue-on-error: true
         with:
           repository: kazz-0818/LIRA
           path: LIRA
+          token: ${{ secrets.VERIORA_ORG_CHECKOUT_TOKEN || github.token }}
 
       - uses: actions/checkout@v4
+        continue-on-error: true
         with:
           repository: kazz-0818/RITS
           path: RITS
+          token: ${{ secrets.VERIORA_ORG_CHECKOUT_TOKEN || github.token }}
 
       - uses: actions/checkout@v4
+        continue-on-error: true
         with:
           repository: kazz-0818/LRAM
           path: LRAM
+          token: ${{ secrets.VERIORA_ORG_CHECKOUT_TOKEN || github.token }}
 
       - uses: actions/setup-node@v4
         with:

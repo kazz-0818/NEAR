@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /**
- * 5 リポ間の Veriora 正典ファイル同期を検証（registry + core migration SQL + 共有 docs）。
- * 使い方: node scripts/verify-veriora-sync.mjs
- * 終了コード 0 = 合格、1 = 不一致あり
+ * Veriora 正典の同期検証（registry + core migration + 共有 docs）。
+ *
+ * 使い方:
+ *   node scripts/verify-veriora-sync.mjs           # 兄弟リポが揃っていれば 5 リポ横断
+ *   node scripts/verify-veriora-sync.mjs --near-only  # NEAR のみ（CI で兄弟 checkout 不可時）
+ *
+ * レイアウト: 親ディレクトリに NEAR, SERA, LIRA, RITS, LRAM が並ぶ（System/ 想定）。
  */
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
@@ -12,6 +16,9 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NEAR_ROOT = join(__dirname, "..");
 const SYSTEM_ROOT = join(NEAR_ROOT, "..");
+
+const args = process.argv.slice(2);
+const forceNearOnly = args.includes("--near-only");
 
 const REGISTRY_TS = {
   NEAR: "NEAR/src/agents/registry.ts",
@@ -37,11 +44,15 @@ const SHARED_DOCS = [
 
 const DOC_REPOS = ["NEAR", "SERA", "LIRA", "RITS", "LRAM"];
 
-function sha256(path) {
-  const full = join(SYSTEM_ROOT, path);
-  if (!existsSync(full)) return { path, missing: true };
+function sha256(rel) {
+  const full = join(SYSTEM_ROOT, rel);
+  if (!existsSync(full)) return { path: rel, missing: true };
   const buf = readFileSync(full);
-  return { path, hash: createHash("sha256").update(buf).digest("hex"), bytes: buf.length };
+  return {
+    path: rel,
+    hash: createHash("sha256").update(buf).digest("hex"),
+    bytes: buf.length,
+  };
 }
 
 function hashOf(rel) {
@@ -59,32 +70,55 @@ function logEntry(label, name, rel) {
   return r.hash;
 }
 
+function hasSiblingRepo(name) {
+  const base = join(SYSTEM_ROOT, name);
+  if (name === "LIRA") return existsSync(join(base, "app/agents/registry.py"));
+  return existsSync(join(base, "src"));
+}
+
+function allSiblingsPresent() {
+  return ["SERA", "LIRA", "RITS", "LRAM"].every(hasSiblingRepo);
+}
+
+const nearOnly = forceNearOnly || !allSiblingsPresent();
+if (nearOnly && !forceNearOnly) {
+  console.warn(
+    "[verify] 兄弟リポ未検出 → NEAR のみ検証（横断同期はローカル System/ または CI で VERIORA_ORG_CHECKOUT_TOKEN 付き checkout を使用）",
+  );
+}
+
 let failed = false;
 
-// --- Registry TS: NEAR≈LRAM, SERA≈RITS ---
-const nearHash = logEntry("registry", "NEAR", REGISTRY_TS.NEAR);
-const lramHash = logEntry("registry", "LRAM", REGISTRY_TS.LRAM);
-const seraHash = logEntry("registry", "SERA", REGISTRY_TS.SERA);
-const ritsHash = logEntry("registry", "RITS", REGISTRY_TS.RITS);
-const pyHash = logEntry("registry", "LIRA", REGISTRY_PYTHON);
+// --- Registry ---
+if (nearOnly) {
+  const nearHash = logEntry("registry", "NEAR", REGISTRY_TS.NEAR);
+  if (!nearHash) failed = true;
+  else console.log("[registry] OK — NEAR only mode");
+} else {
+  const nearHash = logEntry("registry", "NEAR", REGISTRY_TS.NEAR);
+  const lramHash = logEntry("registry", "LRAM", REGISTRY_TS.LRAM);
+  const seraHash = logEntry("registry", "SERA", REGISTRY_TS.SERA);
+  const ritsHash = logEntry("registry", "RITS", REGISTRY_TS.RITS);
+  const pyHash = logEntry("registry", "LIRA", REGISTRY_PYTHON);
 
-if (!nearHash || !lramHash || !seraHash || !ritsHash) failed = true;
-else {
-  if (nearHash !== lramHash) {
-    console.error("[registry] FAIL: NEAR と LRAM の registry.ts が不一致");
-    failed = true;
+  if (!nearHash || !lramHash || !seraHash || !ritsHash) failed = true;
+  else {
+    if (nearHash !== lramHash) {
+      console.error("[registry] FAIL: NEAR と LRAM の registry.ts が不一致");
+      failed = true;
+    }
+    if (seraHash !== ritsHash) {
+      console.error("[registry] FAIL: SERA と RITS の registry.ts が不一致");
+      failed = true;
+    }
+    if (nearHash !== seraHash) {
+      console.log("[registry] OK — TS 2 系統（NEAR≈LRAM, SERA≈RITS）");
+    }
   }
-  if (seraHash !== ritsHash) {
-    console.error("[registry] FAIL: SERA と RITS の registry.ts が不一致");
-    failed = true;
-  }
-  if (nearHash === seraHash) {
-    console.log("[registry] OK — NEAR/LRAM と SERA/RITS は別系統（想定内）");
-  } else {
-    console.log("[registry] OK — TS 2 系統（NEAR≈LRAM, SERA≈RITS）");
+  if (logEntry("registry", "LIRA", REGISTRY_PYTHON)) {
+    console.log("[registry] LIRA Python は別ファイル（バイト一致は要求しない）");
   }
 }
-if (pyHash) console.log("[registry] LIRA Python は別ファイル（バイト一致は要求しない）");
 
 // --- Migration ---
 const canon = sha256(MIGRATION_CANONICAL);
@@ -93,36 +127,42 @@ if (canon.missing) {
   failed = true;
 } else {
   console.log(`[migration] canonical ${canon.hash.slice(0, 12)}… ${MIGRATION_CANONICAL}`);
-  const peers = [
-    ["SERA", "SERA/src/db/migrations/016_veriora_core_schema.sql"],
-    ["LIRA", "LIRA/docs/supabase/migrations/002_veriora_core_schema.sql"],
-    ["RITS", "RITS/rits_schema_migrations/006_veriora_core_schema.sql"],
-    ["LRAM", "LRAM/src/modules/supabase/migrations/002_veriora_core_schema.sql"],
-  ];
-  for (const [name, rel] of peers) {
-    const p = sha256(rel);
-    if (p.missing) {
-      console.error(`[migration] MISSING ${name}: ${rel}`);
-      failed = true;
-      continue;
-    }
-    if (p.hash !== canon.hash) {
-      console.error(`[migration] FAIL ${name}: ${rel}`);
-      failed = true;
-    } else {
-      console.log(`[migration] OK ${name}`);
+  if (!nearOnly) {
+    const peers = [
+      ["SERA", "SERA/src/db/migrations/016_veriora_core_schema.sql"],
+      ["LIRA", "LIRA/docs/supabase/migrations/002_veriora_core_schema.sql"],
+      ["RITS", "RITS/rits_schema_migrations/006_veriora_core_schema.sql"],
+      ["LRAM", "LRAM/src/modules/supabase/migrations/002_veriora_core_schema.sql"],
+    ];
+    for (const [name, rel] of peers) {
+      const p = sha256(rel);
+      if (p.missing) {
+        console.error(`[migration] MISSING ${name}: ${rel}`);
+        failed = true;
+        continue;
+      }
+      if (p.hash !== canon.hash) {
+        console.error(`[migration] FAIL ${name}: ${rel}`);
+        failed = true;
+      } else {
+        console.log(`[migration] OK ${name}`);
+      }
     }
   }
 }
 
-// --- Shared docs (NEAR 基準) ---
-console.log("[docs] comparing shared docs vs NEAR/docs/");
+// --- Shared docs ---
+console.log("[docs] NEAR canonical docs");
 for (const f of SHARED_DOCS) {
   const canonDoc = `NEAR/docs/${f}`;
   const canonDocHash = hashOf(canonDoc);
   if (!canonDocHash) {
-    console.error(`[docs] MISSING canonical ${canonDoc}`);
+    console.error(`[docs] MISSING ${canonDoc}`);
     failed = true;
+    continue;
+  }
+  if (nearOnly) {
+    console.log(`[docs] OK ${f}`);
     continue;
   }
   for (const repo of DOC_REPOS) {
@@ -138,18 +178,11 @@ for (const f of SHARED_DOCS) {
     }
   }
 }
-if (!failed) console.log("[docs] OK — all shared docs match NEAR");
+if (!failed && !nearOnly) console.log("[docs] OK — all shared docs match NEAR");
 
 if (failed) {
-  const nearRoot = join(SYSTEM_ROOT, "NEAR");
-  const hasSera = existsSync(join(SYSTEM_ROOT, "SERA"));
-  if (!hasSera && existsSync(nearRoot)) {
-    console.error(
-      "\nヒント: CI では NEAR と同階層に SERA/LIRA/RITS/LRAM を checkout してください（.github/workflows/ci.yml 参照）。",
-    );
-  }
   console.error("\nverify-veriora-sync: FAILED");
   process.exit(1);
 }
-console.log("\nverify-veriora-sync: OK");
+console.log(`\nverify-veriora-sync: OK${nearOnly ? " (near-only)" : ""}`);
 process.exit(0);

@@ -12,7 +12,8 @@
     "db:test": "node scripts/supabase-database-url.mjs --test",
     "llm:ping": "node scripts/llm-ping.mjs",
     "test": "tsx --test 'src/**/*.test.ts' 'src/**/**/*.test.ts'",
-    "verify:veriora-sync": "node scripts/verify-veriora-sync.mjs"
+    "verify:veriora-sync": "node scripts/verify-veriora-sync.mjs",
+    "verify:vegapunk-phase2": "tsx scripts/vegapunk-phase2-verify.ts"
   },
   "engines": {
     "node": ">=20"

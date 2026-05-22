@@ -49,16 +49,16 @@ JOIN veriora.customer_identities ci
 WHERE c.line_user_id IS NOT NULL
 ON CONFLICT (customer_id, conversation_id) DO NOTHING;
 
-UPDATE veriora.conversations c
+UPDATE veriora.conversations conv
 SET customer_id = ci.customer_id
-FROM veriora.ai_agents a
-JOIN veriora.customer_identities ci
-  ON ci.provider = 'line'
- AND ci.channel_key = a.agent_key || '_line'
- AND ci.external_user_id = c.line_user_id
-WHERE c.agent_id = a.id
-  AND c.customer_id IS NULL
-  AND c.line_user_id IS NOT NULL;
+FROM veriora.ai_agents a,
+     veriora.customer_identities ci
+WHERE conv.agent_id = a.id
+  AND ci.provider = 'line'
+  AND ci.channel_key = a.agent_key || '_line'
+  AND ci.external_user_id = conv.line_user_id
+  AND conv.customer_id IS NULL
+  AND conv.line_user_id IS NOT NULL;
 
 INSERT INTO veriora.customer_merge_candidates (customer_id_a, customer_id_b, reason, score, status, metadata)
 SELECT

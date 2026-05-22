@@ -365,6 +365,10 @@ html.tab-animations-paused * {
   container-type: size;
 }
 
+.member-orbit-center-logo {
+  filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.25));
+}
+
 /* メンバー — 虹色リングの線の中央を周回（--orbit-r は JS でリング幅から算出） */
 @keyframes member-orbit-spin {
   from {

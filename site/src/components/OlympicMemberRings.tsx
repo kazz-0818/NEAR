@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { ShowcaseAgent } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
-import { scrollToAgentSection } from "../lib/agents";
+import { scrollToAgentSection, velioraLogoUrl } from "../lib/agents";
 import { RING_ORDER } from "../lib/colors";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
@@ -118,6 +118,15 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
         <div
           className="pointer-events-none absolute inset-0 rounded-full opacity-20"
           style={{ boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)" }}
+        />
+        <img
+          src={velioraLogoUrl()}
+          alt=""
+          className="member-orbit-center-logo pointer-events-none absolute top-1/2 left-1/2 z-[1] h-[42%] w-[42%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.38]"
+          width={160}
+          height={160}
+          decoding="async"
+          aria-hidden
         />
         {ordered.map((agent, i) => (
           <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />

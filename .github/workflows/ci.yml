@@ -41,4 +41,3 @@ jobs:
 
       - name: Veriora cross-repo sync
         run: npm run verify:veriora-sync
-        continue-on-error: true

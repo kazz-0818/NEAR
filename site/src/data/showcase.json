@@ -135,7 +135,7 @@
       "capabilities": [
         { "id": "draft", "label": "記事構成・見出し・本文のドラフト作成", "status": "live", "since": "2026-04" },
         { "id": "tone", "label": "BRAVO / ファッション文脈のトーン調整", "status": "live", "since": "2026-04" },
-        { "id": "wp-meta", "label": "WordPress 下書き用メタデータ", "status": "live", "since": "2026-04" },
+        { "id": "wp-meta", "label": "各ファッションサイトの最新情報調査", "status": "live", "since": "2026-04" },
         { "id": "image-prompt", "label": "画像生成プロンプト案", "status": "live", "since": "2026-05" },
         { "id": "near-handoff", "label": "NEAR からの内部ハンドオフ受信", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "publish", "label": "WordPress 本番公開・予約投稿", "status": "planned" }

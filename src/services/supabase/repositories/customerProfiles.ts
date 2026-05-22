@@ -65,3 +65,48 @@ export async function listCustomerProfiles(
   const r = await db.query<CustomerProfileRow>(sql, params);
   return r.rows;
 }
+
+export async function getCustomerProfileById(
+  db: VerioraDb,
+  profileId: string
+): Promise<CustomerProfileRow | null> {
+  const r = await db.query<CustomerProfileRow>(
+    `SELECT id, customer_id, profile_type, profile_key, profile_value, confidence,
+            source_agent_key, confirmed, is_sensitive, requires_confirmation
+     FROM ${VERIORA_TABLES.customerProfiles} WHERE id = $1`,
+    [profileId]
+  );
+  return r.rows[0] ?? null;
+}
+
+export async function patchCustomerProfile(
+  db: VerioraDb,
+  profileId: string,
+  patch: {
+    profileValue?: string;
+    confirmed?: boolean;
+    isSensitive?: boolean;
+  }
+): Promise<boolean> {
+  const sets: string[] = [];
+  const params: unknown[] = [profileId];
+  if (patch.profileValue !== undefined) {
+    params.push(patch.profileValue);
+    sets.push(`profile_value = $${params.length}`);
+  }
+  if (patch.confirmed !== undefined) {
+    params.push(patch.confirmed);
+    sets.push(`confirmed = $${params.length}`);
+  }
+  if (patch.isSensitive !== undefined) {
+    params.push(patch.isSensitive);
+    sets.push(`is_sensitive = $${params.length}`);
+  }
+  if (!sets.length) return false;
+  sets.push("updated_at = now()");
+  const r = await db.query(
+    `UPDATE ${VERIORA_TABLES.customerProfiles} SET ${sets.join(", ")} WHERE id = $1`,
+    params
+  );
+  return (r.rowCount ?? 0) > 0;
+}

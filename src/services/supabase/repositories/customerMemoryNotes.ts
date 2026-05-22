@@ -50,3 +50,53 @@ export async function listCustomerMemoryNotes(
   const r = await db.query<CustomerMemoryNoteRow>(sql, params);
   return r.rows;
 }
+
+export async function getCustomerMemoryNoteById(
+  db: VerioraDb,
+  noteId: string
+): Promise<(CustomerMemoryNoteRow & { created_at: string }) | null> {
+  const r = await db.query<CustomerMemoryNoteRow & { created_at: string }>(
+    `SELECT id, customer_id, note, category, source_agent_key, importance, confidence, confirmed, created_at
+     FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE id = $1`,
+    [noteId]
+  );
+  return r.rows[0] ?? null;
+}
+
+export async function patchCustomerMemoryNote(
+  db: VerioraDb,
+  noteId: string,
+  patch: { note?: string; category?: string | null; confirmed?: boolean; importance?: string }
+): Promise<boolean> {
+  const sets: string[] = [];
+  const params: unknown[] = [noteId];
+  if (patch.note !== undefined) {
+    params.push(patch.note);
+    sets.push(`note = $${params.length}`);
+  }
+  if (patch.category !== undefined) {
+    params.push(patch.category);
+    sets.push(`category = $${params.length}`);
+  }
+  if (patch.confirmed !== undefined) {
+    params.push(patch.confirmed);
+    sets.push(`confirmed = $${params.length}`);
+  }
+  if (patch.importance !== undefined) {
+    params.push(patch.importance);
+    sets.push(`importance = $${params.length}`);
+  }
+  if (!sets.length) return false;
+  sets.push("updated_at = now()");
+  const r = await db.query(
+    `UPDATE ${VERIORA_TABLES.customerMemoryNotes} SET ${sets.join(", ")} WHERE id = $1`,
+    params
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+/** 管理 API 用・単一行のみ */
+export async function deleteCustomerMemoryNote(db: VerioraDb, noteId: string): Promise<boolean> {
+  const r = await db.query(`DELETE FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE id = $1`, [noteId]);
+  return (r.rowCount ?? 0) > 0;
+}

@@ -16,14 +16,8 @@ import {
 import { runImprovementCapsuleAnalysisJob } from "../services/improvement_capsule_service.js";
 import { getUserMemory } from "../db/user_memory_repo.js";
 import { getLineUserProfile } from "../db/line_user_profiles_repo.js";
-import { findCustomerByIdentity } from "../services/supabase/repositories/customerIdentities.js";
-import { getCustomerById } from "../services/supabase/repositories/customers.js";
-import { listIdentitiesForCustomer } from "../services/supabase/repositories/customerIdentities.js";
-import { listCustomerProfiles } from "../services/supabase/repositories/customerProfiles.js";
-import { listCustomerMemoryNotes } from "../services/supabase/repositories/customerMemoryNotes.js";
-import { listMergeCandidates } from "../services/supabase/repositories/customerMergeCandidates.js";
-import { mergeCustomersManual } from "../services/customers/mergeCandidates.js";
-import { listConversationIdsForCustomer } from "../services/supabase/repositories/customerConversationLinks.js";
+import { registerCustomerAdminRoutes } from "./customerRoutes.js";
+import { getVegapunkAdminHtml } from "./vegapunkUiHtml.js";
 
 const patchSuggestionBody = z
   .object({
@@ -38,6 +32,11 @@ const patchSuggestionBody = z
 export function createAdminApp(): Hono {
   const app = new Hono();
   const env = getEnv();
+
+  const ui = new Hono();
+  ui.get("/", (c) => c.html(getVegapunkAdminHtml()));
+  ui.get("/*", (c) => c.html(getVegapunkAdminHtml()));
+  app.route("/ui", ui);
 
   app.use("/*", async (c, next) => {
     const bearer = bearerAuth({ token: env.ADMIN_API_KEY });
@@ -486,59 +485,7 @@ export function createAdminApp(): Hono {
     return c.json({ ok: true, ...r });
   });
 
-  app.get("/customers/by-identity", async (c) => {
-    const provider = c.req.query("provider")?.trim() || "line";
-    const channelKey = c.req.query("channel_key")?.trim();
-    const externalUserId = c.req.query("external_user_id")?.trim();
-    if (!channelKey || !externalUserId) {
-      return c.json({ error: "channel_key and external_user_id required" }, 400);
-    }
-    const pool = getPool();
-    const hit = await findCustomerByIdentity(pool, provider, channelKey, externalUserId);
-    if (!hit) return c.json({ found: false }, 404);
-    const customer = await getCustomerById(pool, hit.customerId);
-    return c.json({ found: true, customer, identity: hit.identity });
-  });
-
-  app.get("/customers/:id", async (c) => {
-    const customerId = c.req.param("id");
-    const pool = getPool();
-    const customer = await getCustomerById(pool, customerId);
-    if (!customer) return c.json({ error: "not found" }, 404);
-    const [identities, profiles, notes, conversationIds] = await Promise.all([
-      listIdentitiesForCustomer(pool, customerId),
-      listCustomerProfiles(pool, customerId),
-      listCustomerMemoryNotes(pool, customerId),
-      listConversationIdsForCustomer(pool, customerId),
-    ]);
-    return c.json({ customer, identities, profiles, notes, conversationIds });
-  });
-
-  app.get("/customer-merge-candidates", async (c) => {
-    const status = c.req.query("status")?.trim() || "pending";
-    const pool = getPool();
-    const items = await listMergeCandidates(pool, status);
-    return c.json({ items });
-  });
-
-  const mergeBody = z.object({
-    survivor_customer_id: z.string().uuid(),
-    merged_customer_id: z.string().uuid(),
-    candidate_id: z.string().uuid().optional(),
-  });
-
-  app.post("/customer-merge", async (c) => {
-    const body = mergeBody.safeParse(await c.req.json());
-    if (!body.success) return c.json({ error: body.error.flatten() }, 400);
-    const pool = getPool();
-    await mergeCustomersManual(pool, {
-      survivorCustomerId: body.data.survivor_customer_id,
-      mergedCustomerId: body.data.merged_customer_id,
-      candidateId: body.data.candidate_id,
-      linkedBy: "admin_api",
-    });
-    return c.json({ ok: true });
-  });
+  registerCustomerAdminRoutes(app);
 
   return app;
 }

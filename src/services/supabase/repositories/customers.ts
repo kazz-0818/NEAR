@@ -63,6 +63,40 @@ export async function updateCustomerDisplayFields(
   );
 }
 
+export type CustomerListRow = {
+  id: string;
+  display_name: string | null;
+  preferred_name: string | null;
+  nickname: string | null;
+  status: string;
+  identity_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listCustomers(
+  db: VerioraDb,
+  opts?: { status?: string; q?: string; limit?: number; offset?: number }
+): Promise<CustomerListRow[]> {
+  const limit = Math.min(opts?.limit ?? 50, 200);
+  const offset = opts?.offset ?? 0;
+  const status = opts?.status ?? "active";
+  const params: unknown[] = [status];
+  let sql = `SELECT c.id, c.display_name, c.preferred_name, c.nickname, c.status, c.created_at, c.updated_at,
+             (SELECT COUNT(*)::int FROM ${VERIORA_TABLES.customerIdentities} ci WHERE ci.customer_id = c.id) AS identity_count
+             FROM ${VERIORA_TABLES.customers} c
+             WHERE c.status = $1`;
+  if (opts?.q?.trim()) {
+    params.push(`%${opts.q.trim()}%`);
+    const n = params.length;
+    sql += ` AND (c.display_name ILIKE $${n} OR c.preferred_name ILIKE $${n} OR c.nickname ILIKE $${n} OR c.email ILIKE $${n})`;
+  }
+  params.push(limit, offset);
+  sql += ` ORDER BY c.updated_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
+  const r = await db.query<CustomerListRow>(sql, params);
+  return r.rows;
+}
+
 export async function softDeleteCustomer(db: VerioraDb, customerId: string): Promise<void> {
   await db.query(
     `UPDATE ${VERIORA_TABLES.customers} SET status = 'deleted', updated_at = now() WHERE id = $1`,

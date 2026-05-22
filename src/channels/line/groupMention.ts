@@ -54,6 +54,22 @@ export function stripBotNamePrefix(text: string): string {
   return t;
 }
 
+/** LINE 表示名 API 用（group / room を正しいエンドポイントに振り分け） */
+export type LineMemberProfileContext = { groupId?: string; roomId?: string };
+
+export function getLineMemberProfileContext(
+  source: Record<string, unknown> | undefined
+): LineMemberProfileContext {
+  if (!source) return {};
+  if (source.type === "group" && typeof source.groupId === "string" && source.groupId.trim()) {
+    return { groupId: source.groupId.trim() };
+  }
+  if (source.type === "room" && typeof source.roomId === "string" && source.roomId.trim()) {
+    return { roomId: source.roomId.trim() };
+  }
+  return {};
+}
+
 /** グループなら groupId、トークルームなら roomId（それ以外は undefined） */
 export function getLineGroupOrRoomId(source: Record<string, unknown> | undefined): string | undefined {
   if (!source) return undefined;

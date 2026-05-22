@@ -15,6 +15,7 @@ import { startImprovementCapsuleCron } from "./jobs/improvement_capsule_cron.js"
 import { runImprovementCapsuleAnalysisJob } from "./services/improvement_capsule_service.js";
 import {
   getLineGroupOrRoomId,
+  getLineMemberProfileContext,
   isConfiguredGrowthApprovalGroup,
   isLineGroupOrRoomSource,
   textContainsNearNameReferral,
@@ -240,7 +241,7 @@ async function lineMessagingWebhook(c: Context) {
     if (!text) continue;
 
     const groupId = getLineGroupOrRoomId(source);
-    fireAndForgetRefreshProfile(db, userId, groupId);
+    fireAndForgetRefreshProfile(db, userId, getLineMemberProfileContext(source));
 
     const lineRespondReason = resolveLineRespondReason({
       source,

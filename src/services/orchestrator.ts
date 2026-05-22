@@ -23,7 +23,11 @@ import {
   loadRecentAssistantMessages,
   loadRecentUserMessages,
 } from "./conversation_context.js";
-import { resolveDisplayName, resolveDisplayNameCacheOnly } from "../lib/lineUserProfile.js";
+import {
+  lineMemberProfileContextFromLegacy,
+  resolveDisplayName,
+  resolveDisplayNameCacheOnly,
+} from "../lib/lineUserProfile.js";
 import { lineCallerSalutation, prefixLineReplyWithCaller } from "../lib/lineCallerAddress.js";
 import type { LineRespondReason } from "../channels/line/respondReason.js";
 import { shouldAddressCallerByLineName } from "../channels/line/respondReason.js";
@@ -247,7 +251,11 @@ export async function handleLineTextMessage(input: {
   if (actorUserId) {
     if (groupId || addressByLineName) {
       actorDisplayName =
-        (await resolveDisplayName(db, actorUserId, groupId).catch(() => null)) ?? undefined;
+        (await resolveDisplayName(
+          db,
+          actorUserId,
+          lineMemberProfileContextFromLegacy(groupId, lineSourceType)
+        ).catch(() => null)) ?? undefined;
     } else {
       actorDisplayName =
         (await resolveDisplayNameCacheOnly(db, actorUserId).catch(() => null)) ??

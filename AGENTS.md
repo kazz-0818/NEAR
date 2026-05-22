@@ -32,7 +32,7 @@
 - Canonical DB: `src/services/supabase/`（LINE ログ・[`supabase-simplification.md`](docs/supabase-simplification.md)）
 - ユーザー長期記憶: `src/services/user_memory_*.ts`（[`near-user-memory.md`](docs/near-user-memory.md)、既定 ON）
 
-**現状**: 実行経路からは参照しない前提で追加されています（統一基盤の置き場）。Phase 3 以降で `getEnv` やルーティングから段階的に接続します。
+**現状**: **NEAR** は handoff（`verioraHandoff.ts`）等で `getVerioraAgentByKey` を実行経路で使用。他 TS リポは `src/agents/{key}/config.ts` で参照。LIRA は Python registry。全面接続は Phase 5 以降で段階的に（[`docs/veriora-architecture.md`](docs/veriora-architecture.md)）。
 
 ## 禁止事項（エージェント・人間共通）
 

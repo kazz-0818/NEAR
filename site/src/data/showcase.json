@@ -1,8 +1,8 @@
 {
   "meta": {
-    "title": "Veliora",
+    "title": "Veriora",
     "tagline": "組織 OS — AI が部署として動く",
-    "subtitle": "秘書・マーケ・経理・品質・編集 — 五つの AI 部署が並び、それぞれの領域で進化し続ける組織 OS。"
+    "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。NEAR が総合窓口と LLM の裏方、RITS が横断監査と日次レポートを担う。"
   },
   "agents": [
     {
@@ -11,13 +11,13 @@
       "kana": "ニア",
       "department": "秘書部",
       "displayName": "NEAR-ニア-『秘書部』",
-      "role": "総合窓口・秘書・タスク整理・指示受付",
-      "description": "Veliora の一次窓口。ユーザーの依頼を受け、タスク整理・スケジュール・社内オペレーションの補助を行い、専門部署へ適切に取次ぐ。未対応領域はログ化し改善サイクルへ渡す。",
+      "role": "総合窓口・秘書・タスク整理（LLM / handoff の裏方）",
+      "description": "Veriora の一次窓口。依頼の受付・タスク整理・各専門部署への取次ぎと、強い LLM 経路での応答合成を担う。組織横断の監査レポートの主体ではない（監査は RITS）。",
       "accent": "#f472b6",
       "handoffRules": [
         "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
         "売上・経費・入金・スプレッドシート上の経理は LIRA に渡す",
-        "会話品質・役割逸脱の監査・改善指示は RITS に渡す",
+        "会話品質・組織整合性の監査・改善指示は RITS に渡す",
         "BRAVO 記事・WordPress 下書き・編集は LRAM に渡す"
       ],
       "capabilities": [
@@ -28,15 +28,18 @@
         { "id": "chat", "label": "幅広いチャット相談", "status": "live", "since": "2025-02" },
         { "id": "sheets", "label": "Googleスプレッドシートの参照と分析", "status": "live", "since": "2025-03" },
         { "id": "calendar", "label": "Googleカレンダーの予定一覧・追加", "status": "live", "since": "2025-04" },
-        { "id": "routing", "label": "各エージェントへの取次ぎと文脈引き継ぎ", "status": "live", "since": "2025-06" },
+        { "id": "routing", "label": "registry ベースの取次ぎ・文脈引き継ぎ", "status": "live", "since": "2025-06" },
+        { "id": "line-name", "label": "グループ／トークルームで LINE 表示名呼びかけ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "growth", "label": "未対応・成長シグナルの記録と進化フロー", "status": "evolved", "since": "2025-09", "highlight": true },
         { "id": "lram-handoff", "label": "LRAM 向け BRAVO / 記事キーワードの内部ハンドオフ", "status": "evolved", "since": "2026-05", "highlight": true },
-        { "id": "admin-line", "label": "統一 LINE 履歴の管理 API 連携", "status": "planned" }
+        { "id": "admin-line", "label": "統一 LINE 履歴の管理 API", "status": "evolved", "since": "2026-05" },
+        { "id": "verify-sync", "label": "5リポ正典同期の verify スクリプト（開発・CI）", "status": "evolved", "since": "2026-05" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "トークルーム表示名", "summary": "room member Profile API — グループと同様に名前呼びかけ可能" },
         { "date": "2026-05", "title": "LRAM 内部ハンドオフ", "summary": "BRAVO / WordPress 系キーワードで LRAM へ best-effort 取次ぎ（Phase 7）" },
         { "date": "2025-09", "title": "進化カプセル", "summary": "ユーザー要望から capability_registry へ能力を追加する成長フロー" },
-        { "date": "2025-06", "title": "組織ルーティング", "summary": "registry ベースの専門部署への取次ぎを本格化" }
+        { "date": "2025-06", "title": "組織ルーティング", "summary": "verioraHandoff と registry 接続" }
       ]
     },
     {
@@ -46,11 +49,11 @@
       "department": "マーケ部",
       "displayName": "SERA-セラ-『マーケ部』",
       "role": "SNS・広告・集客・マーケティング支援",
-      "description": "マーケティング観点で SNS・広告・Instagram 等の分析・提案を行う。数値や外部プラットフォームの事実は API または確認可能な範囲に限定し、断定を避ける。",
+      "description": "マーケティング観点で SNS・広告・Instagram 等の分析・提案を行う。グループ／ルームではメンション・名前呼びかけで応答し、LINE 表示名で呼びかける。",
       "accent": "#facc15",
       "handoffRules": [
         "金額・請求・入金の確定は LIRA",
-        "全社ポリシー・人事評価に関する監査文面は RITS",
+        "全社ポリシー・組織整合性の監査は RITS",
         "記事化・WP 下書きは LRAM",
         "一般秘書タスクは NEAR に戻す"
       ],
@@ -59,10 +62,13 @@
         { "id": "campaign", "label": "キャンペーン案・投稿案のたたき台作成", "status": "live", "since": "2025-05" },
         { "id": "channel", "label": "マーケ用語・チャネル別の整理と示唆出し", "status": "live", "since": "2025-06" },
         { "id": "verified", "label": "検証可能な範囲のプロフィール・投稿 URL 要約", "status": "live", "since": "2025-07" },
+        { "id": "line-group", "label": "グループ／ルームのゲート・表示名呼びかけ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "line-log", "label": "統一 LINE 履歴（管理 API）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
         { "id": "auto-post", "label": "広告出稿・実送信の自動化", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "room Profile API", "summary": "トークルームでも member 表示名を取得して返信に反映" },
         { "date": "2026-05", "title": "横断 LINE ログ", "summary": "veliora.line_messages VIEW 経由の管理 API（Phase 8）" },
         { "date": "2025-07", "title": "事実ベース分析", "summary": "未接続 API の指標捏造を禁止する分析ルールを強化" }
       ]
@@ -74,21 +80,25 @@
       "department": "経理部",
       "displayName": "LIRA-リラ-『経理部』",
       "role": "売上・経費・請求・入金・利益管理",
-      "description": "経理・数値の整理を担当。スプレッドシート等の正データに基づき、入金・支払・利益の説明と定型回答を行う。税務・法務の最終判断は行わない。",
+      "description": "経理・数値の整理を担当。LINE ではグループ方針（メンション・名前呼び・引用返信）の参照実装を持ち、room 向け Profile API にも対応。",
       "accent": "#c4b5fd",
       "handoffRules": [
         "マーケ施策の効果測定の物語化は SERA",
         "記事・プレス向けの文章化は LRAM",
-        "依頼の取りこぼし防止の窓口調整は NEAR"
+        "依頼の取りこぼし防止の窓口調整は NEAR",
+        "組織整合性の監査記録は RITS"
       ],
       "capabilities": [
         { "id": "sheet-summary", "label": "スプレッドシート上の数値の要約・照会", "status": "live", "since": "2025-03" },
         { "id": "payment", "label": "入金・支払スケジュールの案内と確認補助", "status": "live", "since": "2025-04" },
         { "id": "audit-meta", "label": "監査ログにメタデータを残す", "status": "live", "since": "2025-05" },
         { "id": "line-channel", "label": "LINE 経理チャネルでの定型応答", "status": "live", "since": "2025-06" },
+        { "id": "line-group-policy", "label": "グループ LINE 方針（組織参照 doc）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
         { "id": "approval", "label": "支払実行・請求書発行の確定", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "line-group-policy", "summary": "他部署が参照するグループ応答の正典候補ドキュメント" },
         { "date": "2025-06", "title": "LINE 経理窓口", "summary": "Python サービスとして独立デプロイ、registry 連携" },
         { "date": "2025-03", "title": "スプシ連携", "summary": "正データソースに基づく数値サマリー（推測捏造なし）" }
       ]
@@ -99,22 +109,27 @@
       "kana": "リツ",
       "department": "AI人事部",
       "displayName": "RITS-リツ-『AI人事部』",
-      "role": "会話品質・役割遵守・改善指示作成",
-      "description": "稼働中の AI エージェントの会話・ログを監査し、品質評価と改善提案（Cursor 向け指示文等）を生成する。人間の人事の代わりではなく、AI 運用の品質管理を担う。",
+      "role": "組織横断監査・会話品質・改善指示",
+      "description": "AI 人事部。各エージェントの会話監査に加え、5リポの docs / registry / migration の整合性監査を実施し、レポートは RITS に残す（正典 doc の置き場は NEAR）。日次レポートに組織整合性の抜粋を載せ、オーナー LINE に push 可能。",
       "accent": "#22c55e",
       "handoffRules": [
-        "実務の実行は各エージェントのオーナー承認のもと NEAR 等へ戻す",
-        "マーケ数値の真偽は SERA・LIRA のデータソースを参照"
+        "実務修正は各部署リポへ（起票理由は RITS 監査）",
+        "マーケ数値の真偽は SERA・LIRA のデータソースを参照",
+        "NEAR は LLM・取次ぎの裏方（監査レポートの出し元ではない）"
       ],
       "capabilities": [
-        { "id": "audit", "label": "エージェント間ログの評価・リスク分類", "status": "live", "since": "2025-05" },
-        { "id": "report", "label": "日次・週次レポート案の生成", "status": "live", "since": "2025-06" },
-        { "id": "improve", "label": "改善タスク・品質指摘のたたき台作成", "status": "live", "since": "2025-07" },
-        { "id": "daily-auto", "label": "監査の自動化・日次レポート配信", "status": "evolved", "since": "2026-03", "highlight": true },
+        { "id": "audit", "label": "エージェント会話ログの評価・リスク分類", "status": "live", "since": "2025-05" },
+        { "id": "report", "label": "日次レポート（NEAR/SERA/LIRA/LRAM サマリ）", "status": "live", "since": "2025-06" },
+        { "id": "improve", "label": "改善タスク・Cursor 向け指示のたたき台", "status": "live", "since": "2025-07" },
+        { "id": "daily-auto", "label": "日次レポート生成・オーナー LINE push（Cron）", "status": "evolved", "since": "2026-03", "highlight": true },
+        { "id": "org-audit", "label": "組織整合性監査レポート（veriora-consistency-audit）", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "llm-usage", "label": "全部署 LLM 使用量の集計・日次占有率", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "auto-apply", "label": "本番プロンプト・RLS の自動適用", "status": "planned" }
       ],
       "evolutionLog": [
-        { "date": "2026-03", "title": "監査パイプライン強化", "summary": "Phase 6 方向 — ログ取り込みとレポート案の定型化" },
+        { "date": "2026-05", "title": "組織整合性 × 日次", "summary": "監査 md を日次 bundle / priority_issues / LINE に自動連携" },
+        { "date": "2026-05", "title": "監査と正典の分離", "summary": "RITS=監査主体、NEAR=設計正典・LLM 裏方 — ドキュメント明文化" },
+        { "date": "2026-03", "title": "監査パイプライン強化", "summary": "agent_logs / agent_audits / daily_reports 台帳" },
         { "date": "2025-07", "title": "Cursor 向け改善ドラフト", "summary": "内部向け品質指摘文の自動たたき台" }
       ]
     },
@@ -125,23 +140,28 @@
       "department": "編集部",
       "displayName": "LRAM-ラム-『編集部』",
       "role": "BRAVO編集・ファッション記事作成・WordPress下書き投稿",
-      "description": "BRAVO およびファッション領域の編集を担当。記事構成案・本文ドラフト・画像プロンプト案・WordPress 下書きまでを支援する。公開は承認後に限定する。",
+      "description": "BRAVO およびファッション領域の編集を担当。グループではメンション・名前呼びで応答し、トークルームでも LINE 表示名を取得して返信に反映する。",
       "accent": "#f97316",
       "handoffRules": [
         "数値・売上ファクトの確認は LIRA",
         "集客・SNS連携の戦略決めは SERA と調整",
-        "ユーザー向けの取次ぎ・スケジュールは NEAR"
+        "ユーザー向けの取次ぎ・スケジュールは NEAR",
+        "組織整合性の指摘は RITS"
       ],
       "capabilities": [
         { "id": "draft", "label": "記事構成・見出し・本文のドラフト作成", "status": "live", "since": "2026-04" },
         { "id": "tone", "label": "BRAVO / ファッション文脈のトーン調整", "status": "live", "since": "2026-04" },
         { "id": "wp-meta", "label": "各ファッションサイトの最新情報調査", "status": "live", "since": "2026-04" },
         { "id": "image-prompt", "label": "画像生成プロンプト案", "status": "live", "since": "2026-05" },
+        { "id": "line-name", "label": "グループ／トークルームで表示名プレフィックス", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "near-handoff", "label": "NEAR からの内部ハンドオフ受信", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "llm-rits", "label": "LLM 使用量の RITS 集計連携", "status": "evolved", "since": "2026-05" },
         { "id": "publish", "label": "WordPress 本番公開・予約投稿", "status": "planned" }
       ],
       "evolutionLog": [
+        { "date": "2026-05", "title": "room Profile API", "summary": "トークルーム member 表示名で「〇〇さん、」プレフィックス" },
         { "date": "2026-05", "title": "NEAR 取次ぎ接続", "summary": "POST /internal/handoff/near — 監査ログ記録（Phase 7）" },
+        { "date": "2026-05", "title": "共有 docs 同期", "summary": "veriora-architecture 等を NEAR 正典と一致" },
         { "date": "2026-04", "title": "編集部サービス立ち上げ", "summary": "BRAVO 編集・WP 下書き支援の本実装開始" }
       ]
     }
@@ -149,22 +169,24 @@
   "handoffEdges": [
     { "from": "near", "to": "sera", "label": "マーケ・SNS" },
     { "from": "near", "to": "lira", "label": "経理・スプシ" },
-    { "from": "near", "to": "rits", "label": "品質監査" },
+    { "from": "near", "to": "rits", "label": "監査・品質" },
     { "from": "near", "to": "lram", "label": "BRAVO・記事" },
     { "from": "sera", "to": "lira", "label": "数値確認" },
     { "from": "sera", "to": "lram", "label": "記事化" },
     { "from": "lira", "to": "lram", "label": "ファクト確認" },
-    { "from": "rits", "to": "near", "label": "改善反映" }
+    { "from": "rits", "to": "near", "label": "横断監査・改善" },
+    { "from": "rits", "to": "sera", "label": "整合性評価" },
+    { "from": "rits", "to": "lram", "label": "整合性評価" }
   ],
   "phases": [
     { "id": 0, "title": "現状調査", "summary": "既存 LINE / DB / env の棚卸し", "status": "done" },
-    { "id": 1, "title": "ドキュメント整備", "summary": "Veliora アーキテクチャ・規約", "status": "done" },
+    { "id": 1, "title": "ドキュメント整備", "summary": "Veriora アーキテクチャ・規約", "status": "done" },
     { "id": 2, "title": "Agent Registry", "summary": "5部署の役割定義をコード化", "status": "done" },
-    { "id": 3, "title": "env 互換", "summary": "VERIORA_* / legacy alias 同期", "status": "done" },
-    { "id": 4, "title": "横断ログ", "summary": "会話ログ形式の統一", "status": "active" },
-    { "id": 5, "title": "ルーティング", "summary": "ハンドオフ・registry 接続", "status": "active" },
-    { "id": 6, "title": "RITS 監査", "summary": "自動化・日次レポート", "status": "upcoming" },
-    { "id": 7, "title": "LRAM 本実装", "summary": "WordPress・NEAR 取次ぎ", "status": "upcoming" },
-    { "id": 8, "title": "管理画面", "summary": "統一 LINE 履歴 API", "status": "upcoming" }
+    { "id": 3, "title": "env 互換", "summary": "VERIORA_* / legacy alias 全リポ", "status": "done" },
+    { "id": 4, "title": "横断ログ", "summary": "会話ログ・LLM usage → RITS", "status": "active" },
+    { "id": 5, "title": "ルーティング", "summary": "NEAR handoff・registry 接続", "status": "active" },
+    { "id": 6, "title": "RITS 監査", "summary": "日次レポート・組織整合性監査", "status": "active" },
+    { "id": 7, "title": "LRAM 本実装", "summary": "WordPress・NEAR 取次ぎ", "status": "active" },
+    { "id": 8, "title": "管理画面", "summary": "統一 LINE 履歴 API", "status": "done" }
   ]
 }

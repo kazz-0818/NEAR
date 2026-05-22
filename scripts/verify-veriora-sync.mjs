@@ -141,6 +141,13 @@ for (const f of SHARED_DOCS) {
 if (!failed) console.log("[docs] OK — all shared docs match NEAR");
 
 if (failed) {
+  const nearRoot = join(SYSTEM_ROOT, "NEAR");
+  const hasSera = existsSync(join(SYSTEM_ROOT, "SERA"));
+  if (!hasSera && existsSync(nearRoot)) {
+    console.error(
+      "\nヒント: CI では NEAR と同階層に SERA/LIRA/RITS/LRAM を checkout してください（.github/workflows/ci.yml 参照）。",
+    );
+  }
   console.error("\nverify-veriora-sync: FAILED");
   process.exit(1);
 }

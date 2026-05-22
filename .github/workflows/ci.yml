@@ -8,7 +8,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# デフォルト GITHUB_TOKEN の権限を明示（組織ポリシーでブロックされにくくする）
 permissions:
   contents: read
 
@@ -16,19 +15,47 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       NODE_ENV: test
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
       LINE_CHANNEL_SECRET: ci-line-channel-secret-placeholder
       LINE_CHANNEL_ACCESS_TOKEN: ci-line-channel-access-token-placeholder
       OPENAI_API_KEY: sk-ci-openai-placeholder
       ADMIN_API_KEY: ci-admin-api-key-placeholder
+    defaults:
+      run:
+        working-directory: NEAR
     steps:
+      # verify-veriora-sync は System/ 配下の兄弟リポレイアウトを前提（NEAR の親 = workspace 直下）
       - uses: actions/checkout@v4
+        with:
+          path: NEAR
+
+      - uses: actions/checkout@v4
+        with:
+          repository: kazz-0818/SERA
+          path: SERA
+
+      - uses: actions/checkout@v4
+        with:
+          repository: kazz-0818/LIRA
+          path: LIRA
+
+      - uses: actions/checkout@v4
+        with:
+          repository: kazz-0818/RITS
+          path: RITS
+
+      - uses: actions/checkout@v4
+        with:
+          repository: kazz-0818/LRAM
+          path: LRAM
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
+          cache-dependency-path: NEAR/package-lock.json
 
       - name: Install dependencies
         run: npm ci

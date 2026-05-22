@@ -25,7 +25,7 @@
         { "id": "memo", "label": "メモの保存", "status": "live", "since": "2025-01" },
         { "id": "remind", "label": "タスクのリマインド通知", "status": "live", "since": "2025-01" },
         { "id": "summary", "label": "短い文章の要約・整理", "status": "live", "since": "2025-02" },
-        { "id": "chat", "label": "幅広いチャット相談（学習・仕事・雑談）", "status": "live", "since": "2025-02" },
+        { "id": "chat", "label": "幅広いチャット相談", "status": "live", "since": "2025-02" },
         { "id": "sheets", "label": "Googleスプレッドシートの参照と分析", "status": "live", "since": "2025-03" },
         { "id": "calendar", "label": "Googleカレンダーの予定一覧・追加", "status": "live", "since": "2025-04" },
         { "id": "routing", "label": "各エージェントへの取次ぎと文脈引き継ぎ", "status": "live", "since": "2025-06" },
@@ -84,7 +84,7 @@
       "capabilities": [
         { "id": "sheet-summary", "label": "スプレッドシート上の数値の要約・照会", "status": "live", "since": "2025-03" },
         { "id": "payment", "label": "入金・支払スケジュールの案内と確認補助", "status": "live", "since": "2025-04" },
-        { "id": "audit-meta", "label": "監査ログにメタデータを残す（秘密は入れない）", "status": "live", "since": "2025-05" },
+        { "id": "audit-meta", "label": "監査ログにメタデータを残す", "status": "live", "since": "2025-05" },
         { "id": "line-channel", "label": "LINE 経理チャネルでの定型応答", "status": "live", "since": "2025-06" },
         { "id": "approval", "label": "支払実行・請求書発行の確定", "status": "planned" }
       ],
@@ -135,8 +135,8 @@
       "capabilities": [
         { "id": "draft", "label": "記事構成・見出し・本文のドラフト作成", "status": "live", "since": "2026-04" },
         { "id": "tone", "label": "BRAVO / ファッション文脈のトーン調整", "status": "live", "since": "2026-04" },
-        { "id": "wp-meta", "label": "WordPress 下書き用メタデータ（タイトル・スラッグ案）", "status": "live", "since": "2026-04" },
-        { "id": "image-prompt", "label": "画像生成プロンプト案（ポリシー順守）", "status": "live", "since": "2026-05" },
+        { "id": "wp-meta", "label": "WordPress 下書き用メタデータ", "status": "live", "since": "2026-04" },
+        { "id": "image-prompt", "label": "画像生成プロンプト案", "status": "live", "since": "2026-05" },
         { "id": "near-handoff", "label": "NEAR からの内部ハンドオフ受信", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "publish", "label": "WordPress 本番公開・予約投稿", "status": "planned" }
       ],

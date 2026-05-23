@@ -106,6 +106,7 @@ npm run build
 
 - `public/icons/{NEAR,SERA,...}_ICON.png` / `.webp`
 - WebP 再生成: `npm run optimize-icons`
+- IRIE アイコン差し替え: `AI_ICON/IRIE_ICON.png` を `public/icons/` に置く。暫定は `node scripts/patch-irie-icon.mjs`（LIRA 画像の顔クロップ）
 
 ## 技術スタック
 

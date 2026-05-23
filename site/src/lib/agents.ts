@@ -3,7 +3,7 @@ import type { ShowcaseAgent } from "../types/showcase";
 const ICON_MAP: Record<string, string> = {
   near: "NEAR",
   sera: "SERA",
-  lira: "LIRA",
+  irie: "IRIE",
   rits: "RITS",
   lram: "LRAM",
 };

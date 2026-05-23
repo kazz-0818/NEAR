@@ -15,7 +15,7 @@ INSERT INTO veliora.ai_agents (agent_code, display_name, parent_brand) VALUES
   ('near', 'NEAR', 'Veliora OS'),
   ('sera', 'SERA', 'Veliora OS'),
   ('nia',  'NIA',  'Veliora OS'),
-  ('lira', 'LIRA', 'Veliora OS')
+  ('irie', 'IRIE', 'Veliora OS')
 ON CONFLICT (agent_code) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS veliora.line_message_events (

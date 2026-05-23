@@ -26,7 +26,7 @@
 |----------------|------|------|--------|
 | `near` | NEAR | 秘書部 | 総合窓口・秘書・タスク整理・指示受付（**LLM / handoff の裏方**） |
 | `sera` | SERA | マーケ部 | SNS・広告・集客・マーケ支援 |
-| `lira` | LIRA | 経理部 | 売上・経費・請求・入金・利益管理 |
+| `irie` | IRIE | 経理部 | 売上・経費・請求・入金・利益管理 |
 | `rits` | RITS | AI人事部 | **組織監査**・会話品質・役割遵守・改善指示 |
 | `lram` | LRAM | 編集部 | BRAVO 編集・記事・WordPress 下書き（サービスリポジトリは今後追加） |
 
@@ -35,19 +35,19 @@
 1. **破壊的変更をしない**: 既存テーブル・env キー・Webhook 契約を尊重する。
 2. **新規は規約に従う**: 追加分から `VERIORA_*` / `{AGENT}_*` を適用（詳細は [`env-conventions.md`](env-conventions.md)）。
 3. **二重記録は段階的に**: 既存の業務テーブルと、横断ログ（Veliora `line_message_events` 等）の関係は [`db-conventions.md`](db-conventions.md) に従う。
-4. **registry は単一の意味論**: `src/agents/registry.ts`（TS）および LIRA の `app/agents/registry.py` が **人間可読の正**（実行時必須ではない Phase）。
+4. **registry は単一の意味論**: `src/agents/registry.ts`（TS）および IRIE の `app/agents/registry.py` が **人間可読の正**（実行時必須ではない Phase）。
 
 ## 関連ドキュメント
 
 - 組織横断整合性監査: RITS リポジトリ `docs/veriora-consistency-audit.md`（監査主体は RITS）
-- LIRA [`line-group-policy.md`](../../LIRA/docs/line-group-policy.md) — グループ LINE 応答方針（組織参照用）
+- LIRA [`line-group-policy.md`](../../IRIE/docs/line-group-policy.md) — グループ LINE 応答方針（組織参照用）
 - [`env-conventions.md`](env-conventions.md) — 環境変数命名
 - [`db-conventions.md`](db-conventions.md) — DB / テーブル命名・RITS / LRAM 接続方針
 - [`new-agent-checklist.md`](new-agent-checklist.md) — 新規エージェント追加手順
 
 ## Agent registry の使い方（現状と今後）
 
-- **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は `verioraHandoff` 等で `getVerioraAgentByKey` を実行経路で使用。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。LIRA は `app/agents/registry.py`。全面接続は Phase 5 以降で段階的に。
+- **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は `verioraHandoff` 等で `getVerioraAgentByKey` を実行経路で使用。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。IRIE は `app/agents/registry.py`。全面接続は Phase 5 以降で段階的に。
 - **Phase 3**: `getEnv()` に **互換 alias**（legacy → canonical）を追加し、`.env.example` と Zod schema を同期。**実装済み**（各リポ `envAlias.ts` / LIRA `config_env_alias.py`）。
 - **Phase 4 以降**: ルーティング・ログ・RITS 取り込みが registry の `code` / `id` と一致するよう段階接続。
 

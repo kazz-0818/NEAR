@@ -27,7 +27,7 @@
 
 ## 4. 環境変数（必須）
 
-- [ ] 必要なキーを **`.env.example`**（LIRA は `env/*.example` も）に追記（**値は書かない**）
+- [ ] 必要なキーを **`.env.example`**（IRIE は `env/*.example` も）に追記（**値は書かない**）
 - [ ] 各サービスの **config スキーマ**（Zod / Pydantic）にキーを追加
 - [ ] 既存キーと意味が重なる場合は [`env-conventions.md`](env-conventions.md) に従い **alias 方針**を Issue / ドキュメントに起票（Phase 3 で実装）
 

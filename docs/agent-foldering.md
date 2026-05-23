@@ -19,7 +19,7 @@ src/agents/
 |----------|----------------|
 | near | `src/services/orchestrator.ts`, `src/modules/` |
 | sera | （別リポジトリ SERA） |
-| lira | （別リポジトリ LIRA） |
+| irie | （別リポジトリ LIRA） |
 | rits | （別リポジトリ RITS） |
 | lram | （別リポジトリ LRAM） |
 

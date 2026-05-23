@@ -43,10 +43,10 @@ checks.push({
   ok: hasLram("src/modules/article/workflow.ts", "customerContextBlock"),
 });
 
-const liraMain = readFileSync(join(root, "..", "LIRA", "app", "main.py"), "utf8");
+const irieMain = readFileSync(join(root, "..", "IRIE", "app", "main.py"), "utf8");
 checks.push({
-  name: "LIRA /ask → RITS",
-  ok: liraMain.includes("send_agent_log_to_rits") && liraMain.includes('source="ask"'),
+  name: "IRIE /ask → RITS",
+  ok: irieMain.includes("send_agent_log_to_rits") && irieMain.includes('source="ask"'),
 });
 
 let fail = 0;

@@ -6,7 +6,7 @@
  *   node scripts/verify-veriora-sync.mjs           # 兄弟リポが揃っていれば 5 リポ横断
  *   node scripts/verify-veriora-sync.mjs --near-only  # NEAR のみ（CI で兄弟 checkout 不可時）
  *
- * レイアウト: 親ディレクトリに NEAR, SERA, LIRA, RITS, LRAM が並ぶ（System/ 想定）。
+ * レイアウト: 親ディレクトリに NEAR, SERA, IRIE, RITS, LRAM が並ぶ（System/ 想定）。
  */
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
@@ -27,7 +27,7 @@ const REGISTRY_TS = {
   RITS: "RITS/src/agents/registry.ts",
 };
 
-const REGISTRY_PYTHON = "LIRA/app/agents/registry.py";
+const REGISTRY_PYTHON = "IRIE/app/agents/registry.py";
 
 const MIGRATION_CANONICAL = "NEAR/src/db/migrations/053_veriora_core_schema.sql";
 
@@ -42,7 +42,7 @@ const SHARED_DOCS = [
   "new-agent-checklist.md",
 ];
 
-const DOC_REPOS = ["NEAR", "SERA", "LIRA", "RITS", "LRAM"];
+const DOC_REPOS = ["NEAR", "SERA", "IRIE", "RITS", "LRAM"];
 
 function sha256(rel) {
   const full = join(SYSTEM_ROOT, rel);
@@ -72,12 +72,12 @@ function logEntry(label, name, rel) {
 
 function hasSiblingRepo(name) {
   const base = join(SYSTEM_ROOT, name);
-  if (name === "LIRA") return existsSync(join(base, "app/agents/registry.py"));
+  if (name === "IRIE") return existsSync(join(base, "app/agents/registry.py"));
   return existsSync(join(base, "src"));
 }
 
 function allSiblingsPresent() {
-  return ["SERA", "LIRA", "RITS", "LRAM"].every(hasSiblingRepo);
+  return ["SERA", "IRIE", "RITS", "LRAM"].every(hasSiblingRepo);
 }
 
 const nearOnly = forceNearOnly || !allSiblingsPresent();

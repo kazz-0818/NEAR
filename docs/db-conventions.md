@@ -76,7 +76,7 @@
 ## RLS
 
 - テーブルごとに **どのロールが書くか**（`service_role` のみ等）を一文で決める。
-- `anon` からの insert を許す場合はポリシー必須（LIRA の `lira_audit_log` は参考例）。
+- `anon` からの insert を許す場合はポリシー必須（IRIE の `lira_audit_log` は参考例）。
 
 ## 削除禁止方針
 

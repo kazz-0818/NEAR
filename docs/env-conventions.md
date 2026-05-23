@@ -15,7 +15,7 @@
 
 1. **大文字 `SNAKE_CASE`**（慣例に合わせる）。
 2. **共通（組織横断）**: `VERIORA_` 接頭辞を推奨（例: `VERIORA_LOG_LEVEL`, `VERIORA_PUBLIC_BASE_URL`）。
-3. **エージェント固有**: `{AGENT_CODE}_` 接頭辞。**AGENT_CODE** は registry の `id` と一致する **ASCII 小文字**（`near`, `sera`, `lira`, `rits`, `lram`）。
+3. **エージェント固有**: `{AGENT_CODE}_` 接頭辞。**AGENT_CODE** は registry の `id` と一致する **ASCII 小文字**（`near`, `sera`, `irie`, `rits`, `lram`）。旧 `lira` は `IRIE_*` / registry alias で互換。
 4. **インフラが注入する変数**はそのまま利用可（例: `PORT`, `NODE_ENV`, `RENDER_EXTERNAL_URL`）。無理に `VERIORA_` を付けない。
 5. **新規キーから本規約を適用**する。既存キーは **非推奨（deprecated）として文書化**しつつ残す。
 
@@ -71,7 +71,7 @@
 
 - `NEAR_LINE_CHANNEL_SECRET`, `NEAR_LINE_CHANNEL_ACCESS_TOKEN`
 - `SERA_LINE_CHANNEL_SECRET`（既存パターン）
-- `LIRA_LINE_CHANNEL_SECRET`, `RITS_LINE_CHANNEL_SECRET`, `LRAM_LINE_CHANNEL_SECRET`（将来）
+- `IRIE_LINE_CHANNEL_SECRET`（`LIRA_LINE_*` は後方互換 alias）、`RITS_LINE_CHANNEL_SECRET`, `LRAM_LINE_CHANNEL_SECRET`（将来）
 
 ### OpenAI
 
@@ -105,7 +105,7 @@
 
 ## `.env.example` と config の同期
 
-- **新規 env を追加したら**: `.env.example`（および LIRA の `env/*.example`）と **config スキーマ**を同じ PR で更新する。
+- **新規 env を追加したら**: `.env.example`（および IRIE の `env/*.example`）と **config スキーマ**を同じ PR で更新する。
 - **値は書かない**（プレースホルダとコメントのみ）。
 
 ## 参考（Veliora OS）

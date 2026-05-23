@@ -17,7 +17,7 @@
       "accent": "#f472b6",
       "handoffRules": [
         "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
-        "売上・経費・入金・スプレッドシート上の経理は LIRA に渡す",
+        "売上・経費・入金・スプレッドシート上の経理は IRIE に渡す",
         "会話品質・組織整合性の監査・改善指示は RITS に渡す",
         "BRAVO 記事・WordPress 下書き・編集は LRAM に渡す"
       ],
@@ -56,7 +56,7 @@
       "greeting": "こんにちは！マーケ部 SERA です。数字は嘘をつかない、一緒に磨こう！",
       "accent": "#facc15",
       "handoffRules": [
-        "金額・請求・入金の確定は LIRA",
+        "金額・請求・入金の確定は IRIE",
         "全社ポリシー・組織整合性の監査は RITS",
         "記事化・WP 下書きは LRAM",
         "一般秘書タスクは NEAR に戻す"
@@ -76,14 +76,14 @@
       ]
     },
     {
-      "id": "lira",
-      "code": "LIRA",
-      "kana": "リラ",
+      "id": "irie",
+      "code": "IRIE",
+      "kana": "イリ",
       "department": "経理部",
-      "displayName": "LIRA-リラ-『経理部』",
+      "displayName": "IRIE-イリ-『経理部』",
       "role": "売上・経費・請求・入金・利益管理",
       "description": "経理・数値の整理を担当。",
-      "greeting": "こんにちは。経理部 LIRA です。経に関することは、丁寧にお答えします。",
+      "greeting": "こんにちは。経理部 IRIE です。経に関することは、丁寧にお答えします。",
       "accent": "#c4b5fd",
       "handoffRules": [
         "マーケ施策の効果測定の物語化は SERA",
@@ -119,7 +119,7 @@
       "accent": "#22c55e",
       "handoffRules": [
         "実務修正は各部署リポへ",
-        "マーケ数値の真偽は SERA・LIRA のデータソースを参照"
+        "マーケ数値の真偽は SERA・IRIE のデータソースを参照"
       ],
       "capabilities": [
         { "id": "audit", "label": "各 AI の会話評価・リスク分類", "status": "live", "since": "2025-05" },
@@ -150,7 +150,7 @@
       "greeting": "編集部 LRAM です。トレンドの匂い、逃しません。記事の種、持ち込んでください。",
       "accent": "#f97316",
       "handoffRules": [
-        "数値・売上ファクトの確認は LIRA",
+        "数値・売上ファクトの確認は IRIE",
         "集客・SNS連携の戦略決めは SERA と調整",
         "ユーザー向けの取次ぎ・スケジュールは NEAR",
         "組織整合性の指摘は RITS"
@@ -176,12 +176,12 @@
   ],
   "handoffEdges": [
     { "from": "near", "to": "sera", "label": "マーケ・SNS" },
-    { "from": "near", "to": "lira", "label": "経理・スプシ" },
+    { "from": "near", "to": "irie", "label": "経理・スプシ" },
     { "from": "near", "to": "rits", "label": "監査・品質" },
     { "from": "near", "to": "lram", "label": "BRAVO・記事" },
-    { "from": "sera", "to": "lira", "label": "数値確認" },
+    { "from": "sera", "to": "irie", "label": "数値確認" },
     { "from": "sera", "to": "lram", "label": "記事化" },
-    { "from": "lira", "to": "lram", "label": "ファクト確認" },
+    { "from": "irie", "to": "lram", "label": "ファクト確認" },
     { "from": "rits", "to": "near", "label": "横断監査・顧客マスター" },
     { "from": "rits", "to": "sera", "label": "整合性評価" },
     { "from": "rits", "to": "lram", "label": "整合性評価" },
@@ -198,7 +198,7 @@
     { "id": 7, "title": "LRAM 本実装", "summary": "WordPress 下書き・NEAR 取次ぎ・嗜好ネタ選定", "status": "done" },
     { "id": 8, "title": "管理画面", "summary": "統一 LINE 履歴 API", "status": "done" },
     { "id": 9, "title": "ベガパンク Phase 1–2", "summary": "共通顧客マスター・migration 065–068・5部署接続", "status": "done" },
-    { "id": 10, "title": "ベガパンク Phase 3", "summary": "管理 UI・RITS 顧客監査・LIRA /ask・LRAM 記事反映・E2E 手順", "status": "done" },
+    { "id": 10, "title": "ベガパンク Phase 3", "summary": "管理 UI・RITS 顧客監査・IRIE /ask・LRAM 記事反映・E2E 手順", "status": "done" },
     { "id": 11, "title": "ベガパンク Phase 4", "summary": "merge通知・email/phone候補・LRAMネタ選定・管理PATCH", "status": "done" }
   ]
 }

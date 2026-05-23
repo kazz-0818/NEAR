@@ -1,9 +1,9 @@
 /**
- * LIRA agent folder — 参照用。実行は既存経路のまま。
+ * IRIE agent folder — 参照用。実行は IRIE リポジトリ（app/）の既存経路のまま。
  */
 import { getVerioraAgentByKey } from "../registry.js";
 
-export const AGENT_KEY = "lira" as const;
+export const AGENT_KEY = "irie" as const;
 
 export function getAgentConfig() {
   const def = getVerioraAgentByKey(AGENT_KEY);
@@ -12,7 +12,7 @@ export function getAgentConfig() {
 }
 
 export const IMPLEMENTATION_PATHS = {
-  primary: "(LIRA repo)",
+  primary: "(IRIE repo — IRIE service)",
   secondary: "app/",
 } as const;
 

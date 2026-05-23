@@ -41,8 +41,8 @@ jobs:
       - uses: actions/checkout@v4
         continue-on-error: true
         with:
-          repository: kazz-0818/LIRA
-          path: LIRA
+          repository: kazz-0818/IRIE
+          path: IRIE
           token: ${{ secrets.VERIORA_ORG_CHECKOUT_TOKEN || github.token }}
 
       - uses: actions/checkout@v4

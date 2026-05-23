@@ -3,7 +3,7 @@
 INSERT INTO veriora.agent_departments (department_key, name, description) VALUES
   ('secretary', '秘書部', 'NEAR — 総合窓口・秘書'),
   ('marketing', 'マーケ部', 'SERA — SNS・広告・マーケ'),
-  ('accounting', '経理部', 'LIRA — 経理・数値'),
+  ('accounting', '経理部', 'IRIE — 経理・数値'),
   ('ai_hr', 'AI人事部', 'RITS — 品質監査・改善'),
   ('editorial', '編集部', 'LRAM — BRAVO・WordPress')
 ON CONFLICT (department_key) DO NOTHING;
@@ -24,7 +24,7 @@ INSERT INTO veriora.ai_agents (
     true
   ),
   (
-    'lira', 'LIRA', 'リラ', '経理部', 'LIRA-リラ-『経理部』',
+    'irie', 'IRIE', 'イリ', '経理部', 'IRIE-イリ-『経理部』',
     '売上・経費・請求・入金・利益管理',
     'スプレッドシート正の経理支援。',
     true

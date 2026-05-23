@@ -7,7 +7,7 @@ import { notifyLramHandoff } from "./verioraHandoffNotify.js";
 /** registry handoffRules と整合するキーワードヒント */
 const HANDOFF_HINTS: readonly { agentKey: string; pattern: RegExp }[] = [
   { agentKey: "sera", pattern: /マーケ|SNS|広告|Instagram|集客|Meta/i },
-  { agentKey: "lira", pattern: /売上|経費|入金|請求|経理|スプレッドシート|会計/i },
+  { agentKey: "irie", pattern: /売上|経費|入金|請求|経理|スプレッドシート|会計/i },
   { agentKey: "rits", pattern: /品質|監査|役割逸脱|改善指示|人事/i },
   { agentKey: "lram", pattern: /BRAVO|記事|WordPress|編集|下書き/i },
 ];

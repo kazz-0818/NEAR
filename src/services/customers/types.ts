@@ -1,7 +1,7 @@
 export const LINE_CHANNEL_KEYS = {
   near: "near_line",
   sera: "sera_line",
-  lira: "lira_line",
+  irie: "irie_line",
   rits: "rits_line",
   lram: "lram_line",
 } as const;

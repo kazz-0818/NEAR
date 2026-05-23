@@ -429,7 +429,7 @@ ${section(checks, /merge_candidates/)}
 
 ${section(checks, /customer-merge|admin/)}
 
-## 8. customer contextがNEAR/SERA/LIRA/RITS/LRAMで参照できるか
+## 8. customer contextがNEAR/SERA/IRIE/RITS/LRAMで参照できるか
 
 ${section(checks, /context|audit/)}
 
@@ -449,7 +449,7 @@ ${fails.length ? fails.map((f) => `- ${f}`).join("\n") : "- なし"}
 
 ${fixList.length ? fixList.map((f) => `- ${f}`).join("\n") : `- 068 backfill: UPDATE conversations の alias 修正（conv / 旧 c 参照バグ）
 - 検証スクリプト \`scripts/vegapunk-phase2-verify.ts\` 追加
-- 同内容を SERA/LIRA/RITS/LRAM の 068 同梱 SQL に反映`}
+- 同内容を SERA/IRIE/RITS/LRAM の 068 同梱 SQL に反映`}
 
 ## 13. まだ未接続の箇所
 
@@ -468,7 +468,7 @@ ${fixList.length ? fixList.map((f) => `- ${f}`).join("\n") : `- 068 backfill: UP
 ## 15. Phase 3 提案
 
 - 管理UI（顧客閲覧・merge承認）
-- LIRA /ask への customer resolve
+- IRIE /ask への customer resolve
 - RITS 日次レポートで \`VERIORA_CUSTOMER_AUDIT_IN_DAILY_REPORT=true\` 常時化の判断
 - 電話・メールによる merge **候補**（自動統合はしない）
 - \`near_user_memory\` からの段階的 read 移行（DROP なし）

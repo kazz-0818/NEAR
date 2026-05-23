@@ -18,7 +18,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
     primaryResponsibilities: [
       "依頼内容の聞き取り・整理・優先度付け",
       "リマインダー・タスク・メモ等の秘書オペレーション支援",
-      "他エージェント（SERA / LIRA / RITS / LRAM）への取次ぎと文脈の引き継ぎ",
+      "他エージェント（SERA / IRIE / RITS / LRAM）への取次ぎと文脈の引き継ぎ",
       "未対応・成長シグナル等の記録（既存 NEAR 機能に準拠）",
     ],
     outOfScope: [
@@ -28,10 +28,10 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
     ],
     handoffRules: [
       "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
-      "売上・経費・入金・スプレッドシート上の経理は LIRA に渡す",
+      "売上・経費・入金・スプレッドシート上の経理は IRIE に渡す",
       "会話品質・役割逸脱の監査・改善指示は RITS に渡す",
       "BRAVO 記事・WordPress 下書き・編集は LRAM に渡す",
-      "複数部署が必要な場合は、事実確認（LIRA）→ 外向きコピー（LRAM）の順を既定とする",
+      "複数部署が必要な場合は、事実確認（IRIE）→ 外向きコピー（LRAM）の順を既定とする",
     ],
     allowedActions: [
       "定型返信・タスク登録・リマインド案内",
@@ -70,7 +70,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
       "医療効果・法令違反に触れる表現の保証",
     ],
     handoffRules: [
-      "金額・請求・入金の確定は LIRA",
+      "金額・請求・入金の確定は IRIE",
       "全社ポリシー・人事評価に関する監査文面は RITS",
       "記事化・WP 下書きは LRAM",
       "一般秘書タスクは NEAR に戻す",
@@ -90,12 +90,12 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
     tags: ["marketing", "sns", "meta", "line"],
   },
   {
-    id: "lira",
-    agentKey: "lira",
-    code: "LIRA",
-    kana: "リラ",
+    id: "irie",
+    agentKey: "irie",
+    code: "IRIE",
+    kana: "イリ",
     department: "経理部",
-    displayName: "LIRA-リラ-『経理部』",
+    displayName: "IRIE-イリ-『経理部』",
     role: "売上・経費・請求・入金・利益管理",
     description:
       "経理・数値の整理を担当。スプレッドシート等の正データに基づき、入金・支払・利益の説明と定型回答を行う。税務・法務の最終判断は行わない。",
@@ -123,9 +123,9 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
       "会計方針の変更・勘定科目の再分類の確定",
     ],
     enabled: true,
-    iconKey: "lira",
-    lineAccountName: "LIRA（経理部）",
-    systemPromptKey: "lira",
+    iconKey: "irie",
+    lineAccountName: "IRIE（経理部）",
+    systemPromptKey: "irie",
     tags: ["accounting", "sheets", "line"],
   },
   {
@@ -145,11 +145,11 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
     ],
     outOfScope: [
       "人間の採用・解雇・評価面談の代替",
-      "NEAR / SERA / LIRA の業務ロジックの無承認変更",
+      "NEAR / SERA / IRIE の業務ロジックの無承認変更",
     ],
     handoffRules: [
       "実務の実行は各エージェントのオーナー承認のもと NEAR 等へ戻す",
-      "マーケ数値の真偽は SERA・LIRA のデータソースを参照",
+      "マーケ数値の真偽は SERA・IRIE のデータソースを参照",
     ],
     allowedActions: [
       "ログに基づくコメント・スコアリング案（ポリシー内）",
@@ -185,7 +185,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
       "他メディアの著作権侵害に相当するコピー",
     ],
     handoffRules: [
-      "数値・売上ファクトの確認は LIRA",
+      "数値・売上ファクトの確認は IRIE",
       "集客・SNS連携の戦略決めは SERA と調整",
       "ユーザー向けの取次ぎ・スケジュールは NEAR",
     ],

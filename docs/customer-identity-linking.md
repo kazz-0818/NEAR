@@ -6,7 +6,7 @@
 |-----------|-------------|
 | near | `near_line` |
 | sera | `sera_line` |
-| irie | `lira_line` |
+| irie | `irie_line` |
 | rits | `rits_line` |
 | lram | `lram_line` |
 

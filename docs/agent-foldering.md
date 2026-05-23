@@ -19,13 +19,13 @@ src/agents/
 |----------|----------------|
 | near | `src/services/orchestrator.ts`, `src/modules/` |
 | sera | （別リポジトリ SERA） |
-| irie | （別リポジトリ LIRA） |
+| irie | （別リポジトリ IRIE） |
 | rits | （別リポジトリ RITS） |
 | lram | （別リポジトリ LRAM） |
 
 NEAR リポジトリ内の `src/agents/{key}/` は **ドキュメント + 将来の移行先**。既存 import は変更していません。
 
-## LIRA（Python）
+## IRIE（Python）
 
 ```
 app/agents/{agentKey}/config.py

@@ -1,4 +1,4 @@
-# LIRA (`src/agents/lira/`)
+# IRIE (`src/agents/irie/`)
 
 Veriora 組織 OS 用のエージェント別フォルダ。既存コードは移動していません。
 

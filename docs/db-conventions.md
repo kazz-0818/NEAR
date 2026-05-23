@@ -43,7 +43,7 @@
 | `lram_generated_articles` | 同上 |
 | `lram_wp_posts` | WordPress 投稿履歴（将来） |
 
-## LIRA（現状）
+## IRIE（現状）
 
 - 監査: `public.lira_audit_log`（`docs/supabase.sql`）。**エージェント横断の会話テーブルは持たない**（Sheets 正）。
 

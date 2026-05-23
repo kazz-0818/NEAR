@@ -27,7 +27,7 @@
 
 ## Agent registry（コード）
 
-- TypeScript サービス: `src/agents/`（`types.ts`, `registry.ts`, `index.ts`）+ `src/agents/{near,sera,lira,rits,lram}/`
+- TypeScript サービス: `src/agents/`（`types.ts`, `registry.ts`, `index.ts`）+ `src/agents/{near,sera,irie,rits,lram}/`
 - LIRA（Python）: `app/agents/` + `app/agents/{agentKey}/`
 - Canonical DB: `src/services/supabase/`（LINE ログ・[`supabase-simplification.md`](docs/supabase-simplification.md)）
 - ユーザー長期記憶: `src/services/user_memory_*.ts`（[`near-user-memory.md`](docs/near-user-memory.md)、既定 ON）

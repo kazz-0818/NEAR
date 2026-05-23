@@ -48,7 +48,7 @@
 ## Agent registry の使い方（現状と今後）
 
 - **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は `verioraHandoff` 等で `getVerioraAgentByKey` を実行経路で使用。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。IRIE は `app/agents/registry.py`。全面接続は Phase 5 以降で段階的に。
-- **Phase 3**: `getEnv()` に **互換 alias**（legacy → canonical）を追加し、`.env.example` と Zod schema を同期。**実装済み**（各リポ `envAlias.ts` / LIRA `config_env_alias.py`）。
+- **Phase 3**: `getEnv()` に **互換 alias**（legacy → canonical）を追加し、`.env.example` と Zod schema を同期。**実装済み**（各リポ `envAlias.ts` / IRIE `config_env_alias.py`）。
 - **Phase 4 以降**: ルーティング・ログ・RITS 取り込みが registry の `code` / `id` と一致するよう段階接続。
 
 参照 API（例）:
@@ -70,7 +70,7 @@
 | 1 | ドキュメント整備（本リリース相当） |
 | 2 | agent registry 追加 | **同梱済み**（一部リポで config / handoff 接続済み） |
 | 3 | env 互換（alias・`.env.example` 同期） | **コード実装済み** |
-| 4 | ログ形式・横断会話ログの統一 | **実装済み**（5部署 LINE + LIRA `/ask` → RITS） |
+| 4 | ログ形式・横断会話ログの統一 | **実装済み**（5部署 LINE + IRIE `/ask` → RITS） |
 | 5 | ルーティング / ハンドオフ整理 | **実装済み**（NEAR handoff・registry） |
 | 6 | RITS 監査の自動化・日次レポート | **実装済み**（顧客マスター監査節含む） |
 | 7 | LRAM（WordPress・編集）本実装 | **実装済み**（下書き・嗜好ネタ選定。本番公開は Phase 5+） |

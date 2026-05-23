@@ -29,8 +29,38 @@ WHERE NOT EXISTS (SELECT 1 FROM veriora.ai_agents WHERE agent_key = 'irie');
 -- ---------------------------------------------------------------------------
 -- agent_key / channel_key columns (veriora customer + messaging)
 -- ---------------------------------------------------------------------------
-UPDATE veriora.conversations SET agent_key = 'irie' WHERE agent_key = 'lira';
-UPDATE veriora.messages SET agent_key = 'irie' WHERE agent_key = 'lira';
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'veriora' AND table_name = 'conversations' AND column_name = 'agent_key'
+  ) THEN
+    UPDATE veriora.conversations SET agent_key = 'irie' WHERE agent_key = 'lira';
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'veriora' AND table_name = 'conversations' AND column_name = 'agent_id'
+  ) THEN
+    UPDATE veriora.conversations c
+    SET agent_id = irie.id
+    FROM veriora.ai_agents irie, veriora.ai_agents lira
+    WHERE c.agent_id = lira.id AND lira.agent_key = 'lira' AND irie.agent_key = 'irie';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'veriora' AND table_name = 'messages' AND column_name = 'agent_key'
+  ) THEN
+    UPDATE veriora.messages SET agent_key = 'irie' WHERE agent_key = 'lira';
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'veriora' AND table_name = 'messages' AND column_name = 'agent_id'
+  ) THEN
+    UPDATE veriora.messages m
+    SET agent_id = irie.id
+    FROM veriora.ai_agents irie, veriora.ai_agents lira
+    WHERE m.agent_id = lira.id AND lira.agent_key = 'lira' AND irie.agent_key = 'irie';
+  END IF;
+END $$;
 UPDATE veriora.customer_identities
 SET
   agent_key = 'irie',

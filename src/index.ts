@@ -7,6 +7,7 @@ import { getPool } from "./db/client.js";
 import { getLogger } from "./lib/logger.js";
 import { verifyLineSignature } from "./channels/line/verify.js";
 import { saveInboundMessage } from "./services/inbound_store.js";
+import { recordGroupObserveToRits } from "./lib/ritsIngest.js";
 import { handleLineTextMessage } from "./services/orchestrator.js";
 import { replyOrPush } from "./channels/line/client.js";
 import { createAdminApp } from "./admin/routes.js";
@@ -225,6 +226,13 @@ async function lineMessagingWebhook(c: Context) {
         const nameRef = textContainsNearNameReferral(groupText);
         if (!mentioned && !nameRef) {
           log.info({ messageId }, "group/room: skip (no bot mention and no NEAR/ニア in text)");
+          recordGroupObserveToRits({
+            userText: groupText,
+            groupId: observedGroupId ?? null,
+            lineSourceType: source?.type === "room" ? "room" : "group",
+            actorUserId: userId,
+            skipReason: "no_mention_or_name",
+          });
           continue;
         }
       }

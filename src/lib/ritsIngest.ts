@@ -19,6 +19,13 @@ function clip(s: string | null | undefined, max = MAX_FIELD): string | null {
   return t.length <= max ? t : `${t.slice(0, max)}…`;
 }
 
+/** 既定 ON。`VERIORA_RITS_GROUP_OBSERVE=false` でグループ傍受のみ停止 */
+export function isRitsGroupObserveEnabled(): boolean {
+  const v = process.env.VERIORA_RITS_GROUP_OBSERVE?.trim().toLowerCase();
+  if (v === "0" || v === "false" || v === "off" || v === "no") return false;
+  return true;
+}
+
 /** NEAR → RITS POST /admin/logs（env 未設定時は no-op） */
 export async function sendAgentLogToRits(payload: RitsAgentLogPayload): Promise<void> {
   const base = process.env.VERIORA_RITS_BASE_URL?.trim().replace(/\/$/, "");
@@ -71,6 +78,33 @@ export function recordLineExchangeToRits(input: {
     source: "line",
     metadata: {
       group_id: input.groupId ?? null,
+    },
+  }).catch(() => undefined);
+}
+
+/** グループ／ルームでボットが返信しなかったテキストも RITS に記録（監査 LLM 対象外） */
+export function recordGroupObserveToRits(input: {
+  userText: string;
+  groupId?: string | null;
+  lineSourceType?: string | null;
+  actorUserId?: string | null;
+  skipReason: string;
+}): void {
+  if (!isRitsGroupObserveEnabled()) return;
+  const text = clip(input.userText);
+  if (!text) return;
+  void sendAgentLogToRits({
+    agent_name: "NEAR",
+    user_message: text,
+    agent_reply: null,
+    intent: "group_observe",
+    source: "line",
+    metadata: {
+      observe_only: true,
+      skip_reason: input.skipReason,
+      group_id: input.groupId ?? null,
+      line_source_type: input.lineSourceType ?? null,
+      actor_user_id: input.actorUserId ?? null,
     },
   }).catch(() => undefined);
 }

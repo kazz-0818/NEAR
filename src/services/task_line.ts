@@ -15,10 +15,17 @@
  */
 
 import type { Db } from "../db/client.js";
+import { resolveCategoryByName, createTaskCategory } from "../db/task_categories_repo.js";
 import { getLogger } from "../lib/logger.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
 import { extractTaskItemsFromAssistantMessages } from "../lib/taskListContext.js";
 import type { SessionMemoryType } from "./conversation_session_memory.js";
+import {
+  extractBulkTaskItems,
+  looksLikeBulkTaskAdd,
+  type BulkTaskItem,
+} from "./task_bulk_extractor.js";
+import { resolveCategoryIdForTaskAdd } from "./task_category_line.js";
 
 const log = getLogger();
 
@@ -42,7 +49,10 @@ type TaskRow = {
   task_scope: string;
   actor_user_id: string | null;
   created_at: Date;
+  category_name?: string | null;
 };
+
+const CATEGORY_FILTER_LIST_RE = /(.+?)(?:の)?タスク(?:一覧|リスト|見せて|教えて|確認)/u;
 
 // ─── コマンド判定 ─────────────────────────────────────────────────────────────
 
@@ -107,6 +117,7 @@ export function isTaskManagementCommand(
   recentAssistantMessages?: string[]
 ): boolean {
   const t = text.normalize("NFKC").replace(/\s+/g, " ").trim();
+  if (looksLikeBulkTaskAdd(text)) return true;
   const op = resolveUserOperation({ text, recentAssistantMessages });
   if (op.kind.startsWith("task.")) return true;
   if (LIST_RE.test(t) || DONE_RE.test(t) || DELETE_RE.test(t) || EDIT_RE.test(t)) return true;
@@ -130,38 +141,116 @@ async function fetchActiveTasks(
   db: Db,
   channelUserId: string,
   groupId: string | undefined,
-  actorUserId: string
+  actorUserId: string,
+  categoryId?: string | null
 ): Promise<TaskRow[]> {
+  const categoryClause = categoryId ? "AND t.category_id = $3::uuid" : "";
   // グループ: groupタスク(全員共有) + 自分のpersonalタスク
   // 個人: 自分のpersonalタスクのみ
   if (groupId) {
     const r = await db.query<TaskRow>(
-      `SELECT id, title, notes, status, task_scope, actor_user_id, created_at
-       FROM near_tasks
-       WHERE status = 'open'
+      `SELECT t.id, t.title, t.notes, t.status, t.task_scope, t.actor_user_id, t.created_at, c.name AS category_name
+       FROM near_tasks t
+       LEFT JOIN near_task_categories c ON c.id = t.category_id
+       WHERE t.status = 'open'
          AND (
-           (group_id = $1 AND task_scope = 'group')
+           (t.group_id = $1 AND t.task_scope = 'group')
            OR
-           (actor_user_id = $2 AND task_scope = 'personal' AND group_id = $1)
+           (t.actor_user_id = $2 AND t.task_scope = 'personal' AND t.group_id = $1)
          )
-       ORDER BY created_at ASC
+         ${categoryClause}
+       ORDER BY t.created_at ASC
        LIMIT 30`,
-      [groupId, actorUserId]
+      categoryId ? [groupId, actorUserId, categoryId] : [groupId, actorUserId]
     );
     return r.rows;
   } else {
     const r = await db.query<TaskRow>(
-      `SELECT id, title, notes, status, task_scope, actor_user_id, created_at
-       FROM near_tasks
-       WHERE status = 'open'
-         AND channel_user_id = $1
-         AND task_scope = 'personal'
-       ORDER BY created_at ASC
+      `SELECT t.id, t.title, t.notes, t.status, t.task_scope, t.actor_user_id, t.created_at, c.name AS category_name
+       FROM near_tasks t
+       LEFT JOIN near_task_categories c ON c.id = t.category_id
+       WHERE t.status = 'open'
+         AND t.channel_user_id = $1
+         AND t.task_scope = 'personal'
+         ${categoryId ? "AND t.category_id = $2::uuid" : ""}
+       ORDER BY t.created_at ASC
        LIMIT 30`,
-      [channelUserId]
+      categoryId ? [channelUserId, categoryId] : [channelUserId]
     );
     return r.rows;
   }
+}
+
+async function resolveCategoryIdForItems(
+  db: Db,
+  channelUserId: string,
+  groupId: string | undefined,
+  items: BulkTaskItem[]
+): Promise<Map<string, string | null>> {
+  const map = new Map<string, string | null>();
+  for (const item of items) {
+    const key = item.category ?? "";
+    if (!item.category?.trim()) {
+      map.set(key, null);
+      continue;
+    }
+    if (map.has(key)) continue;
+    const { category } = await resolveCategoryByName(db, channelUserId, groupId, item.category);
+    if (category) map.set(key, category.id);
+    else {
+      const created = await createTaskCategory(db, {
+        channelUserId,
+        groupId,
+        name: item.category.trim(),
+      });
+      map.set(key, created.id);
+    }
+  }
+  return map;
+}
+
+async function insertBulkTasks(
+  db: Db,
+  input: {
+    channelUserId: string;
+    actorUserId: string;
+    groupId?: string;
+    items: BulkTaskItem[];
+  }
+): Promise<{ titles: string[]; count: number }> {
+  const taskScope = input.groupId ? "group" : "personal";
+  const catMap = await resolveCategoryIdForItems(
+    db,
+    input.channelUserId,
+    input.groupId,
+    input.items
+  );
+  const titles: string[] = [];
+  await db.query("BEGIN");
+  try {
+    for (const item of input.items) {
+      const categoryId = item.category ? (catMap.get(item.category) ?? null) : null;
+      await db.query(
+        `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, category_id, status, created_at, updated_at)
+         VALUES ('line', $1, $2, $3, $4, $5, $6, $7::uuid, 'open', now(), now())`,
+        [
+          input.channelUserId,
+          input.actorUserId,
+          input.groupId ?? null,
+          taskScope,
+          item.title,
+          item.notes ?? null,
+          categoryId,
+        ]
+      );
+      titles.push(item.title);
+    }
+    await db.query("COMMIT");
+  } catch (e) {
+    await db.query("ROLLBACK").catch(() => {});
+    throw e;
+  }
+  return { titles, count: titles.length };
 }
 
 function formatTaskList(tasks: TaskRow[], groupId?: string): string {
@@ -172,8 +261,9 @@ function formatTaskList(tasks: TaskRow[], groupId?: string): string {
   }
   const lines = tasks.map((t, i) => {
     const scope = t.task_scope === "group" ? "【共有】" : "【個人】";
+    const cat = t.category_name ? `【${t.category_name}】` : "";
     const note = t.notes ? `（${t.notes}）` : "";
-    return `${i + 1}. ${scope} ${t.title}${note}`;
+    return `${i + 1}. ${scope}${cat} ${t.title}${note}`;
   });
   const header = groupId
     ? `📋 タスク一覧（${tasks.length}件 / 共有＋あなたの個人）:`
@@ -216,6 +306,33 @@ export async function tryHandleTaskLine(input: {
     op.kind === "task.update" &&
     op.requiresConfirmation === true;
 
+  // ─ 一括タスク追加 ─
+  if (looksLikeBulkTaskAdd(input.text)) {
+    try {
+      const items = await extractBulkTaskItems(input.text);
+      if (items.length >= 2) {
+        const { titles, count } = await insertBulkTasks(db, {
+          channelUserId,
+          actorUserId,
+          groupId,
+          items,
+        });
+        const preview = titles
+          .slice(0, 5)
+          .map((title, i) => `${i + 1}. ${title}`)
+          .join("\n");
+        const more = count > 5 ? `\n…他 ${count - 5} 件（「タスク一覧」で確認）` : "";
+        return {
+          handled: true,
+          reply: `✅ ${count}件のタスクを追加しました:\n${preview}${more}`,
+        };
+      }
+    } catch (e) {
+      log.error({ err: e }, "bulk task add failed");
+      return { handled: true, reply: "タスクの一括追加中にエラーが発生しました。" };
+    }
+  }
+
   // ─ タスク追加 ─
   const addMatch = t.match(ADD_RE);
   if (addMatch) {
@@ -223,13 +340,24 @@ export async function tryHandleTaskLine(input: {
     if (!title) {
       return { handled: true, reply: "追加するタスクのタイトルを教えてください。\n例: 「〇〇をタスクに追加して」" };
     }
+    const catResolved = await resolveCategoryIdForTaskAdd(db, channelUserId, groupId, input.text);
+    if (catResolved.hint) {
+      return { handled: true, reply: catResolved.hint };
+    }
     const taskScope = groupId ? "group" : "personal";
     try {
       const ins = await db.query<{ id: string }>(
-        `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, status, created_at, updated_at)
-         VALUES ('line', $1, $2, $3, $4, $5, NULL, 'open', now(), now())
+        `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, category_id, status, created_at, updated_at)
+         VALUES ('line', $1, $2, $3, $4, $5, NULL, $6::uuid, 'open', now(), now())
          RETURNING id::text`,
-        [channelUserId, actorUserId, groupId ?? null, taskScope, title]
+        [
+          channelUserId,
+          actorUserId,
+          groupId ?? null,
+          taskScope,
+          title,
+          catResolved.categoryId,
+        ]
       );
       const taskId = ins.rows[0]?.id ?? "";
       log.info({ title, actorUserId }, "task added");
@@ -397,6 +525,44 @@ export async function tryHandleTaskLine(input: {
     } catch (e) {
       log.error({ err: e }, "task all-done failed");
       return { handled: true, reply: "タスクの更新中にエラーが発生しました。" };
+    }
+  }
+
+  // ─ カテゴリ別一覧 ─
+  const catListMatch = t.match(CATEGORY_FILTER_LIST_RE);
+  if (catListMatch?.[1]) {
+    const nameQuery = catListMatch[1].trim();
+    if (nameQuery && !/^(今の|今日の|現在の|やること|タスク|登録した|追加した|俺の|自分の)$/u.test(nameQuery)) {
+      const { category, ambiguous } = await resolveCategoryByName(
+        db,
+        channelUserId,
+        groupId,
+        nameQuery
+      );
+      if (ambiguous.length > 0) {
+        const names = ambiguous.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+        return { handled: true, reply: `カテゴリが複数あります。どれですか？\n${names}` };
+      }
+      if (category) {
+        try {
+          const tasks = await fetchActiveTasks(
+            db,
+            channelUserId,
+            groupId,
+            actorUserId,
+            category.id
+          );
+          const header = `📋 「${category.name}」のタスク（${tasks.length}件）:`;
+          const body =
+            tasks.length === 0
+              ? "該当するオープンタスクはありません。"
+              : formatTaskList(tasks, groupId).replace(/^📋[^\n]+\n\n/u, "");
+          return { handled: true, reply: `${header}\n\n${body}` };
+        } catch (e) {
+          log.error({ err: e }, "category task list failed");
+          return { handled: true, reply: "タスク一覧の取得中にエラーが発生しました。" };
+        }
+      }
     }
   }
 

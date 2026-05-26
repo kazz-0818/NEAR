@@ -26,6 +26,11 @@ import { normalizeUserUtterance } from "../lib/utteranceNormalizer.js";
 import { resolveUserOperation } from "../lib/utteranceResolver.js";
 import { resolveSemanticOperation } from "../services/semantic_operation_resolver.js";
 import { isTaskManagementCommand, tryHandleTaskLine, type TaskLineResult } from "../services/task_line.js";
+import { tryHandleTaskCompoundLine } from "../services/task_compound_line.js";
+import {
+  looksLikeTaskCategoryCommand,
+  tryHandleTaskCategoryLine,
+} from "../services/task_category_line.js";
 import { tryResolveReminderFromRecentTaskList } from "../services/task_reminder_router.js";
 import { extractTaskItemsFromAssistantMessages, parseTaskTargetNumber } from "../lib/taskListContext.js";
 import {
@@ -460,6 +465,30 @@ export async function runThinRouterPhase(input: {
         handled: true,
         finalText: "どの一覧の1番か分かりませんでした。",
       };
+    }
+
+    const compoundTask = await tryHandleTaskCompoundLine({
+      db,
+      text,
+      channelUserId,
+      actorUserId: effectiveActorId,
+      groupId,
+    });
+    if (compoundTask.handled) {
+      await persistTaskLineSessionMemory(compoundTask);
+      return { handled: true, finalText: compoundTask.reply };
+    }
+
+    if (looksLikeTaskCategoryCommand(text)) {
+      const catResult = await tryHandleTaskCategoryLine({
+        db,
+        text,
+        channelUserId,
+        groupId,
+      });
+      if (catResult.handled) {
+        return { handled: true, finalText: catResult.reply };
+      }
     }
 
     const reminderByList = await tryResolveReminderFromRecentTaskList({

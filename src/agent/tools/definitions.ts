@@ -108,8 +108,32 @@ export const NEAR_AGENT_FUNCTION_TOOLS: FunctionTool[] = [
       properties: {
         title: { type: "string", description: "タスクの要約タイトル（短く）" },
         notes: { type: ["string", "null"], description: "補足。なければ null" },
+        category_name: {
+          type: ["string", "null"],
+          description: "カテゴリ名（例: 仕事）。未指定なら null",
+        },
       },
-      required: ["title", "notes"],
+      required: ["title", "notes", "category_name"],
+    },
+  },
+  {
+    type: "function",
+    name: "near_save_task_with_reminder",
+    strict: true,
+    description:
+      "タスクを1件追加し、同時にリマインドも設定するとき。『〇〇をタスクに入れて明日17時にリマインド』など。",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        title: { type: "string", description: "タスクタイトル" },
+        when_description: {
+          type: "string",
+          description: "リマインド日時（例: 明日17時、30分後）",
+        },
+        category_name: { type: ["string", "null"], description: "カテゴリ名。なければ null" },
+      },
+      required: ["title", "when_description", "category_name"],
     },
   },
   {

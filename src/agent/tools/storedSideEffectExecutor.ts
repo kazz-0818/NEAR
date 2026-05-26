@@ -59,6 +59,10 @@ export async function executeStoredSideEffectTool(
         if (typeof notesVal === "string" && notesVal.trim()) {
           params.notes = notesVal.trim();
         }
+        const catVal = rec.category_name;
+        if (typeof catVal === "string" && catVal.trim()) {
+          params.category_name = catVal.trim();
+        }
         const intent = syntheticAgentIntent("task_create", params);
         const mod = await taskManager(toModuleContext(input, intent, title));
         return await finish(mod, mod.success, mod.success ? null : "task_failed");

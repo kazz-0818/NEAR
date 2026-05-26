@@ -8,6 +8,7 @@ import { sheetsQuery } from "../../modules/sheets_query.js";
 import { summarizer } from "../../modules/summarizer.js";
 import { taskSheetQuery } from "../../modules/task_sheet_query.js";
 import { taskManager } from "../../modules/task_manager.js";
+import { saveTaskWithReminderInDb } from "../../services/task_compound_line.js";
 import type { ModuleResult } from "../../modules/types.js";
 import { listCapabilityLines } from "../../modules/capabilities.js";
 import { syntheticAgentIntent } from "../syntheticIntent.js";
@@ -226,9 +227,13 @@ export async function executeNearAgentFunction(
             "followup"
           );
         }
+        const catVal = rec.category_name;
         const params: Record<string, unknown> = { title };
         if (typeof notesVal === "string" && notesVal.trim()) {
           params.notes = notesVal.trim();
+        }
+        if (typeof catVal === "string" && catVal.trim()) {
+          params.category_name = catVal.trim();
         }
         const intent = syntheticAgentIntent("task_create", params);
         const mod = await taskManager(toModuleContext(input, intent, title));
@@ -284,6 +289,40 @@ export async function executeNearAgentFunction(
           name,
           started,
           JSON.stringify({ ok: true, ...moduleResultToToolPayload(mod) }),
+          mod.situation
+        );
+      }
+      case "near_save_task_with_reminder": {
+        const title = typeof rec.title === "string" ? rec.title.trim() : "";
+        const when = typeof rec.when_description === "string" ? rec.when_description.trim() : "";
+        if (!title || !when) {
+          return finishToolExecution(
+            input,
+            name,
+            started,
+            JSON.stringify({ ok: false, error: "title_and_when_required" })
+          );
+        }
+        const catVal = rec.category_name;
+        const saved = await saveTaskWithReminderInDb({
+          db: input.db,
+          channelUserId: input.channelUserId,
+          actorUserId: input.actorUserId ?? input.channelUserId,
+          groupId: input.groupId ?? undefined,
+          title,
+          whenDescription: when,
+          categoryName: typeof catVal === "string" ? catVal : null,
+        });
+        const mod: ModuleResult = {
+          success: saved.ok,
+          draft: saved.reply,
+          situation: saved.ok ? "success" : "followup",
+        };
+        return finishToolExecution(
+          input,
+          name,
+          started,
+          JSON.stringify({ ok: saved.ok, ...moduleResultToToolPayload(mod) }),
           mod.situation
         );
       }

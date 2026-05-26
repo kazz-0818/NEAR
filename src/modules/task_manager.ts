@@ -1,3 +1,4 @@
+import { createTaskCategory, resolveCategoryByName } from "../db/task_categories_repo.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
 
 function pickTitle(ctx: ModuleContext): string {
@@ -29,10 +30,39 @@ export async function taskManager(ctx: ModuleContext): Promise<ModuleResult> {
   // グループではデフォルトでグループ共有タスク、個人と明示した場合のみ個人タスク
   const taskScope = !isGroup ? "personal" : isExplicitPersonalTaskIntent(ctx.originalText) ? "personal" : "group";
 
+  let categoryId: string | null = null;
+  const catName = (ctx.intent.required_params as Record<string, unknown>).category_name;
+  if (typeof catName === "string" && catName.trim()) {
+    const { category } = await resolveCategoryByName(
+      ctx.db,
+      ctx.channelUserId,
+      ctx.groupId ?? undefined,
+      catName.trim()
+    );
+    if (category) categoryId = category.id;
+    else {
+      const created = await createTaskCategory(ctx.db, {
+        channelUserId: ctx.channelUserId,
+        groupId: ctx.groupId ?? undefined,
+        name: catName.trim(),
+      });
+      categoryId = created.id;
+    }
+  }
+
   await ctx.db.query(
-    `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [ctx.channel, ctx.channelUserId, ctx.actorUserId ?? null, ctx.groupId ?? null, taskScope, title, notes]
+    `INSERT INTO near_tasks (channel, channel_user_id, actor_user_id, group_id, task_scope, title, notes, category_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::uuid)`,
+    [
+      ctx.channel,
+      ctx.channelUserId,
+      ctx.actorUserId ?? null,
+      ctx.groupId ?? null,
+      taskScope,
+      title,
+      notes,
+      categoryId,
+    ]
   );
 
   const name = ctx.actorDisplayName ?? null;

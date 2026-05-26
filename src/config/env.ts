@@ -649,6 +649,11 @@ const envSchema = z.object({
       const n = parseInt(s, 10);
       return Number.isFinite(n) && n >= 200 && n <= 2000 ? n : 700;
     }),
+  /** true / 1（既定 ON）: 一括タスク追加でルール分割が不十分なとき LLM 抽出を試す */
+  NEAR_TASK_BULK_EXTRACT_ENABLED: z
+    .string()
+    .optional()
+    .transform((s) => s !== "false" && s !== "0"),
   /** true / 1 で veriora.messages へ書き込み（既定 ON）。false / 0 で OFF */
   /** Veliora ベガパンク: 横断共通顧客マスター（既定 ON） */
   VERIORA_CUSTOMER_MASTER_ENABLED: z

@@ -1,6 +1,7 @@
 import {
   isReminderTimeInPast,
   parseRelativeReminderAt,
+  parseReminderAtFromDescription,
 } from "../lib/datetimeContext.js";
 import type { ModuleContext, ModuleResult } from "./types.js";
 import { upsertSessionMemory } from "../services/conversation_session_memory.js";
@@ -23,8 +24,15 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
       ? p.when_description.trim()
       : null;
 
-  const relative = parseRelativeReminderAt(whenDescription ?? ctx.originalText, now);
-  let iso = relative ?? parseIso(p.datetime_iso);
+  const whenText = whenDescription ?? ctx.originalText;
+  const relative = parseRelativeReminderAt(whenText, now);
+  let iso =
+    relative ??
+    (whenDescription ? parseReminderAtFromDescription(whenDescription, now) : null) ??
+    parseIso(p.datetime_iso);
+  const taskIdRaw = p.task_id;
+  const taskId =
+    typeof taskIdRaw === "string" && taskIdRaw.trim() ? taskIdRaw.trim() : null;
   let pastTimeDetected = false;
   if (iso && !relative && isReminderTimeInPast(iso, now)) {
     pastTimeDetected = true;
@@ -33,8 +41,8 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
 
   if (iso) {
     const ins = await ctx.db.query<{ id: number }>(
-      `INSERT INTO near_reminders (channel, channel_user_id, actor_user_id, group_id, remind_at, message, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+      `INSERT INTO near_reminders (channel, channel_user_id, actor_user_id, group_id, remind_at, message, status, task_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7::bigint)
        RETURNING id`,
       [
         ctx.channel,
@@ -43,6 +51,7 @@ export async function reminderManager(ctx: ModuleContext): Promise<ModuleResult>
         ctx.groupId ?? null,
         iso.toISOString(),
         message,
+        taskId,
       ]
     );
     const rid = ins.rows[0]?.id;

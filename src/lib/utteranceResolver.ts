@@ -34,7 +34,8 @@ const SHEET_TASK_LIST_RE =
   /(スプレッドシート.*タスク|スプシ.*タスク|スプレッド.*タスク|シート.*タスク|googleシート.*タスク|ガントチャート.*(見せ|出して|確認|教えて)?|タスク管理表.*(見せ|出して|確認|教えて)?|シートから.*タスク|表から.*タスク)/iu;
 const DELETE_WORD_RE = /(削除|消して|消去|消す|外して|外す|remove|delete)/iu;
 const UPDATE_WORD_RE = /(完了|終わった|進行中にして|変更|修正|期限|担当|ステータス|内容修正|優先度.*にして)/iu;
-const MEMO_RE = /(メモ|覚えて|記録して|残して)/iu;
+const MEMO_RE = /(メモ(?!欄)|記録して|残して)/iu;
+const MEMO_REMEMBER_RE = /覚えておいて|覚えといて/u;
 const REMINDER_RE = /(リマインド|思い出させ|通知して|アラーム|明日|今日|分後|時間後|月\d+日|時)/iu;
 const CALENDAR_RE = /(カレンダー|予定|予定表|googleカレンダー|予定入れて|予定追加|予定確認)/iu;
 const AMBIGUOUS_TASK_RE = /^(タスク|リスト|todo|やること|あれやっといて|さっきのやつ(お願い)?|それお願い|整理して|管理して)$/iu;
@@ -137,7 +138,10 @@ export function resolveUserOperation(input: {
     return { kind: "task.clarify", confidence: 0.8, reason: "task_action_unspecified" };
   }
 
-  if (MEMO_RE.test(compact) && !hasTaskWord) {
+  if (MEMO_REMEMBER_RE.test(compact) && !hasTaskWord && !hasAddWord) {
+    return { kind: "memo.save", confidence: 0.7, reason: "memo_remember_phrase" };
+  }
+  if (MEMO_RE.test(compact) && !hasTaskWord && !hasAddWord) {
     return { kind: "memo.save", confidence: 0.66, reason: "memo_keywords" };
   }
   if (REMINDER_RE.test(compact) && /(リマインド|通知|思い出させ|分後|時間後|明日|今日|時)/iu.test(compact)) {

@@ -89,3 +89,71 @@ export function parseRelativeReminderAt(text: string, from: Date = new Date()): 
 export function isReminderTimeInPast(iso: Date, now: Date = new Date(), graceMs = 120_000): boolean {
   return iso.getTime() < now.getTime() - graceMs;
 }
+
+function parseHourMinuteFromJapaneseTimeFragment(t: string): { hour: number; min: number } | null {
+  const colonMatch = t.match(/(\d{1,2})[:：](\d{2})/u);
+  if (colonMatch) {
+    const hour = Number.parseInt(colonMatch[1]!, 10);
+    const min = Number.parseInt(colonMatch[2]!, 10);
+    if (hour >= 0 && hour <= 23 && min >= 0 && min <= 59) return { hour, min };
+    return null;
+  }
+  const jiMatch = t.match(/(\d{1,2})\s*時(?:\s*(\d{1,2})\s*分|半)?/u);
+  if (!jiMatch) return null;
+  const hour = Number.parseInt(jiMatch[1]!, 10);
+  let min = 0;
+  if (jiMatch[0]?.includes("半")) min = 30;
+  else if (jiMatch[2]) min = Number.parseInt(jiMatch[2], 10);
+  if (hour < 0 || hour > 23 || min < 0 || min > 59) return null;
+  return { hour, min };
+}
+
+function jstCalendarParts(from: Date, dayOffset: number): { year: number; month: number; day: number } | null {
+  const shifted = new Date(from.getTime() + dayOffset * 86_400_000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(shifted);
+  const year = Number.parseInt(parts.find((p) => p.type === "year")?.value ?? "0", 10);
+  const month = Number.parseInt(parts.find((p) => p.type === "month")?.value ?? "0", 10);
+  const day = Number.parseInt(parts.find((p) => p.type === "day")?.value ?? "0", 10);
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+}
+
+/**
+ * 日本語の when 説明（明日17:00、30分後 など）を絶対日時に変換。
+ * reminder_manager / task_compound_line で共有。
+ */
+export function parseReminderAtFromDescription(whenDescription: string, from: Date = new Date()): Date | null {
+  const trimmed = whenDescription.trim();
+  if (!trimmed) return null;
+
+  const relative = parseRelativeReminderAt(trimmed, from);
+  if (relative) return relative;
+
+  const isoTry = new Date(trimmed);
+  if (!Number.isNaN(isoTry.getTime()) && /\d{4}-\d{2}-\d{2}/u.test(trimmed)) {
+    return isoTry;
+  }
+
+  const t = trimmed.normalize("NFKC");
+  let dayOffset: number | null = null;
+  if (/明後日/u.test(t)) dayOffset = 2;
+  else if (/明日/u.test(t)) dayOffset = 1;
+  else if (/今日/u.test(t)) dayOffset = 0;
+  if (dayOffset === null) return null;
+
+  const hm = parseHourMinuteFromJapaneseTimeFragment(t);
+  if (!hm) return null;
+
+  const cal = jstCalendarParts(from, dayOffset);
+  if (!cal) return null;
+
+  const utcMs = Date.UTC(cal.year, cal.month - 1, cal.day, hm.hour, hm.min, 0) - 9 * 60 * 60 * 1000;
+  const result = new Date(utcMs);
+  if (isReminderTimeInPast(result, from)) return null;
+  return result;
+}

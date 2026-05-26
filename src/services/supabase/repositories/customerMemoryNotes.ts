@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 import type { CreateMemoryNoteInput, CustomerMemoryNoteRow } from "../../customers/types.js";
 
 export async function createCustomerMemoryNote(
@@ -7,7 +7,7 @@ export async function createCustomerMemoryNote(
   input: CreateMemoryNoteInput
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.customerMemoryNotes} (
+    `INSERT INTO ${VELIORA_TABLES.customerMemoryNotes} (
       customer_id, note, category, source_agent_key,
       source_conversation_id, source_message_id,
       importance, confidence, confirmed
@@ -37,7 +37,7 @@ export async function listCustomerMemoryNotes(
 ): Promise<CustomerMemoryNoteRow[]> {
   const params: unknown[] = [customerId];
   let sql = `SELECT id, customer_id, note, category, source_agent_key, importance, confidence, confirmed
-             FROM ${VERIORA_TABLES.customerMemoryNotes}
+             FROM ${VELIORA_TABLES.customerMemoryNotes}
              WHERE customer_id = $1`;
   if (opts?.confirmedOnly) sql += ` AND confirmed = true`;
   sql += ` ORDER BY
@@ -57,7 +57,7 @@ export async function getCustomerMemoryNoteById(
 ): Promise<(CustomerMemoryNoteRow & { created_at: string }) | null> {
   const r = await db.query<CustomerMemoryNoteRow & { created_at: string }>(
     `SELECT id, customer_id, note, category, source_agent_key, importance, confidence, confirmed, created_at
-     FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE id = $1`,
+     FROM ${VELIORA_TABLES.customerMemoryNotes} WHERE id = $1`,
     [noteId]
   );
   return r.rows[0] ?? null;
@@ -89,7 +89,7 @@ export async function patchCustomerMemoryNote(
   if (!sets.length) return false;
   sets.push("updated_at = now()");
   const r = await db.query(
-    `UPDATE ${VERIORA_TABLES.customerMemoryNotes} SET ${sets.join(", ")} WHERE id = $1`,
+    `UPDATE ${VELIORA_TABLES.customerMemoryNotes} SET ${sets.join(", ")} WHERE id = $1`,
     params
   );
   return (r.rowCount ?? 0) > 0;
@@ -97,6 +97,6 @@ export async function patchCustomerMemoryNote(
 
 /** 管理 API 用・単一行のみ */
 export async function deleteCustomerMemoryNote(db: VelioraDb, noteId: string): Promise<boolean> {
-  const r = await db.query(`DELETE FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE id = $1`, [noteId]);
+  const r = await db.query(`DELETE FROM ${VELIORA_TABLES.customerMemoryNotes} WHERE id = $1`, [noteId]);
   return (r.rowCount ?? 0) > 0;
 }

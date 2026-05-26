@@ -324,7 +324,7 @@ async function main(): Promise<void> {
 
     const masterFlag = (s: string | undefined) => s !== "false" && s !== "0";
     record(
-      "VERIORA_CUSTOMER_MASTER_ENABLED=false",
+      "VELIORA_CUSTOMER_MASTER_ENABLED=false",
       masterFlag("false") === false && masterFlag("0") === false,
       "env transform matches getEnv schema (lineResolve skips when false)",
     );
@@ -437,7 +437,7 @@ ${section(checks, /context|audit/)}
 
 ${section(checks, /memoryExtractor/)}
 
-## 10. VERIORA_CUSTOMER_MASTER_ENABLED=false時の挙動
+## 10. VELIORA_CUSTOMER_MASTER_ENABLED=false時の挙動
 
 ${section(checks, /ENABLED=false/)}
 
@@ -462,7 +462,7 @@ ${fixList.length ? fixList.map((f) => `- ${f}`).join("\n") : `- 068 backfill: UP
 - [ ] staging で本レポートの全項目が green
 - [ ] 068 backfill 件数確認
 - [ ] NEAR → 他部署の順でデプロイ
-- [ ] \`VERIORA_CUSTOMER_MASTER_ENABLED\` 緊急OFF手順の共有
+- [ ] \`VELIORA_CUSTOMER_MASTER_ENABLED\` 緊急OFF手順の共有
 - [ ] 手動 merge 運用（自動統合なし）の合意
 
 ## 15. Phase 3 提案

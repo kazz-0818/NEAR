@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export async function createLramArticleSource(
   db: VelioraDb,
@@ -14,7 +14,7 @@ export async function createLramArticleSource(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.lramArticleSources} (
+    `INSERT INTO ${VELIORA_TABLES.lramArticleSources} (
       source_url, source_site, source_title, brand_name, category, fetched_at, raw_summary, metadata
     ) VALUES ($1,$2,$3,$4,$5, now(), $6, $7::jsonb)
     RETURNING id`,
@@ -46,7 +46,7 @@ export async function createLramArticleCandidate(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.lramArticleCandidates} (
+    `INSERT INTO ${VELIORA_TABLES.lramArticleCandidates} (
       source_id, agent_id, title_candidate, angle, facts, bravo_viewpoint, status
     ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7)
     RETURNING id`,
@@ -80,7 +80,7 @@ export async function createGeneratedArticle(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.lramGeneratedArticles} (
+    `INSERT INTO ${VELIORA_TABLES.lramGeneratedArticles} (
       candidate_id, title, slug, excerpt, content, image_prompt, tags, categories, status
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING id`,
@@ -113,7 +113,7 @@ export async function saveWordPressPostRecord(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.lramWpPosts} (
+    `INSERT INTO ${VELIORA_TABLES.lramWpPosts} (
       generated_article_id, wp_post_id, wp_post_url, wp_status, posted_at, metadata
     ) VALUES ($1,$2,$3,$4,$5,$6::jsonb)
     RETURNING id`,

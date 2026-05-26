@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 import { getAgentByKey } from "./agents.js";
 import { upsertConversation } from "./conversations.js";
 
@@ -36,7 +36,7 @@ export async function saveMessage(db: VelioraDb, input: SaveMessageInput): Promi
 
   if (input.legacyRowId != null && input.legacySchema && input.legacyTable) {
     const dup = await db.query<{ id: string }>(
-      `SELECT id FROM ${VERIORA_TABLES.messages}
+      `SELECT id FROM ${VELIORA_TABLES.messages}
        WHERE legacy_schema = $1 AND legacy_table = $2 AND legacy_row_id = $3 LIMIT 1`,
       [input.legacySchema, input.legacyTable, input.legacyRowId]
     );
@@ -44,7 +44,7 @@ export async function saveMessage(db: VelioraDb, input: SaveMessageInput): Promi
   }
 
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.messages} (
+    `INSERT INTO ${VELIORA_TABLES.messages} (
       conversation_id, agent_id, direction, role, message_type, text,
       raw_payload, tool_calls, metadata,
       legacy_schema, legacy_table, legacy_row_id, created_at
@@ -90,7 +90,7 @@ export async function listMessagesByConversation(
   const lim = Math.min(Math.max(limit, 1), 500);
   const r = await db.query<MessageRow>(
     `SELECT id, conversation_id, agent_id, direction, role, message_type, text, created_at
-     FROM ${VERIORA_TABLES.messages}
+     FROM ${VELIORA_TABLES.messages}
      WHERE conversation_id = $1
      ORDER BY created_at ASC
      LIMIT $2`,

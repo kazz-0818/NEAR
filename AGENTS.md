@@ -5,8 +5,10 @@
 ## 正典とレガシー表記
 
 - **組織・ブランド名（正典）**: **Veliora**
-- **技術識別子（変更しない）**: Postgres スキーマ `veriora`、env 接頭辞 `VERIORA_*`、`verioraHandoff.ts` など
-- **旧誤表記**: **Veriora** は **Veliora** に読み替え。`veliora` schema は旧 LINE ログ用（`VELIORA_LEGACY_VELIORA_LINE_LOG`）
+- **Postgres（migration 073 以降）**: 正典スキーマ `veliora`、旧 LINE イベントは `veliora_line_legacy`（`VELIORA_LEGACY_LINE_LOG`）
+- **env**: 推奨 `VELIORA_*`。`VERIORA_*` は互換 alias（`src/config/envAlias.ts`）
+- **コード**: `velioraHandoff.ts` が正。`verioraHandoff.ts` は re-export シム
+- **旧誤表記**: **Veriora** → **Veliora**。migration ファイル名の `053_veriora_*` は適用履歴のためリネームしない
 
 ## このリポジトリの役割
 
@@ -20,7 +22,7 @@
 | [`docs/env-conventions.md`](docs/env-conventions.md) | 環境変数命名規約 |
 | [`docs/db-conventions.md`](docs/db-conventions.md) | DB / テーブル命名規約 |
 | [`docs/new-agent-checklist.md`](docs/new-agent-checklist.md) | 新規 AI エージェント追加手順 |
-| [`docs/supabase-schema.md`](docs/supabase-schema.md) | `veriora` schema・既存テーブル対応表 |
+| [`docs/supabase-schema.md`](docs/supabase-schema.md) | `veliora` schema・既存テーブル対応表 |
 | [`docs/migration-plan.md`](docs/migration-plan.md) | migration 053–063 適用手順 |
 | [`docs/supabase-simplification.md`](docs/supabase-simplification.md) | Table Editor 整理・LINE ログ env |
 | [`docs/near-user-memory.md`](docs/near-user-memory.md) | ユーザー長期記憶（学習） |
@@ -33,7 +35,7 @@
 - Canonical DB: `src/services/supabase/`（LINE ログ・[`supabase-simplification.md`](docs/supabase-simplification.md)）
 - ユーザー長期記憶: `src/services/user_memory_*.ts`（[`near-user-memory.md`](docs/near-user-memory.md)、既定 ON）
 
-**現状**: **NEAR** は handoff（`verioraHandoff.ts`）等で `getVelioraAgentByKey` を実行経路で使用。他 TS リポは `src/agents/{key}/config.ts` で参照。IRIE は Python registry。全面接続は Phase 5 以降で段階的に（[`docs/veriora-architecture.md`](docs/veriora-architecture.md)）。
+**現状**: **NEAR** は handoff（`velioraHandoff.ts`）等で `getVelioraAgentByKey` を実行経路で使用。他 TS リポは `src/agents/{key}/config.ts` で参照。IRIE は Python registry。全面接続は Phase 5 以降で段階的に（[`docs/veriora-architecture.md`](docs/veriora-architecture.md)）。
 
 ## 禁止事項（エージェント・人間共通）
 

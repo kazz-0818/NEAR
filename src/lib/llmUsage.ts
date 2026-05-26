@@ -86,10 +86,10 @@ export function recordLlmUsage(payload: LlmUsagePayload): void {
   void sendLlmUsageToRits(payload).catch(() => undefined);
 }
 
-/** VERIORA_RITS_BASE_URL + VERIORA_RITS_ADMIN_API_KEY があるときのみ送信（未設定は no-op） */
+/** VELIORA_RITS_BASE_URL + VELIORA_RITS_ADMIN_API_KEY があるときのみ送信（未設定は no-op） */
 export async function sendLlmUsageToRits(payload: LlmUsagePayload): Promise<void> {
-  const base = process.env.VERIORA_RITS_BASE_URL?.trim().replace(/\/$/, "");
-  const key = process.env.VERIORA_RITS_ADMIN_API_KEY?.trim();
+  const base = process.env.VELIORA_RITS_BASE_URL?.trim().replace(/\/$/, "");
+  const key = process.env.VELIORA_RITS_ADMIN_API_KEY?.trim();
   if (!base || !key || key.length < 12) return;
 
   const url = `${base}/admin/usage`;

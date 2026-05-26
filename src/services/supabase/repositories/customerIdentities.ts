@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 import type { CustomerIdentityRow } from "../../customers/types.js";
 
 export type UpsertIdentityInput = {
@@ -24,7 +24,7 @@ export async function findCustomerByIdentity(
   const r = await db.query<CustomerIdentityRow & { customer_id: string }>(
     `SELECT id, customer_id, provider, channel_key, agent_key, external_user_id,
             external_display_name, external_picture_url, raw_profile, verified, linked_by
-     FROM ${VERIORA_TABLES.customerIdentities}
+     FROM ${VELIORA_TABLES.customerIdentities}
      WHERE provider = $1 AND channel_key = $2 AND external_user_id = $3
      LIMIT 1`,
     [provider, channelKey, externalUserId]
@@ -54,17 +54,17 @@ export async function upsertCustomerIdentity(
   input: UpsertIdentityInput
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.customerIdentities} (
+    `INSERT INTO ${VELIORA_TABLES.customerIdentities} (
       customer_id, provider, channel_key, agent_key, external_user_id,
       external_display_name, external_picture_url, raw_profile, linked_by, verified
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)
     ON CONFLICT (provider, channel_key, external_user_id) DO UPDATE SET
       customer_id = EXCLUDED.customer_id,
-      agent_key = COALESCE(EXCLUDED.agent_key, ${VERIORA_TABLES.customerIdentities}.agent_key),
-      external_display_name = COALESCE(EXCLUDED.external_display_name, ${VERIORA_TABLES.customerIdentities}.external_display_name),
-      external_picture_url = COALESCE(EXCLUDED.external_picture_url, ${VERIORA_TABLES.customerIdentities}.external_picture_url),
+      agent_key = COALESCE(EXCLUDED.agent_key, ${VELIORA_TABLES.customerIdentities}.agent_key),
+      external_display_name = COALESCE(EXCLUDED.external_display_name, ${VELIORA_TABLES.customerIdentities}.external_display_name),
+      external_picture_url = COALESCE(EXCLUDED.external_picture_url, ${VELIORA_TABLES.customerIdentities}.external_picture_url),
       raw_profile = CASE
-        WHEN EXCLUDED.raw_profile = '{}'::jsonb THEN ${VERIORA_TABLES.customerIdentities}.raw_profile
+        WHEN EXCLUDED.raw_profile = '{}'::jsonb THEN ${VELIORA_TABLES.customerIdentities}.raw_profile
         ELSE EXCLUDED.raw_profile
       END,
       updated_at = now()
@@ -94,7 +94,7 @@ export async function listIdentitiesForCustomer(
   const r = await db.query<CustomerIdentityRow>(
     `SELECT id, customer_id, provider, channel_key, agent_key, external_user_id,
             external_display_name, external_picture_url, raw_profile, verified, linked_by
-     FROM ${VERIORA_TABLES.customerIdentities}
+     FROM ${VELIORA_TABLES.customerIdentities}
      WHERE customer_id = $1
      ORDER BY created_at`,
     [customerId]
@@ -111,7 +111,7 @@ export async function reassignIdentitiesToCustomer(
   toCustomerId: string
 ): Promise<void> {
   await db.query(
-    `UPDATE ${VERIORA_TABLES.customerIdentities}
+    `UPDATE ${VELIORA_TABLES.customerIdentities}
      SET customer_id = $2, updated_at = now()
      WHERE customer_id = $1`,
     [fromCustomerId, toCustomerId]

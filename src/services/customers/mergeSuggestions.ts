@@ -29,8 +29,8 @@ export async function suggestMergeByDisplayName(
 ): Promise<number> {
   const r = await db.query<{ other_id: string }>(
     `SELECT DISTINCT ci2.customer_id AS other_id
-     FROM veriora.customer_identities ci1
-     JOIN veriora.customer_identities ci2
+     FROM veliora.customer_identities ci1
+     JOIN veliora.customer_identities ci2
        ON ci1.external_display_name IS NOT NULL
       AND btrim(ci1.external_display_name) = btrim(ci2.external_display_name)
       AND btrim(ci1.external_display_name) = btrim($2::text)
@@ -60,7 +60,7 @@ export async function suggestMergeByEmail(
   const norm = email.trim().toLowerCase();
   if (!norm.includes("@")) return 0;
   const r = await db.query<{ other_id: string }>(
-    `SELECT id AS other_id FROM veriora.customers
+    `SELECT id AS other_id FROM veliora.customers
      WHERE status = 'active' AND id <> $1
        AND email IS NOT NULL AND lower(btrim(email)) = $2
      LIMIT 5`,
@@ -87,7 +87,7 @@ export async function suggestMergeByPhone(
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 10) return 0;
   const r = await db.query<{ other_id: string }>(
-    `SELECT id AS other_id FROM veriora.customers
+    `SELECT id AS other_id FROM veliora.customers
      WHERE status = 'active' AND id <> $1
        AND phone IS NOT NULL
        AND regexp_replace(phone, '[^0-9]', '', 'g') = $2

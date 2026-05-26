@@ -19,17 +19,17 @@ function clip(s: string | null | undefined, max = MAX_FIELD): string | null {
   return t.length <= max ? t : `${t.slice(0, max)}…`;
 }
 
-/** 既定 ON。`VERIORA_RITS_GROUP_OBSERVE=false` でグループ傍受のみ停止 */
+/** 既定 ON。`VELIORA_RITS_GROUP_OBSERVE=false` でグループ傍受のみ停止 */
 export function isRitsGroupObserveEnabled(): boolean {
-  const v = process.env.VERIORA_RITS_GROUP_OBSERVE?.trim().toLowerCase();
+  const v = process.env.VELIORA_RITS_GROUP_OBSERVE?.trim().toLowerCase();
   if (v === "0" || v === "false" || v === "off" || v === "no") return false;
   return true;
 }
 
 /** NEAR → RITS POST /admin/logs（env 未設定時は no-op） */
 export async function sendAgentLogToRits(payload: RitsAgentLogPayload): Promise<void> {
-  const base = process.env.VERIORA_RITS_BASE_URL?.trim().replace(/\/$/, "");
-  const key = process.env.VERIORA_RITS_ADMIN_API_KEY?.trim();
+  const base = process.env.VELIORA_RITS_BASE_URL?.trim().replace(/\/$/, "");
+  const key = process.env.VELIORA_RITS_ADMIN_API_KEY?.trim();
   if (!base || !key || key.length < 12) return;
 
   const body = {

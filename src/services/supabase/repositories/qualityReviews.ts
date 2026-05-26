@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export async function createQualityReview(
   db: VelioraDb,
@@ -15,7 +15,7 @@ export async function createQualityReview(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.agentQualityReviews} (
+    `INSERT INTO ${VELIORA_TABLES.agentQualityReviews} (
       review_date, agent_id, score_overall, score_understanding, score_accuracy,
       score_role_adherence, score_actionability, summary
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -50,7 +50,7 @@ export async function createQualityFinding(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.agentQualityFindings} (
+    `INSERT INTO ${VELIORA_TABLES.agentQualityFindings} (
       review_id, agent_id, conversation_id, message_id,
       category, severity, finding, suggestion
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -84,7 +84,7 @@ export async function createImprovementTask(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.agentImprovementTasks} (
+    `INSERT INTO ${VELIORA_TABLES.agentImprovementTasks} (
       source_finding_id, target_agent_id, title, description,
       cursor_instruction, priority, status
     ) VALUES ($1,$2,$3,$4,$5,$6,$7)

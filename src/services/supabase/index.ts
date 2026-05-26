@@ -1,5 +1,10 @@
 export { getVelioraDb, type VelioraDb, getVerioraDb, type VerioraDb } from "./client.js";
-export { VERIORA_SCHEMA, VERIORA_TABLES } from "./schema.js";
+export {
+  VELIORA_SCHEMA,
+  VELIORA_TABLES,
+  VERIORA_SCHEMA,
+  VERIORA_TABLES,
+} from "./schema.js";
 export * from "./repositories/agents.js";
 export * from "./repositories/conversations.js";
 export * from "./repositories/messages.js";

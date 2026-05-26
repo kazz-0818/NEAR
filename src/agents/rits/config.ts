@@ -16,8 +16,8 @@ export const IMPLEMENTATION_PATHS = {
   secondary: "src/services/",
 } as const;
 
-export const VERIORA_TABLES_USED = [
-  "veriora.ai_agents",
-  "veriora.conversations",
-  "veriora.messages",
+export const VELIORA_TABLES_USED = [
+  "veliora.ai_agents",
+  "veliora.conversations",
+  "veliora.messages",
 ] as const;

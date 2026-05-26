@@ -1,5 +1,5 @@
 import type { Db } from "../../db/client.js";
-import { VERIORA_TABLES } from "../supabase/schema.js";
+import { VELIORA_TABLES } from "../supabase/schema.js";
 import { listMergeCandidates } from "../supabase/repositories/customerMergeCandidates.js";
 
 const SENSITIVE_PATTERN =
@@ -12,33 +12,33 @@ export async function buildCustomerAuditSummary(db: Db): Promise<Record<string, 
   const [active, new24h, pending, memConfirmed, memUnconfirmed, agentMsgs, multiAgent] =
     await Promise.all([
       db.query<{ n: string }>(
-        `SELECT COUNT(*)::text AS n FROM ${VERIORA_TABLES.customers} WHERE status = 'active'`,
+        `SELECT COUNT(*)::text AS n FROM ${VELIORA_TABLES.customers} WHERE status = 'active'`,
       ),
       db.query<{ n: string }>(
-        `SELECT COUNT(*)::text AS n FROM ${VERIORA_TABLES.customers}
+        `SELECT COUNT(*)::text AS n FROM ${VELIORA_TABLES.customers}
          WHERE status = 'active' AND created_at >= $1::timestamptz`,
         [since24h],
       ),
       listMergeCandidates(db, "pending"),
       db.query<{ n: string }>(
-        `SELECT COUNT(*)::text AS n FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE confirmed = true`,
+        `SELECT COUNT(*)::text AS n FROM ${VELIORA_TABLES.customerMemoryNotes} WHERE confirmed = true`,
       ),
       db.query<{ n: string }>(
-        `SELECT COUNT(*)::text AS n FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE confirmed = false`,
+        `SELECT COUNT(*)::text AS n FROM ${VELIORA_TABLES.customerMemoryNotes} WHERE confirmed = false`,
       ),
       db.query<{ agent_key: string; n: string }>(
         `SELECT a.agent_key, COUNT(*)::text AS n
-         FROM veriora.messages m
-         JOIN veriora.ai_agents a ON a.id = m.agent_id
+         FROM veliora.messages m
+         JOIN veliora.ai_agents a ON a.id = m.agent_id
          WHERE m.created_at >= $1::timestamptz
          GROUP BY a.agent_key ORDER BY COUNT(*) DESC`,
         [since24h],
       ),
       db.query<{ customer_id: string; agent_count: string }>(
         `SELECT l.customer_id, COUNT(DISTINCT COALESCE(l.agent_key, a.agent_key))::text AS agent_count
-         FROM ${VERIORA_TABLES.customerConversationLinks} l
-         JOIN veriora.conversations c ON c.id = l.conversation_id
-         JOIN veriora.ai_agents a ON a.id = c.agent_id
+         FROM ${VELIORA_TABLES.customerConversationLinks} l
+         JOIN veliora.conversations c ON c.id = l.conversation_id
+         JOIN veliora.ai_agents a ON a.id = c.agent_id
          WHERE c.last_message_at >= $1::timestamptz
          GROUP BY l.customer_id
          HAVING COUNT(DISTINCT COALESCE(l.agent_key, a.agent_key)) > 1
@@ -56,7 +56,7 @@ export async function buildCustomerAuditSummary(db: Db): Promise<Record<string, 
     confirmed: boolean;
   }>(
     `SELECT id, customer_id, note, category, confirmed
-     FROM ${VERIORA_TABLES.customerMemoryNotes}
+     FROM ${VELIORA_TABLES.customerMemoryNotes}
      WHERE confirmed = false
      ORDER BY created_at DESC LIMIT 15`,
   );
@@ -67,7 +67,7 @@ export async function buildCustomerAuditSummary(db: Db): Promise<Record<string, 
     note: string;
   }>(
     `SELECT id, customer_id, note
-     FROM ${VERIORA_TABLES.customerMemoryNotes}
+     FROM ${VELIORA_TABLES.customerMemoryNotes}
      ORDER BY created_at DESC LIMIT 80`,
   );
 
@@ -81,8 +81,8 @@ export async function buildCustomerAuditSummary(db: Db): Promise<Record<string, 
   }>(
     `SELECT c.id AS customer_id, c.display_name, c.preferred_name,
             string_agg(DISTINCT ci.external_display_name, ', ') AS identity_names
-     FROM ${VERIORA_TABLES.customers} c
-     JOIN ${VERIORA_TABLES.customerIdentities} ci ON ci.customer_id = c.id
+     FROM ${VELIORA_TABLES.customers} c
+     JOIN ${VELIORA_TABLES.customerIdentities} ci ON ci.customer_id = c.id
      WHERE c.status = 'active'
        AND c.preferred_name IS NOT NULL AND btrim(c.preferred_name) <> ''
        AND ci.external_display_name IS NOT NULL
@@ -99,8 +99,8 @@ export async function buildCustomerAuditSummary(db: Db): Promise<Record<string, 
     `SELECT n.customer_id,
             COUNT(*) FILTER (WHERE n.source_agent_key = 'sera')::text AS sera_notes,
             COALESCE(MAX(LENGTH(ac.context_summary)) FILTER (WHERE ac.agent_key = 'near'), '0') AS near_ctx_len
-     FROM ${VERIORA_TABLES.customerMemoryNotes} n
-     LEFT JOIN ${VERIORA_TABLES.customerAgentContexts} ac ON ac.customer_id = n.customer_id
+     FROM ${VELIORA_TABLES.customerMemoryNotes} n
+     LEFT JOIN ${VELIORA_TABLES.customerAgentContexts} ac ON ac.customer_id = n.customer_id
      WHERE n.confirmed = true
      GROUP BY n.customer_id
      HAVING COUNT(*) FILTER (WHERE n.source_agent_key = 'sera') > 0
@@ -146,10 +146,10 @@ export async function listCustomerConversations(
     message_count: number;
   }>(
     `SELECT c.id AS conversation_id, a.agent_key, c.line_user_id, c.last_message_at,
-            (SELECT COUNT(*)::int FROM veriora.messages m WHERE m.conversation_id = c.id) AS message_count
-     FROM ${VERIORA_TABLES.customerConversationLinks} l
-     JOIN veriora.conversations c ON c.id = l.conversation_id
-     JOIN veriora.ai_agents a ON a.id = c.agent_id
+            (SELECT COUNT(*)::int FROM veliora.messages m WHERE m.conversation_id = c.id) AS message_count
+     FROM ${VELIORA_TABLES.customerConversationLinks} l
+     JOIN veliora.conversations c ON c.id = l.conversation_id
+     JOIN veliora.ai_agents a ON a.id = c.agent_id
      WHERE l.customer_id = $1
      ORDER BY c.last_message_at DESC NULLS LAST
      LIMIT $2`,
@@ -181,10 +181,10 @@ export async function listCustomerMessages(
     created_at: string;
   }>(
     `SELECT m.id, a.agent_key, m.direction, m.role, m.text, m.created_at
-     FROM veriora.messages m
-     JOIN veriora.conversations c ON c.id = m.conversation_id
-     JOIN ${VERIORA_TABLES.customerConversationLinks} l ON l.conversation_id = c.id
-     JOIN veriora.ai_agents a ON a.id = m.agent_id
+     FROM veliora.messages m
+     JOIN veliora.conversations c ON c.id = m.conversation_id
+     JOIN ${VELIORA_TABLES.customerConversationLinks} l ON l.conversation_id = c.id
+     JOIN veliora.ai_agents a ON a.id = m.agent_id
      WHERE l.customer_id = $1
      ORDER BY m.created_at DESC
      LIMIT $2`,

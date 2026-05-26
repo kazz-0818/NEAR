@@ -7,7 +7,7 @@ import { classifyIntent } from "./intent_classifier.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
 import { getLogger } from "../lib/logger.js";
-import { recordVelioraHandoffHint } from "../lib/verioraHandoff.js";
+import { recordVelioraHandoffHint } from "../lib/velioraHandoff.js";
 import type { GrowthGateResult } from "./growth_suggestion_gate.js";
 import { runGrowthPipelineAfterUnsupported } from "./growth_pipeline.js";
 import {

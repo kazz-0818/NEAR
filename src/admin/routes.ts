@@ -79,7 +79,7 @@ export function createAdminApp(): Hono {
   });
 
   /**
-   * Veliora OS 統一 LINE 履歴（063: veriora.messages + 未ミラー veliora.line_message_events）。
+   * Veliora OS 統一 LINE 履歴（063/073: veliora.messages + 未ミラー veliora_line_legacy.line_message_events）。
    * Query: agent_code, line_user_id, group_id, conversation_key, direction, limit
    */
   app.get("/veliora/line-messages", async (c) => {

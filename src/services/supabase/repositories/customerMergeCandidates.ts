@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export type MergeCandidateRow = {
   id: string;
@@ -25,12 +25,12 @@ export async function createMergeCandidate(
   const b = input.customerIdA < input.customerIdB ? input.customerIdB : input.customerIdA;
   if (a === b) return null;
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.customerMergeCandidates} (
+    `INSERT INTO ${VELIORA_TABLES.customerMergeCandidates} (
       customer_id_a, customer_id_b, reason, score, status, metadata
     )
     SELECT $1,$2,$3,$4,'pending',$5::jsonb
     WHERE NOT EXISTS (
-      SELECT 1 FROM ${VERIORA_TABLES.customerMergeCandidates}
+      SELECT 1 FROM ${VELIORA_TABLES.customerMergeCandidates}
       WHERE customer_id_a = $1 AND customer_id_b = $2 AND status = 'pending'
     )
     RETURNING id`,
@@ -45,7 +45,7 @@ export async function listMergeCandidates(
 ): Promise<MergeCandidateRow[]> {
   const r = await db.query<MergeCandidateRow>(
     `SELECT id, customer_id_a, customer_id_b, reason, score, status, created_at
-     FROM ${VERIORA_TABLES.customerMergeCandidates}
+     FROM ${VELIORA_TABLES.customerMergeCandidates}
      WHERE status = $1
      ORDER BY created_at DESC
      LIMIT 200`,
@@ -60,7 +60,7 @@ export async function markMergeCandidateStatus(
   status: string
 ): Promise<void> {
   await db.query(
-    `UPDATE ${VERIORA_TABLES.customerMergeCandidates}
+    `UPDATE ${VELIORA_TABLES.customerMergeCandidates}
      SET status = $2, updated_at = now() WHERE id = $1`,
     [id, status]
   );

@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export async function linkConversationToCustomer(
   db: VelioraDb,
@@ -12,7 +12,7 @@ export async function linkConversationToCustomer(
   }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO ${VERIORA_TABLES.customerConversationLinks} (
+    `INSERT INTO ${VELIORA_TABLES.customerConversationLinks} (
       customer_id, conversation_id, agent_key, link_reason, confidence
     ) VALUES ($1,$2,$3,$4,$5)
     ON CONFLICT (customer_id, conversation_id) DO NOTHING`,
@@ -25,7 +25,7 @@ export async function linkConversationToCustomer(
     ]
   );
   await db.query(
-    `UPDATE ${VERIORA_TABLES.conversations}
+    `UPDATE ${VELIORA_TABLES.conversations}
      SET customer_id = $2, updated_at = now()
      WHERE id = $1 AND customer_id IS NULL`,
     [input.conversationId, input.customerId]
@@ -37,7 +37,7 @@ export async function listConversationIdsForCustomer(
   customerId: string
 ): Promise<string[]> {
   const r = await db.query<{ conversation_id: string }>(
-    `SELECT conversation_id FROM ${VERIORA_TABLES.customerConversationLinks}
+    `SELECT conversation_id FROM ${VELIORA_TABLES.customerConversationLinks}
      WHERE customer_id = $1`,
     [customerId]
   );

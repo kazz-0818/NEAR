@@ -24,13 +24,13 @@ type AppendInput = {
 
 function shouldWriteCanonical(env: Env, legacyRowId: number | null | undefined): boolean {
   if (legacyRowId == null) return false;
-  if (env.VERIORA_CANONICAL_LINE_LOG) return true;
-  return env.VERIORA_CORE_DUAL_WRITE;
+  if (env.VELIORA_CANONICAL_LINE_LOG) return true;
+  return env.VELIORA_CORE_DUAL_WRITE;
 }
 
 /**
  * Veliora 共通 LINE ログへ追記。失敗しても本処理は継続（警告ログのみ）。
- * 正典は veriora.messages。veliora.line_message_events は VERIORA_LEGACY_VELIORA_LINE_LOG で制御。
+ * 正典は veliora.messages。veliora_line_legacy.line_message_events は VELIORA_LEGACY_LINE_LOG で制御。
  */
 export async function appendVelioraNearLineEvent(db: Db, input: AppendInput): Promise<void> {
   const log = getLogger();
@@ -63,11 +63,11 @@ export async function appendVelioraNearLineEvent(db: Db, input: AppendInput): Pr
         lineUserId: input.lineUserId,
       }).catch(() => undefined);
     } catch (e) {
-      log.warn({ err: e }, "veriora.messages canonical write failed (non-fatal)");
+      log.warn({ err: e }, "veliora.messages canonical write failed (non-fatal)");
     }
   }
 
-  if (!env.VERIORA_LEGACY_VELIORA_LINE_LOG) return;
+  if (!env.VELIORA_LEGACY_LINE_LOG) return;
 
   try {
     await db.query(

@@ -79,6 +79,7 @@ const MIGRATION_FILES = [
   "070_irie_line_group_registry.sql",
   "071_near_reminders_task_id.sql",
   "072_near_task_categories.sql",
+  "073_rename_veriora_schema_to_veliora.sql",
 ] as const;
 
 /** 旧名 schema_migrations → near_schema_migrations（Supabase 上で SERA と並べて識別しやすくする） */

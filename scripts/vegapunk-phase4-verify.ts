@@ -26,8 +26,8 @@ checks.push({
   ok: has("src/admin/customerRoutes.ts", 'app.patch("/customers/:id"'),
 });
 checks.push({
-  name: "VERIORA_MERGE_CANDIDATE_NOTIFY env",
-  ok: has("src/config/env.ts", "VERIORA_MERGE_CANDIDATE_NOTIFY"),
+  name: "VELIORA_MERGE_CANDIDATE_NOTIFY env",
+  ok: has("src/config/env.ts", "VELIORA_MERGE_CANDIDATE_NOTIFY"),
 });
 
 const lramRoot = join(root, "..", "LRAM");

@@ -7,7 +7,7 @@ import { listMergeCandidates } from "../supabase/repositories/customerMergeCandi
 
 function resolveNotifyTo(): string | null {
   const env = getEnv();
-  if (env.VERIORA_MERGE_CANDIDATE_NOTIFY === false) return null;
+  if (env.VELIORA_MERGE_CANDIDATE_NOTIFY === false) return null;
   if (env.GROWTH_APPROVAL_GROUP_ID?.trim()) return env.GROWTH_APPROVAL_GROUP_ID.trim();
   if (env.ADMIN_LINE_USER_ID?.trim()) return env.ADMIN_LINE_USER_ID.trim();
   return null;

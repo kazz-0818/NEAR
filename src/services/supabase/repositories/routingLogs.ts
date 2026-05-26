@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export async function saveRoutingLog(
   db: VelioraDb,
@@ -14,7 +14,7 @@ export async function saveRoutingLog(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.agentRoutingLogs} (
+    `INSERT INTO ${VELIORA_TABLES.agentRoutingLogs} (
       conversation_id, from_agent_id, to_agent_id, intent, confidence, reason, raw_result
     ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)
     RETURNING id`,
@@ -44,7 +44,7 @@ export async function saveHandoffLog(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.agentHandoffLogs} (
+    `INSERT INTO ${VELIORA_TABLES.agentHandoffLogs} (
       conversation_id, from_agent_id, to_agent_id, handoff_reason, summary
     ) VALUES ($1,$2,$3,$4,$5)
     RETURNING id`,

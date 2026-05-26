@@ -4,7 +4,7 @@
  * `code` は表示・RITS の agent_name 等との整合用（大文字推奨）。
  */
 export interface AgentDefinition {
-  /** Registry / DB `veriora.ai_agents.agent_key`（小文字） */
+  /** Registry / DB `veliora.ai_agents.agent_key`（小文字） */
   id: string;
   /** `id` と同値。明示用エイリアス */
   agentKey: string;

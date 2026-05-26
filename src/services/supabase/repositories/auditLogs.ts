@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export async function saveAuditLog(
   db: VelioraDb,
@@ -12,7 +12,7 @@ export async function saveAuditLog(
   }
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.agentAuditLogs} (agent_id, event_type, severity, message, metadata)
+    `INSERT INTO ${VELIORA_TABLES.agentAuditLogs} (agent_id, event_type, severity, message, metadata)
      VALUES ($1,$2,$3,$4,$5::jsonb)
      RETURNING id`,
     [

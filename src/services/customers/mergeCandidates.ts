@@ -28,30 +28,30 @@ export async function mergeCustomersManual(
   await reassignIdentitiesToCustomer(db, merged, survivor);
 
   await db.query(
-    `UPDATE veriora.customer_profiles SET customer_id = $2, updated_at = now() WHERE customer_id = $1`,
+    `UPDATE veliora.customer_profiles SET customer_id = $2, updated_at = now() WHERE customer_id = $1`,
     [merged, survivor]
   );
   await db.query(
-    `UPDATE veriora.customer_memory_notes SET customer_id = $2, updated_at = now() WHERE customer_id = $1`,
+    `UPDATE veliora.customer_memory_notes SET customer_id = $2, updated_at = now() WHERE customer_id = $1`,
     [merged, survivor]
   );
   await db.query(
-    `UPDATE veriora.customer_agent_contexts SET customer_id = $2, updated_at = now() WHERE customer_id = $1`,
+    `UPDATE veliora.customer_agent_contexts SET customer_id = $2, updated_at = now() WHERE customer_id = $1`,
     [merged, survivor]
   );
   await db.query(
-    `UPDATE veriora.customer_conversation_links SET customer_id = $2 WHERE customer_id = $1`,
+    `UPDATE veliora.customer_conversation_links SET customer_id = $2 WHERE customer_id = $1`,
     [merged, survivor]
   );
   await db.query(
-    `UPDATE veriora.conversations SET customer_id = $2, updated_at = now()
+    `UPDATE veliora.conversations SET customer_id = $2, updated_at = now()
      WHERE customer_id = $1`,
     [merged, survivor]
   );
 
   await softDeleteCustomer(db, merged);
   await db.query(
-    `UPDATE veriora.customers SET status = 'merged', metadata = metadata || $2::jsonb, updated_at = now()
+    `UPDATE veliora.customers SET status = 'merged', metadata = metadata || $2::jsonb, updated_at = now()
      WHERE id = $1`,
     [merged, JSON.stringify({ merged_into: survivor, linked_by: input.linkedBy ?? "manual" })]
   );

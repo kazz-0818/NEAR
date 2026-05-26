@@ -654,29 +654,29 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => s !== "false" && s !== "0"),
-  /** true / 1 で veriora.messages へ書き込み（既定 ON）。false / 0 で OFF */
+  /** true / 1 で veliora.messages へ書き込み（既定 ON）。false / 0 で OFF */
   /** Veliora ベガパンク: 横断共通顧客マスター（既定 ON） */
-  VERIORA_CUSTOMER_MASTER_ENABLED: z
+  VELIORA_CUSTOMER_MASTER_ENABLED: z
     .string()
     .optional()
     .transform((s) => s !== "false" && s !== "0"),
   /** false / 0 で merge 候補の管理者 LINE 通知を止める（既定 ON） */
-  VERIORA_MERGE_CANDIDATE_NOTIFY: z
+  VELIORA_MERGE_CANDIDATE_NOTIFY: z
     .string()
     .optional()
     .transform((s) => s !== "false" && s !== "0"),
 
-  VERIORA_CANONICAL_LINE_LOG: z
+  VELIORA_CANONICAL_LINE_LOG: z
     .string()
     .optional()
     .transform((s) => s !== "false" && s !== "0"),
   /** true / 1 で veliora.line_message_events へ書き込み（既定 ON）。false / 0 でレガシー停止 */
-  VERIORA_LEGACY_VELIORA_LINE_LOG: z
+  VELIORA_LEGACY_LINE_LOG: z
     .string()
     .optional()
     .transform((s) => s !== "false" && s !== "0"),
-  /** @deprecated VERIORA_CANONICAL_LINE_LOG を使う。true のとき canonical を強制 ON */
-  VERIORA_CORE_DUAL_WRITE: z
+  /** @deprecated VELIORA_CANONICAL_LINE_LOG を使う。true のとき canonical を強制 ON */
+  VELIORA_CORE_DUAL_WRITE: z
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
@@ -686,7 +686,7 @@ const envSchema = z.object({
     .optional()
     .transform((s) => (s?.trim() ? s.trim().replace(/\/$/, "") : undefined)),
   /** NEAR↔LRAM 内部取次ぎ Bearer（12文字以上） */
-  VERIORA_HANDOFF_SECRET: z
+  VELIORA_HANDOFF_SECRET: z
     .string()
     .optional()
     .transform((s) => (s?.trim() ? s.trim() : undefined)),

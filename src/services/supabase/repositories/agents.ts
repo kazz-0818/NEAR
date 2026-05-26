@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 
 export type VelioraAgentRow = {
   id: string;
@@ -16,7 +16,7 @@ export type VelioraAgentRow = {
 export async function getAgentByKey(db: VelioraDb, agentKey: string): Promise<VelioraAgentRow | null> {
   const r = await db.query<VelioraAgentRow>(
     `SELECT id, agent_key, code, kana, department, display_name, role, description, enabled
-     FROM ${VERIORA_TABLES.aiAgents}
+     FROM ${VELIORA_TABLES.aiAgents}
      WHERE agent_key = $1 AND enabled = true
      LIMIT 1`,
     [agentKey.trim().toLowerCase()]
@@ -27,7 +27,7 @@ export async function getAgentByKey(db: VelioraDb, agentKey: string): Promise<Ve
 export async function listAgents(db: VelioraDb): Promise<VelioraAgentRow[]> {
   const r = await db.query<VelioraAgentRow>(
     `SELECT id, agent_key, code, kana, department, display_name, role, description, enabled
-     FROM ${VERIORA_TABLES.aiAgents}
+     FROM ${VELIORA_TABLES.aiAgents}
      WHERE enabled = true
      ORDER BY agent_key`
   );

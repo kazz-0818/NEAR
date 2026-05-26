@@ -16,7 +16,7 @@ export type ResolveLineCustomerInput = {
 
 export function isCustomerMasterEnabled(): boolean {
   const env = getEnv();
-  return env.VERIORA_CUSTOMER_MASTER_ENABLED !== false;
+  return env.VELIORA_CUSTOMER_MASTER_ENABLED !== false;
 }
 
 export async function resolveAndLinkLineCustomer(
@@ -78,7 +78,7 @@ export async function linkConversationForAgentKey(
   if (!agent) return { customerId: null, conversationId: null };
 
   const conv = await db.query<{ id: string }>(
-    `SELECT id FROM veriora.conversations
+    `SELECT id FROM veliora.conversations
      WHERE agent_id = $1 AND conversation_key = $2 LIMIT 1`,
     [agent.id, input.conversationKey]
   );

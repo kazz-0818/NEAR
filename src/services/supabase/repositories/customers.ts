@@ -1,5 +1,5 @@
 import type { VelioraDb } from "../client.js";
-import { VERIORA_TABLES } from "../schema.js";
+import { VELIORA_TABLES } from "../schema.js";
 import type { CustomerRow } from "../../customers/types.js";
 
 export type CreateCustomerInput = {
@@ -15,7 +15,7 @@ export async function createCustomer(
   input: CreateCustomerInput = {}
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
-    `INSERT INTO ${VERIORA_TABLES.customers} (
+    `INSERT INTO ${VELIORA_TABLES.customers} (
       display_name, preferred_name, nickname, memo, metadata
     ) VALUES ($1,$2,$3,$4,$5::jsonb)
     RETURNING id`,
@@ -36,7 +36,7 @@ export async function getCustomerById(db: VelioraDb, customerId: string): Promis
   const r = await db.query<CustomerRow>(
     `SELECT id, display_name, preferred_name, nickname, real_name, email, phone,
             company_name, memo, status, tags, metadata, created_at, updated_at
-     FROM ${VERIORA_TABLES.customers}
+     FROM ${VELIORA_TABLES.customers}
      WHERE id = $1 AND status <> 'deleted'`,
     [customerId]
   );
@@ -49,7 +49,7 @@ export async function updateCustomerContactFields(
   fields: { email?: string | null; phone?: string | null }
 ): Promise<void> {
   await db.query(
-    `UPDATE ${VERIORA_TABLES.customers}
+    `UPDATE ${VELIORA_TABLES.customers}
      SET email = COALESCE($2, email),
          phone = COALESCE($3, phone),
          updated_at = now()
@@ -68,7 +68,7 @@ export async function updateCustomerDisplayFields(
   }
 ): Promise<void> {
   await db.query(
-    `UPDATE ${VERIORA_TABLES.customers}
+    `UPDATE ${VELIORA_TABLES.customers}
      SET display_name = COALESCE($2, display_name),
          preferred_name = COALESCE($3, preferred_name),
          nickname = COALESCE($4, nickname),
@@ -98,8 +98,8 @@ export async function listCustomers(
   const status = opts?.status ?? "active";
   const params: unknown[] = [status];
   let sql = `SELECT c.id, c.display_name, c.preferred_name, c.nickname, c.status, c.created_at, c.updated_at,
-             (SELECT COUNT(*)::int FROM ${VERIORA_TABLES.customerIdentities} ci WHERE ci.customer_id = c.id) AS identity_count
-             FROM ${VERIORA_TABLES.customers} c
+             (SELECT COUNT(*)::int FROM ${VELIORA_TABLES.customerIdentities} ci WHERE ci.customer_id = c.id) AS identity_count
+             FROM ${VELIORA_TABLES.customers} c
              WHERE c.status = $1`;
   if (opts?.q?.trim()) {
     params.push(`%${opts.q.trim()}%`);
@@ -114,7 +114,7 @@ export async function listCustomers(
 
 export async function softDeleteCustomer(db: VelioraDb, customerId: string): Promise<void> {
   await db.query(
-    `UPDATE ${VERIORA_TABLES.customers} SET status = 'deleted', updated_at = now() WHERE id = $1`,
+    `UPDATE ${VELIORA_TABLES.customers} SET status = 'deleted', updated_at = now() WHERE id = $1`,
     [customerId]
   );
 }

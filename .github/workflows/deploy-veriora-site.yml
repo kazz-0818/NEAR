@@ -1,8 +1,8 @@
-# Veriora ショーケース（site/）を GitHub Pages へ公開
+# Veliora ショーケース（site/）を GitHub Pages へ公開
 # 有効化: リポジトリ Settings → Pages → Source: GitHub Actions
 # 公開 URL（既定）: https://<user>.github.io/NEAR/
 
-name: Deploy Veriora site
+name: Deploy Veliora site
 
 on:
   push:

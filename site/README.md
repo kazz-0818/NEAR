@@ -37,7 +37,7 @@ npm run preview   # 本番ビルドのローカル確認
 3. **Source** を **GitHub Actions** にする（未設定だと deploy が `HttpError: Not Found` で失敗します）
 4. `main` に push するとワークフローが走り、数分後に公開されます
 
-初回だけ Actions の **Deploy Veriora site** を **Re-run all jobs** してもよいです。
+初回だけ Actions の **Deploy Veliora site** を **Re-run all jobs** してもよいです。
 
 **公開 URL（既定）:** `https://kazz-0818.github.io/NEAR/`
 
@@ -47,7 +47,7 @@ npm run preview   # 本番ビルドのローカル確認
 
 ```bash
 git add site/ .github/workflows/deploy-veriora-site.yml
-git commit -m "Add Veriora showcase site and GitHub Pages deploy"
+git commit -m "Add Veliora showcase site and GitHub Pages deploy"
 git push origin main
 ```
 

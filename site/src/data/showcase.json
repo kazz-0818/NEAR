@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Veriora",
+    "title": "Veliora",
     "tagline": "組織 OS — AI が部署として動く",
     "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。共通顧客マスターで記憶を横断共有。"
   },
@@ -12,7 +12,7 @@
       "department": "秘書部",
       "displayName": "NEAR-ニア-『秘書部』",
       "role": "総合窓口・秘書・タスク整理",
-      "description": "Veriora の一次窓口。依頼の受付・タスク整理・各専門部署への取次ぎと、強い LLM 経路での応答合成を担う。",
+      "description": "Veliora の一次窓口。依頼の受付・タスク整理・各専門部署への取次ぎと、強い LLM 経路での応答合成を担う。",
       "greeting": "お疲れ様です。秘書部 NEAR です。タスク整理と取次ぎ、なんでもやりますよ。",
       "accent": "#f472b6",
       "handoffRules": [
@@ -38,11 +38,11 @@
       ],
       "evolutionLog": [
         { "date": "2026-05", "title": "ベガパンク Phase 3 運用", "summary": "顧客一覧・merge 承認・memory 編集の管理 UI。RITS 監査サマリ表示。E2E 手順ドキュメント" },
-        { "date": "2026-05", "title": "共通顧客マスター", "summary": "veriora.customers — チャネル横断の identity・memory。SERA 由来メモを NEAR context に注入" },
+        { "date": "2026-05", "title": "共通顧客マスター", "summary": "veliora.customers — チャネル横断の identity・memory。SERA 由来メモを NEAR context に注入" },
         { "date": "2026-05", "title": "トークルーム表示名", "summary": "room member Profile API — グループと同様に名前呼びかけ可能" },
         { "date": "2026-05", "title": "LRAM 内部ハンドオフ", "summary": "BRAVO / WordPress 系キーワードで LRAM へ best-effort 取次ぎ" },
         { "date": "2025-09", "title": "進化カプセル", "summary": "ユーザー要望から capability_registry へ能力を追加する成長フロー" },
-        { "date": "2025-06", "title": "組織ルーティング", "summary": "verioraHandoff と registry 接続" }
+        { "date": "2025-06", "title": "組織ルーティング", "summary": "部署間 handoff と registry 接続" }
       ]
     },
     {
@@ -189,7 +189,7 @@
   ],
   "phases": [
     { "id": 0, "title": "現状調査", "summary": "既存 LINE / DB / env の棚卸し", "status": "done" },
-    { "id": 1, "title": "ドキュメント整備", "summary": "Veriora アーキテクチャ・規約", "status": "done" },
+    { "id": 1, "title": "ドキュメント整備", "summary": "Veliora アーキテクチャ・規約", "status": "done" },
     { "id": 2, "title": "Agent Registry", "summary": "5部署の役割定義をコード化", "status": "done" },
     { "id": 3, "title": "env 互換", "summary": "VERIORA_* / legacy alias 全リポ", "status": "done" },
     { "id": 4, "title": "横断ログ", "summary": "会話ログ・LLM usage → RITS", "status": "done" },

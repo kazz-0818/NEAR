@@ -1,8 +1,8 @@
--- Veriora OS: canonical schema (additive). Legacy veliora.* remains unchanged.
+-- Veliora OS: canonical schema (additive). Legacy veliora.* remains unchanged.
 
 CREATE SCHEMA IF NOT EXISTS veriora;
 
-COMMENT ON SCHEMA veriora IS 'Veriora organization OS — canonical tables (UUID agents, conversations, messages)';
+COMMENT ON SCHEMA veriora IS 'Veliora organization OS — canonical tables (UUID agents, conversations, messages)';
 
 -- ---------------------------------------------------------------------------
 -- updated_at helper

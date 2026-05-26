@@ -1,4 +1,4 @@
--- Veriora: conversations + messages (canonical message store for all agents)
+-- Veliora: conversations + messages (canonical message store for all agents)
 
 CREATE TABLE IF NOT EXISTS veriora.conversations (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),

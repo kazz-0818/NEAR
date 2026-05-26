@@ -1,4 +1,4 @@
--- Veriora: seed departments and agents (idempotent)
+-- Veliora: seed departments and agents (idempotent)
 
 INSERT INTO veriora.agent_departments (department_key, name, description) VALUES
   ('secretary', '秘書部', 'NEAR — 総合窓口・秘書'),
@@ -14,7 +14,7 @@ INSERT INTO veriora.ai_agents (
   (
     'near', 'NEAR', 'ニア', '秘書部', 'NEAR-ニア-『秘書部』',
     '総合窓口・秘書・タスク整理・指示受付',
-    'Veriora の一次窓口。専門部署へ取次ぎ、未対応はログ化。',
+    'Veliora の一次窓口。専門部署へ取次ぎ、未対応はログ化。',
     true
   ),
   (

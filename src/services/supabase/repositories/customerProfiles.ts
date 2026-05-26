@@ -1,10 +1,10 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 import type { CustomerProfileRow } from "../../customers/types.js";
 import type { UpsertProfileInput } from "../../customers/types.js";
 
 export async function upsertCustomerProfile(
-  db: VerioraDb,
+  db: VelioraDb,
   input: UpsertProfileInput
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
@@ -44,7 +44,7 @@ export async function upsertCustomerProfile(
 }
 
 export async function listCustomerProfiles(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string,
   opts?: { agentKey?: string; limit?: number }
 ): Promise<CustomerProfileRow[]> {
@@ -67,7 +67,7 @@ export async function listCustomerProfiles(
 }
 
 export async function getCustomerProfileById(
-  db: VerioraDb,
+  db: VelioraDb,
   profileId: string
 ): Promise<CustomerProfileRow | null> {
   const r = await db.query<CustomerProfileRow>(
@@ -80,7 +80,7 @@ export async function getCustomerProfileById(
 }
 
 export async function patchCustomerProfile(
-  db: VerioraDb,
+  db: VelioraDb,
   profileId: string,
   patch: {
     profileValue?: string;

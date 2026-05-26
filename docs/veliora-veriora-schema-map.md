@@ -1,6 +1,6 @@
-# Veliora / Veriora — スキーマ対応表
+# Veliora — スキーマ対応表
 
-組織名の正典は **Veriora**（`veriora` schema）です。レガシー **Veliora**（`veliora` schema）は **削除せず併存**します。Table Editor で両方見えることがあります。
+組織ブランド名は **Veliora** です。Postgres 識別子 **`veriora`**（正典）と **`veliora`**（旧 LINE）は **削除せず併存**します。Table Editor で両方見えることがあります。
 
 ## ざっくり覚え方
 

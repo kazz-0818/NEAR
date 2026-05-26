@@ -1,10 +1,10 @@
 import type { AgentDefinition } from "./types.js";
 
 /**
- * Veriora 組織に登録された AI エージェント定義（静的マスタ）。
+ * Veliora 組織に登録された AI エージェント定義（静的マスタ）。
  * 実行経路からは Phase 3 以降で参照。型の単一ソースとして利用する。
  */
-export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
+export const VELIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
   {
     id: "near",
     agentKey: "near",
@@ -14,7 +14,7 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
     displayName: "NEAR-ニア-『秘書部』",
     role: "総合窓口・秘書・タスク整理・指示受付",
     description:
-      "Veriora の一次窓口。ユーザーの依頼を受け、タスク整理・スケジュール・社内オペレーションの補助を行い、専門部署へ適切に取次ぐ。未対応領域はログ化し改善サイクルへ渡す。",
+      "Veliora の一次窓口。ユーザーの依頼を受け、タスク整理・スケジュール・社内オペレーションの補助を行い、専門部署へ適切に取次ぐ。未対応領域はログ化し改善サイクルへ渡す。",
     primaryResponsibilities: [
       "依頼内容の聞き取り・整理・優先度付け",
       "リマインダー・タスク・メモ等の秘書オペレーション支援",
@@ -206,22 +206,34 @@ export const VERIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
 ];
 
 const byId = new Map<string, AgentDefinition>(
-  VERIORA_AGENT_DEFINITIONS.map((a) => [a.id.toLowerCase(), a]),
+  VELIORA_AGENT_DEFINITIONS.map((a) => [a.id.toLowerCase(), a]),
 );
 
 const byCode = new Map<string, AgentDefinition>(
-  VERIORA_AGENT_DEFINITIONS.map((a) => [a.code.toUpperCase(), a]),
+  VELIORA_AGENT_DEFINITIONS.map((a) => [a.code.toUpperCase(), a]),
 );
 
-export function getVerioraAgentById(id: string): AgentDefinition | undefined {
+export function getVelioraAgentById(id: string): AgentDefinition | undefined {
   return byId.get(id.trim().toLowerCase());
 }
 
 /** `agentKey` は `id` と同義 */
-export function getVerioraAgentByKey(agentKey: string): AgentDefinition | undefined {
-  return getVerioraAgentById(agentKey);
+export function getVelioraAgentByKey(agentKey: string): AgentDefinition | undefined {
+  return getVelioraAgentById(agentKey);
 }
 
-export function getVerioraAgentByCode(code: string): AgentDefinition | undefined {
+export function getVelioraAgentByCode(code: string): AgentDefinition | undefined {
   return byCode.get(code.trim().toUpperCase());
 }
+
+/** @deprecated Use VELIORA_AGENT_DEFINITIONS */
+export const VERIORA_AGENT_DEFINITIONS = VELIORA_AGENT_DEFINITIONS;
+
+/** @deprecated Use getVelioraAgentById */
+export const getVerioraAgentById = getVelioraAgentById;
+
+/** @deprecated Use getVelioraAgentByKey */
+export const getVerioraAgentByKey = getVelioraAgentByKey;
+
+/** @deprecated Use getVelioraAgentByCode */
+export const getVerioraAgentByCode = getVelioraAgentByCode;

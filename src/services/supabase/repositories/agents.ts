@@ -1,7 +1,7 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
-export type VerioraAgentRow = {
+export type VelioraAgentRow = {
   id: string;
   agent_key: string;
   code: string;
@@ -13,8 +13,8 @@ export type VerioraAgentRow = {
   enabled: boolean;
 };
 
-export async function getAgentByKey(db: VerioraDb, agentKey: string): Promise<VerioraAgentRow | null> {
-  const r = await db.query<VerioraAgentRow>(
+export async function getAgentByKey(db: VelioraDb, agentKey: string): Promise<VelioraAgentRow | null> {
+  const r = await db.query<VelioraAgentRow>(
     `SELECT id, agent_key, code, kana, department, display_name, role, description, enabled
      FROM ${VERIORA_TABLES.aiAgents}
      WHERE agent_key = $1 AND enabled = true
@@ -24,8 +24,8 @@ export async function getAgentByKey(db: VerioraDb, agentKey: string): Promise<Ve
   return r.rows[0] ?? null;
 }
 
-export async function listAgents(db: VerioraDb): Promise<VerioraAgentRow[]> {
-  const r = await db.query<VerioraAgentRow>(
+export async function listAgents(db: VelioraDb): Promise<VelioraAgentRow[]> {
+  const r = await db.query<VelioraAgentRow>(
     `SELECT id, agent_key, code, kana, department, display_name, role, description, enabled
      FROM ${VERIORA_TABLES.aiAgents}
      WHERE enabled = true

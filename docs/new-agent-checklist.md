@@ -1,4 +1,4 @@
-# Veriora — 新規 AI エージェント追加チェックリスト
+# Veliora — 新規 AI エージェント追加チェックリスト
 
 新しい AI エージェント（部署）を追加するときは、以下を **上から順に**確認してください。項目は **必須**と **推奨**に分類しています。
 
@@ -33,7 +33,7 @@
 
 ## 5. Agent registry（必須）
 
-- [ ] TypeScript リポジトリ: `src/agents/registry.ts` の `VERIORA_AGENT_DEFINITIONS` に 1 行追加
+- [ ] TypeScript リポジトリ: `src/agents/registry.ts` の `VELIORA_AGENT_DEFINITIONS` に 1 行追加
 - [ ] LIRA: `app/agents/registry.py` に同内容を追加
 - [ ] `enabled: true` を確認（カナリーデプロイ時は `false` も可）
 

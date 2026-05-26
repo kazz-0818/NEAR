@@ -1,4 +1,4 @@
--- Veriora Vegapunk: 索引・RLS・コメント
+-- Veliora Vegapunk: 索引・RLS・コメント
 
 CREATE INDEX IF NOT EXISTS idx_customers_status_updated
   ON veriora.customers (status, updated_at DESC);

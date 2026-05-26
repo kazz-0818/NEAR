@@ -53,7 +53,7 @@ LRAM は顧客のブランド嗜好・事業情報を `buildCustomerContextForAg
 
 ## NEAR 既存記憶との関係
 
-`near.near_user_memory` は **削除しません**。`VERIORA_CUSTOMER_MASTER_ENABLED` 時は Veriora マスターを優先し、legacy はフォールバックします。
+`near.near_user_memory` は **削除しません**。`VERIORA_CUSTOMER_MASTER_ENABLED` 時は Veliora マスターを優先し、legacy はフォールバックします。
 
 ## Phase 4 で完了した運用面
 

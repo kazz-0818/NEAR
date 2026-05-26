@@ -1,4 +1,4 @@
--- Veriora: routing, handoff, audit logs
+-- Veliora: routing, handoff, audit logs
 
 CREATE TABLE IF NOT EXISTS veriora.agent_routing_logs (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),

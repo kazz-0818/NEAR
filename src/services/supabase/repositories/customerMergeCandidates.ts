@@ -1,4 +1,4 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export type MergeCandidateRow = {
@@ -12,7 +12,7 @@ export type MergeCandidateRow = {
 };
 
 export async function createMergeCandidate(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     customerIdA: string;
     customerIdB: string;
@@ -40,7 +40,7 @@ export async function createMergeCandidate(
 }
 
 export async function listMergeCandidates(
-  db: VerioraDb,
+  db: VelioraDb,
   status = "pending"
 ): Promise<MergeCandidateRow[]> {
   const r = await db.query<MergeCandidateRow>(
@@ -55,7 +55,7 @@ export async function listMergeCandidates(
 }
 
 export async function markMergeCandidateStatus(
-  db: VerioraDb,
+  db: VelioraDb,
   id: string,
   status: string
 ): Promise<void> {

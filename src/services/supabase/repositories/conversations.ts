@@ -1,4 +1,4 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export type UpsertConversationInput = {
@@ -12,7 +12,7 @@ export type UpsertConversationInput = {
 };
 
 export async function upsertConversation(
-  db: VerioraDb,
+  db: VelioraDb,
   input: UpsertConversationInput
 ): Promise<{ id: string }> {
   const existing = await db.query<{ id: string }>(

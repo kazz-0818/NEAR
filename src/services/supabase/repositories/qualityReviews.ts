@@ -1,8 +1,8 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export async function createQualityReview(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     reviewDate: string;
     agentId?: string | null;
@@ -37,7 +37,7 @@ export async function createQualityReview(
 }
 
 export async function createQualityFinding(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     reviewId?: string | null;
     agentId?: string | null;
@@ -72,7 +72,7 @@ export async function createQualityFinding(
 }
 
 export async function createImprovementTask(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     sourceFindingId?: string | null;
     targetAgentId?: string | null;

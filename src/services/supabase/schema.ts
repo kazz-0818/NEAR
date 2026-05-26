@@ -1,4 +1,4 @@
-/** Veriora canonical schema qualified names */
+/** Veliora canonical schema qualified names */
 export const VERIORA_SCHEMA = "veriora" as const;
 
 export const VERIORA_TABLES = {

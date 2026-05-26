@@ -1,8 +1,8 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export async function createLramArticleSource(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     sourceUrl: string;
     sourceSite?: string | null;
@@ -34,7 +34,7 @@ export async function createLramArticleSource(
 }
 
 export async function createLramArticleCandidate(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     sourceId?: string | null;
     agentId?: string | null;
@@ -66,7 +66,7 @@ export async function createLramArticleCandidate(
 }
 
 export async function createGeneratedArticle(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     candidateId?: string | null;
     title: string;
@@ -102,7 +102,7 @@ export async function createGeneratedArticle(
 }
 
 export async function saveWordPressPostRecord(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     generatedArticleId?: string | null;
     wpPostId?: string | null;

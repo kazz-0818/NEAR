@@ -1,5 +1,5 @@
 import type { Db } from "../db/client.js";
-import { getVerioraAgentByKey } from "../agents/registry.js";
+import { getVelioraAgentByKey } from "../agents/registry.js";
 import { getLogger } from "./logger.js";
 import { getAgentByKey, saveHandoffLog } from "../services/supabase/index.js";
 import { notifyLramHandoff } from "./verioraHandoffNotify.js";
@@ -24,15 +24,15 @@ export function suggestHandoffAgentKey(userText: string): string | null {
 /**
  * 取次ぎ候補を検出したら veriora.agent_handoff_logs に best-effort 記録（Phase 5）。
  */
-export async function recordVerioraHandoffHint(
+export async function recordVelioraHandoffHint(
   db: Db,
   input: { userText: string; intent: string; channelUserId?: string }
 ): Promise<void> {
   const targetKey = suggestHandoffAgentKey(input.userText);
   if (!targetKey) return;
 
-  const nearDef = getVerioraAgentByKey("near");
-  const targetDef = getVerioraAgentByKey(targetKey);
+  const nearDef = getVelioraAgentByKey("near");
+  const targetDef = getVelioraAgentByKey(targetKey);
   if (!nearDef || !targetDef) return;
 
   try {
@@ -56,6 +56,9 @@ export async function recordVerioraHandoffHint(
       }).catch(() => undefined);
     }
   } catch (e) {
-    getLogger().warn({ err: e, targetKey }, "recordVerioraHandoffHint failed (non-fatal)");
+    getLogger().warn({ err: e, targetKey }, "recordVelioraHandoffHint failed (non-fatal)");
   }
 }
+
+/** @deprecated Use recordVelioraHandoffHint */
+export const recordVerioraHandoffHint = recordVelioraHandoffHint;

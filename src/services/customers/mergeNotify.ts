@@ -26,7 +26,7 @@ export async function notifyMergeCandidateCreated(
     const base = getEffectivePublicBaseUrl();
     const ui = base ? `${base}/admin/ui` : "/admin/ui";
     const body = [
-      "【Veriora】顧客マスター: 手動 merge 候補が追加されました",
+      "【Veliora】顧客マスター: 手動 merge 候補が追加されました",
       `理由: ${input.reason}`,
       `候補ID: ${input.candidateId.slice(0, 8)}…`,
       `pending 合計: ${pending.length} 件`,

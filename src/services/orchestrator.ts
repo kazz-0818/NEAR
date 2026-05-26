@@ -7,7 +7,7 @@ import { classifyIntent } from "./intent_classifier.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
 import { getLogger } from "../lib/logger.js";
-import { recordVerioraHandoffHint } from "../lib/verioraHandoff.js";
+import { recordVelioraHandoffHint } from "../lib/verioraHandoff.js";
 import type { GrowthGateResult } from "./growth_suggestion_gate.js";
 import { runGrowthPipelineAfterUnsupported } from "./growth_pipeline.js";
 import {
@@ -646,7 +646,7 @@ export async function handleLineTextMessage(input: {
     }
   }
 
-  void recordVerioraHandoffHint(db, {
+  void recordVelioraHandoffHint(db, {
     userText: text,
     intent: parsed.intent,
     channelUserId,

@@ -1,8 +1,8 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export async function saveAuditLog(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     agentId?: string | null;
     eventType: string;

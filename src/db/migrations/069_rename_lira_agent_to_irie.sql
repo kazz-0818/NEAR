@@ -1,4 +1,4 @@
--- Veriora: rename accounting agent LIRA → IRIE (agent_key, code, display, legacy schema)
+-- Veliora: rename accounting agent LIRA → IRIE (agent_key, code, display, legacy schema)
 
 -- ---------------------------------------------------------------------------
 -- veriora.ai_agents + departments

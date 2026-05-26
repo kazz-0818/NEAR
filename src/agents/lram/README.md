@@ -1,6 +1,6 @@
 # LRAM (`src/agents/lram/`)
 
-Veriora 組織 OS 用のエージェント別フォルダ。既存コードは移動していません。
+Veliora 組織 OS 用のエージェント別フォルダ。既存コードは移動していません。
 
 - `config.ts` — registry + 既存実装パス
 - `prompt.ts` — プロンプト参照

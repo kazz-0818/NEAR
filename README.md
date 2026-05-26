@@ -1,8 +1,8 @@
 # NEAR（LINE × AI秘書）MVP
 
-## Veriora 組織OS
+## Veliora 組織OS
 
-このリポジトリは **Veriora** の秘書部エージェント（**NEAR**）です。組織共通の規約・registry・手順は [`AGENTS.md`](AGENTS.md) と [`docs/veriora-architecture.md`](docs/veriora-architecture.md) を参照してください（環境変数・DB 規約は `docs/env-conventions.md` / `docs/db-conventions.md`）。
+このリポジトリは **Veliora** の秘書部エージェント（**NEAR**）です。組織共通の規約・registry・手順は [`AGENTS.md`](AGENTS.md) と [`docs/veriora-architecture.md`](docs/veriora-architecture.md) を参照してください（環境変数・DB 規約は `docs/env-conventions.md` / `docs/db-conventions.md`）。
 
 **ショーケースサイト（5部署の能力・進化の見せ場）**: [`site/README.md`](site/README.md) — ローカル `cd site && npm run dev` / Web公開は同 README の「Web 公開」
 

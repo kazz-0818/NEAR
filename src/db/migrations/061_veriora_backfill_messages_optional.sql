@@ -1,4 +1,4 @@
--- Veriora: optional backfill veliora.line_message_events → veriora.conversations + messages
+-- Veliora: optional backfill veliora.line_message_events → veriora.conversations + messages
 -- Idempotent. Safe to re-run. Does not delete or update legacy rows.
 
 DO $$

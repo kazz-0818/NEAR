@@ -1,5 +1,5 @@
 /**
- * Veriora agent registry — 共通型定義。
+ * Veliora agent registry — 共通型定義。
  * `id` は Postgres `veliora.ai_agents.agent_code`（小文字）と揃える。
  * `code` は表示・RITS の agent_name 等との整合用（大文字推奨）。
  */

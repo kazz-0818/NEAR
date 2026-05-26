@@ -1,4 +1,4 @@
--- Veriora: RITS quality reviews, findings, improvement tasks
+-- Veliora: RITS quality reviews, findings, improvement tasks
 
 CREATE TABLE IF NOT EXISTS veriora.agent_quality_reviews (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),

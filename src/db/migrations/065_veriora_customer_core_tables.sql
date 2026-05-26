@@ -1,4 +1,4 @@
--- Veriora Vegapunk: 共通顧客マスター（core）
+-- Veliora Vegapunk: 共通顧客マスター（core）
 -- 非破壊: CREATE / ADD COLUMN のみ
 
 CREATE TABLE IF NOT EXISTS veriora.customers (

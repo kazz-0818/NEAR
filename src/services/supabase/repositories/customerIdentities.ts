@@ -1,4 +1,4 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 import type { CustomerIdentityRow } from "../../customers/types.js";
 
@@ -16,7 +16,7 @@ export type UpsertIdentityInput = {
 };
 
 export async function findCustomerByIdentity(
-  db: VerioraDb,
+  db: VelioraDb,
   provider: string,
   channelKey: string,
   externalUserId: string
@@ -50,7 +50,7 @@ export async function findCustomerByIdentity(
 }
 
 export async function upsertCustomerIdentity(
-  db: VerioraDb,
+  db: VelioraDb,
   input: UpsertIdentityInput
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
@@ -88,7 +88,7 @@ export async function upsertCustomerIdentity(
 }
 
 export async function listIdentitiesForCustomer(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string
 ): Promise<CustomerIdentityRow[]> {
   const r = await db.query<CustomerIdentityRow>(
@@ -106,7 +106,7 @@ export async function listIdentitiesForCustomer(
 }
 
 export async function reassignIdentitiesToCustomer(
-  db: VerioraDb,
+  db: VelioraDb,
   fromCustomerId: string,
   toCustomerId: string
 ): Promise<void> {

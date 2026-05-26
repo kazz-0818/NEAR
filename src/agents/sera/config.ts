@@ -1,12 +1,12 @@
 /**
  * SERA agent folder — 参照用。実行は既存経路のまま。
  */
-import { getVerioraAgentByKey } from "../registry.js";
+import { getVelioraAgentByKey } from "../registry.js";
 
 export const AGENT_KEY = "sera" as const;
 
 export function getAgentConfig() {
-  const def = getVerioraAgentByKey(AGENT_KEY);
+  const def = getVelioraAgentByKey(AGENT_KEY);
   if (!def) throw new Error(`Agent ${AGENT_KEY} not in registry`);
   return def;
 }

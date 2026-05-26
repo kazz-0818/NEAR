@@ -64,7 +64,7 @@ pending before merge: 1
 - **table veriora.customer_agent_contexts**: OK — exists
 - **NEAR context after merge (SERA note)**: OK — 170 chars
 - **LRAM context (shared confirmed)**: OK — 170 chars
-- **RITS customer audit section (query parity)**: OK — ## Veriora_customer_master | merge_candidates_pending: 0 | customers_active: 6
+- **RITS customer audit section (query parity)**: OK — ## Veliora_customer_master | merge_candidates_pending: 0 | customers_active: 6
 
 
 ## 9. memoryExtractorの動作結果
@@ -133,7 +133,7 @@ pending before merge: 1
 - [x] merge aggregates identities: channels: near_line, sera_line
 - [x] NEAR context after merge (SERA note): 170 chars
 - [x] LRAM context (shared confirmed): 170 chars
-- [x] RITS customer audit section (query parity): ## Veriora_customer_master | merge_candidates_pending: 0 | customers_active: 6
+- [x] RITS customer audit section (query parity): ## Veliora_customer_master | merge_candidates_pending: 0 | customers_active: 6
 - [x] VERIORA_CUSTOMER_MASTER_ENABLED=false: env transform matches getEnv schema (lineResolve skips when false)
 - [x] lineResolve empty userId non-throw: empty lineUserId returns early
 - [x] admin GET by-identity (HTTP): skipped — server not reachable; merge/API logic verified via DB (fetch failed)

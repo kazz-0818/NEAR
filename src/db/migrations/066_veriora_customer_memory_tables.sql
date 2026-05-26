@@ -1,4 +1,4 @@
--- Veriora Vegapunk: プロフィール・記憶・会話リンク
+-- Veliora Vegapunk: プロフィール・記憶・会話リンク
 
 CREATE TABLE IF NOT EXISTS veriora.customer_profiles (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),

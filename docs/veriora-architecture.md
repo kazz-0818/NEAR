@@ -1,17 +1,20 @@
-# Veriora 組織OS — アーキテクチャ概要
+# Veliora 組織OS — アーキテクチャ概要
 
-## Veriora とは
+## Veliora とは
 
-**Veriora** は、複数の AI エージェントが「部署」として役割分担し、人間のオペレーションとシステム境界を明確に保ちながら拡張するための **組織 OS** です。単一の巨大プロンプトではなく、**registry（役割定義）・環境変数・DB・ログ**を揃えて追加可能にします。
+**Veliora** は、複数の AI エージェントが「部署」として役割分担し、人間のオペレーションとシステム境界を明確に保ちながら拡張するための **組織 OS** です。単一の巨大プロンプトではなく、**registry（役割定義）・環境変数・DB・ログ**を揃えて追加可能にします。
 
-### レガシー表記について（Veliora）
+### レガシー識別子（DB・env）
 
-既存のコードベース・Postgres には **Veliora** という識別子（例: `veliora` schema、`docs/VELIORA_OS.md`）が残っています。**本ドキュメントの canonical 名は Veriora** としますが、**DB schema 名や過去ドキュメントをこのタイミングで一括リネームしない**方針です。将来 Phase で「schema 別名 VIEW」「読み替えマッピング」などから段階的に寄せます。
+- **ブランド名**: **Veliora**
+- **Postgres**: スキーマ名 `veriora`（組織 OS 正典）、`veliora`（旧 LINE イベント）は **リネームせず併存**
+- **env**: `VERIORA_*` を正とする（互換 alias は `docs/env-conventions.md`）
+- 旧ドキュメントの **Veriora** 表記は誤記 → **Veliora** に読み替え
 
 ## 組織としての位置付け
 
 - **人間**: 方針決定・承認・例外処理・ブランド責任
-- **Veriora エージェント**: 定型・調査・下書き・ログ化・取次ぎ
+- **Veliora エージェント**: 定型・調査・下書き・ログ化・取次ぎ
 - **基盤**: env / DB / 監査 / ルーティング（Phase 3 以降で強化）
 
 ## 監査と正典の分離
@@ -47,13 +50,13 @@
 
 ## Agent registry の使い方（現状と今後）
 
-- **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は `verioraHandoff` 等で `getVerioraAgentByKey` を実行経路で使用。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。IRIE は `app/agents/registry.py`。全面接続は Phase 5 以降で段階的に。
+- **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は `verioraHandoff` 等で `getVelioraAgentByKey` を実行経路で使用。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。IRIE は `app/agents/registry.py`。全面接続は Phase 5 以降で段階的に。
 - **Phase 3**: `getEnv()` に **互換 alias**（legacy → canonical）を追加し、`.env.example` と Zod schema を同期。**実装済み**（各リポ `envAlias.ts` / IRIE `config_env_alias.py`）。
 - **Phase 4 以降**: ルーティング・ログ・RITS 取り込みが registry の `code` / `id` と一致するよう段階接続。
 
 参照 API（例）:
 
-- TypeScript: `getVerioraAgentById("near")`, `getVerioraAgentByKey("near")`, `getVerioraAgentByCode("NEAR")`
+- TypeScript: `getVelioraAgentById("near")`, `getVelioraAgentByKey("near")`, `getVelioraAgentByCode("NEAR")`
 - Postgres 正典: `veriora.*`（migration 053–063、[`supabase-schema.md`](supabase-schema.md)）
 - Repository: `src/services/supabase/`（LINE ログは canonical 既定 ON、legacy veliora は env で停止可 — [`supabase-simplification.md`](supabase-simplification.md)）
 - Python: `get_veriora_agent_by_id("near")`

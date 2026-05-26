@@ -1,4 +1,4 @@
-# Veriora マルチリポワークスペース
+# Veliora マルチリポワークスペース
 
 Cursor で `System/` 以下の複数リポを開いているときの **作業ガイド**。
 
@@ -15,7 +15,7 @@ Cursor で `System/` 以下の複数リポを開いているときの **作業�
 ## 正典ドキュメント（NEAR `docs/`）
 
 - [アーキテクチャ](docs/veriora-architecture.md) — Phase 0–8
-- [Veliora / Veriora テーブル対応](docs/veliora-veriora-schema-map.md)
+- [Veliora / Veliora テーブル対応](docs/veliora-veriora-schema-map.md)
 - [env 命名 + alias](docs/env-conventions.md)
 - [migration 053–063](docs/migration-plan.md)
 

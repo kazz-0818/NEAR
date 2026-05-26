@@ -3,7 +3,7 @@ export function getVegapunkAdminHtml(): string {
   return `<!DOCTYPE html>
 <html lang="ja"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Veriora 顧客マスター</title>
+<title>Veliora 顧客マスター</title>
 <style>
 *{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#f4f4f5;color:#18181b}
 header{background:#1e3a5f;color:#fff;padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -23,7 +23,7 @@ label{display:block;margin:8px 0 4px;font-size:13px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style></head><body>
 <header>
-<strong>Veriora 顧客マスター</strong>
+<strong>Veliora 顧客マスター</strong>
 <input id="apiKey" type="password" placeholder="ADMIN_API_KEY" autocomplete="off">
 <button type="button" id="saveKey">キー保存</button>
 <span class="muted" id="keyStatus"></span>

@@ -1,4 +1,4 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 import { getAgentByKey } from "./agents.js";
 import { upsertConversation } from "./conversations.js";
@@ -22,7 +22,7 @@ export type SaveMessageInput = {
   createdAt?: Date;
 };
 
-export async function saveMessage(db: VerioraDb, input: SaveMessageInput): Promise<{ id: string }> {
+export async function saveMessage(db: VelioraDb, input: SaveMessageInput): Promise<{ id: string }> {
   const agent = await getAgentByKey(db, input.agentKey);
   if (!agent) throw new Error(`saveMessage: unknown agent_key ${input.agentKey}`);
 
@@ -83,7 +83,7 @@ export type MessageRow = {
 };
 
 export async function listMessagesByConversation(
-  db: VerioraDb,
+  db: VelioraDb,
   conversationId: string,
   limit = 100
 ): Promise<MessageRow[]> {
@@ -101,7 +101,7 @@ export async function listMessagesByConversation(
 
 /** LINE イベントから canonical messages へ（デュアル書き込み用） */
 export async function saveMessageFromLineEvent(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     agentKey: string;
     conversationKey: string;

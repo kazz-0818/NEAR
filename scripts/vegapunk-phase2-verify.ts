@@ -312,13 +312,13 @@ async function main(): Promise<void> {
       `SELECT COUNT(*)::text AS n FROM veriora.customers WHERE status = 'active'`,
     );
     const ritsSection = [
-      "## Veriora_customer_master",
+      "## Veliora_customer_master",
       `merge_candidates_pending: ${pendingMc.length}`,
       `customers_active: ${activeCust.rows[0]?.n ?? "?"}`,
     ].join("\n");
     record(
       "RITS customer audit section (query parity)",
-      ritsSection.includes("Veriora_customer_master"),
+      ritsSection.includes("Veliora_customer_master"),
       ritsSection.replace(/\n/g, " | "),
     );
 

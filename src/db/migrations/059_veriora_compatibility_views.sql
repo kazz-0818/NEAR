@@ -1,4 +1,4 @@
--- Veriora: compatibility views (read-only bridges to legacy stores)
+-- Veliora: compatibility views (read-only bridges to legacy stores)
 
 -- Legacy veliora.ai_agents (text PK) → canonical veriora.ai_agents
 CREATE OR REPLACE VIEW veriora.legacy_veliora_ai_agents AS

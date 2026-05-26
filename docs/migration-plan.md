@@ -1,4 +1,4 @@
-# Veriora migration 実行手順
+# Veliora migration 実行手順
 
 ## ファイル一覧（NEAR `src/db/migrations/`）
 

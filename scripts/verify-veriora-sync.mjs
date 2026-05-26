@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Veriora 正典の同期検証（registry + core migration + 共有 docs）。
+ * Veliora 正典の同期検証（registry + core migration + 共有 docs）。
  *
  * 使い方:
  *   node scripts/verify-veriora-sync.mjs           # 兄弟リポが揃っていれば 5 リポ横断

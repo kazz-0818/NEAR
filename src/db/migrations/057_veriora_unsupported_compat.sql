@@ -1,4 +1,4 @@
--- Veriora: read-only views over NEAR growth tables (legacy veliora.* views unchanged)
+-- Veliora: read-only views over NEAR growth tables (legacy veliora.* views unchanged)
 
 DO $$
 BEGIN

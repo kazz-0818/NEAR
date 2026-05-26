@@ -1,8 +1,8 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export async function linkConversationToCustomer(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     customerId: string;
     conversationId: string;
@@ -33,7 +33,7 @@ export async function linkConversationToCustomer(
 }
 
 export async function listConversationIdsForCustomer(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string
 ): Promise<string[]> {
   const r = await db.query<{ conversation_id: string }>(

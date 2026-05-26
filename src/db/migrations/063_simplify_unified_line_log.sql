@@ -1,4 +1,4 @@
--- Veriora: unify LINE log read path; deprecate public NEAR compat VIEW shortcuts.
+-- Veliora: unify LINE log read path; deprecate public NEAR compat VIEW shortcuts.
 -- Safe additive: veliora.line_message_events table unchanged; veliora.line_messages becomes unified read model.
 
 COMMENT ON SCHEMA veliora IS 'Legacy LINE / Veliora namespace. Writes optional (VERIORA_LEGACY_VELIORA_LINE_LOG). Reads: veliora.line_messages unified VIEW.';

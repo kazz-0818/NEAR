@@ -1,4 +1,4 @@
-# Veriora — 環境変数（env）命名規約
+# Veliora — 環境変数（env）命名規約
 
 ## 目的
 
@@ -8,8 +8,8 @@
 
 ## 正典名とレガシー
 
-- 組織名の正典: **Veriora**
-- 既存の `VELIORA_*` や `veliora` schema 名は **このドキュメントだけでは変更しない**（別 Phase）。
+- 組織名の正典: **Veliora**
+- 技術識別子 `VERIORA_*`（env）・`veriora` / `veliora`（schema）は **互換のためリネームしない**。
 
 ## 基本ルール
 
@@ -110,4 +110,4 @@
 
 ## 参考（Veliora OS）
 
-NEAR / SERA の Postgres 統一ログについては、従来ドキュメント `docs/VELIORA_OS.md`（NEAR リポジトリ）を参照。env 名そのものの正典は **本ドキュメント（Veriora）** に寄せていく。
+NEAR / SERA の Postgres 統一ログについては、従来ドキュメント `docs/VELIORA_OS.md`（NEAR リポジトリ）を参照。env 名そのものの正典は **本ドキュメント（Veliora）** に寄せていく。

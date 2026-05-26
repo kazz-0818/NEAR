@@ -74,5 +74,5 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Veriora cross-repo sync
+      - name: Veliora cross-repo sync
         run: npm run verify:veriora-sync

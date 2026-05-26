@@ -1,4 +1,4 @@
-# Veriora — DB / テーブル命名規約
+# Veliora — DB / テーブル命名規約
 
 ## 目的
 
@@ -56,7 +56,7 @@
 ## LRAM（WordPress）との接続方針
 
 - 記事・下書き・メディアは **`lram_*` テーブル** または `lram` schema に集約する案を採用（未作成）。
-- WP 本体は外部システムのため、**WP 側 ID・URL・revision** を Veriora DB に保存し、本文の正は WP またはオブジェクトストレージに任せる設計を推奨。
+- WP 本体は外部システムのため、**WP 側 ID・URL・revision** を Veliora DB に保存し、本文の正は WP またはオブジェクトストレージに任せる設計を推奨。
 
 ## Supabase Table Editor での確認
 

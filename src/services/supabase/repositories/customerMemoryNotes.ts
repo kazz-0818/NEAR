@@ -1,9 +1,9 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 import type { CreateMemoryNoteInput, CustomerMemoryNoteRow } from "../../customers/types.js";
 
 export async function createCustomerMemoryNote(
-  db: VerioraDb,
+  db: VelioraDb,
   input: CreateMemoryNoteInput
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
@@ -31,7 +31,7 @@ export async function createCustomerMemoryNote(
 }
 
 export async function listCustomerMemoryNotes(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string,
   opts?: { limit?: number; confirmedOnly?: boolean }
 ): Promise<CustomerMemoryNoteRow[]> {
@@ -52,7 +52,7 @@ export async function listCustomerMemoryNotes(
 }
 
 export async function getCustomerMemoryNoteById(
-  db: VerioraDb,
+  db: VelioraDb,
   noteId: string
 ): Promise<(CustomerMemoryNoteRow & { created_at: string }) | null> {
   const r = await db.query<CustomerMemoryNoteRow & { created_at: string }>(
@@ -64,7 +64,7 @@ export async function getCustomerMemoryNoteById(
 }
 
 export async function patchCustomerMemoryNote(
-  db: VerioraDb,
+  db: VelioraDb,
   noteId: string,
   patch: { note?: string; category?: string | null; confirmed?: boolean; importance?: string }
 ): Promise<boolean> {
@@ -96,7 +96,7 @@ export async function patchCustomerMemoryNote(
 }
 
 /** 管理 API 用・単一行のみ */
-export async function deleteCustomerMemoryNote(db: VerioraDb, noteId: string): Promise<boolean> {
+export async function deleteCustomerMemoryNote(db: VelioraDb, noteId: string): Promise<boolean> {
   const r = await db.query(`DELETE FROM ${VERIORA_TABLES.customerMemoryNotes} WHERE id = $1`, [noteId]);
   return (r.rowCount ?? 0) > 0;
 }

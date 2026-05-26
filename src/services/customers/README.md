@@ -1,4 +1,4 @@
-# Veriora 共通顧客マスター（ベガパンク）
+# Veliora 共通顧客マスター（ベガパンク）
 
 - LINE `userId` はチャネルごとに別。`customer_identities` で `customers.id` に束ねる。
 - 自動 merge しない。`customer_merge_candidates` は人手承認用。

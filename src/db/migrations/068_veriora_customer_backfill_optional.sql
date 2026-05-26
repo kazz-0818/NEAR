@@ -1,4 +1,4 @@
--- Veriora Vegapunk: 既存 conversations から identity / link を INSERT のみで生成
+-- Veliora Vegapunk: 既存 conversations から identity / link を INSERT のみで生成
 -- 自動 merge は行わない。表示名一致は merge_candidates のみ。
 
 WITH missing AS (

@@ -1,4 +1,4 @@
--- Veriora: LRAM editorial workflow (canonical). Legacy public.lram_* tables remain.
+-- Veliora: LRAM editorial workflow (canonical). Legacy public.lram_* tables remain.
 
 CREATE TABLE IF NOT EXISTS veriora.lram_article_sources (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,4 +1,4 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 import type { CustomerRow } from "../../customers/types.js";
 
@@ -11,7 +11,7 @@ export type CreateCustomerInput = {
 };
 
 export async function createCustomer(
-  db: VerioraDb,
+  db: VelioraDb,
   input: CreateCustomerInput = {}
 ): Promise<{ id: string }> {
   const r = await db.query<{ id: string }>(
@@ -32,7 +32,7 @@ export async function createCustomer(
   return { id };
 }
 
-export async function getCustomerById(db: VerioraDb, customerId: string): Promise<CustomerRow | null> {
+export async function getCustomerById(db: VelioraDb, customerId: string): Promise<CustomerRow | null> {
   const r = await db.query<CustomerRow>(
     `SELECT id, display_name, preferred_name, nickname, real_name, email, phone,
             company_name, memo, status, tags, metadata, created_at, updated_at
@@ -44,7 +44,7 @@ export async function getCustomerById(db: VerioraDb, customerId: string): Promis
 }
 
 export async function updateCustomerContactFields(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string,
   fields: { email?: string | null; phone?: string | null }
 ): Promise<void> {
@@ -59,7 +59,7 @@ export async function updateCustomerContactFields(
 }
 
 export async function updateCustomerDisplayFields(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string,
   fields: {
     displayName?: string | null;
@@ -90,7 +90,7 @@ export type CustomerListRow = {
 };
 
 export async function listCustomers(
-  db: VerioraDb,
+  db: VelioraDb,
   opts?: { status?: string; q?: string; limit?: number; offset?: number }
 ): Promise<CustomerListRow[]> {
   const limit = Math.min(opts?.limit ?? 50, 200);
@@ -112,7 +112,7 @@ export async function listCustomers(
   return r.rows;
 }
 
-export async function softDeleteCustomer(db: VerioraDb, customerId: string): Promise<void> {
+export async function softDeleteCustomer(db: VelioraDb, customerId: string): Promise<void> {
   await db.query(
     `UPDATE ${VERIORA_TABLES.customers} SET status = 'deleted', updated_at = now() WHERE id = $1`,
     [customerId]

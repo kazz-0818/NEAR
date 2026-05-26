@@ -1,4 +1,4 @@
-# Veriora — Supabase / Postgres スキーマ
+# Veliora — Supabase / Postgres スキーマ
 
 正典は **`veriora` schema**（UUID ベース）。レガシー **`veliora` schema**（LINE イベント・text `agent_code`）は削除せず併存します。
 

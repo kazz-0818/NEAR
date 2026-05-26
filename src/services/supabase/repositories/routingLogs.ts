@@ -1,8 +1,8 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 
 export async function saveRoutingLog(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     conversationId?: string | null;
     fromAgentId?: string | null;
@@ -34,7 +34,7 @@ export async function saveRoutingLog(
 }
 
 export async function saveHandoffLog(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     conversationId?: string | null;
     fromAgentId?: string | null;

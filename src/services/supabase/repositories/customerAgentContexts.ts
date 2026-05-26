@@ -1,9 +1,9 @@
-import type { VerioraDb } from "../client.js";
+import type { VelioraDb } from "../client.js";
 import { VERIORA_TABLES } from "../schema.js";
 import type { CustomerAgentContextRow } from "../../customers/types.js";
 
 export async function getCustomerAgentContext(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string,
   agentKey: string
 ): Promise<CustomerAgentContextRow | null> {
@@ -17,7 +17,7 @@ export async function getCustomerAgentContext(
 }
 
 export async function upsertCustomerAgentContext(
-  db: VerioraDb,
+  db: VelioraDb,
   input: {
     customerId: string;
     agentKey: string;
@@ -47,7 +47,7 @@ export async function upsertCustomerAgentContext(
 }
 
 export async function listAgentContextsForCustomer(
-  db: VerioraDb,
+  db: VelioraDb,
   customerId: string,
   excludeAgentKey?: string
 ): Promise<CustomerAgentContextRow[]> {

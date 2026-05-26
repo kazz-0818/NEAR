@@ -40,8 +40,12 @@ BEGIN
 END $cmt$;
 
 -- 統合 LINE 履歴 VIEW（正典 veliora + legacy 未ミラー行）
-DROP VIEW IF EXISTS veliora.line_messages;
-DROP VIEW IF EXISTS veliora_line_legacy.line_messages;
+-- SERA 015 等の部署ラッパ VIEW が veliora.line_messages に依存するため先に外す
+DROP VIEW IF EXISTS sera.line_message_events CASCADE;
+DROP VIEW IF EXISTS sera.line_messages CASCADE;
+
+DROP VIEW IF EXISTS veliora.line_messages CASCADE;
+DROP VIEW IF EXISTS veliora_line_legacy.line_messages CASCADE;
 
 CREATE OR REPLACE VIEW veliora.line_messages
 WITH (security_invoker = true)
@@ -98,7 +102,53 @@ WHERE NOT EXISTS (
 COMMENT ON VIEW veliora.line_messages IS
   'Unified LINE history: veliora.messages + veliora_line_legacy.line_message_events not yet mirrored.';
 
+-- SERA Table Editor 用ラッパ（015_sera_schema_folder_views.sql 相当）
+DO $sera_wrap$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'sera') THEN
+    EXECUTE $v$
+      CREATE OR REPLACE VIEW sera.line_messages AS
+        SELECT
+          id,
+          agent_code,
+          direction,
+          channel,
+          line_user_id,
+          actor_user_id,
+          group_id,
+          conversation_key,
+          line_message_id,
+          message_type,
+          text,
+          raw_payload,
+          legacy_schema,
+          legacy_table,
+          legacy_row_id,
+          created_at
+        FROM veliora.line_messages
+        WHERE agent_code = 'sera'
+    $v$;
+    EXECUTE $c$COMMENT ON VIEW sera.line_messages IS
+      'SERA の統一 LINE 履歴（実体: veliora.messages + veliora_line_legacy）'$c$;
+
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'veliora_line_legacy' AND table_name = 'line_message_events'
+    ) THEN
+      EXECUTE $e$
+        CREATE OR REPLACE VIEW sera.line_message_events AS
+          SELECT *
+          FROM veliora_line_legacy.line_message_events
+          WHERE agent_code = 'sera'
+      $e$;
+      EXECUTE $c2$COMMENT ON VIEW sera.line_message_events IS
+        'SERA の統一 LINE イベント（実体: veliora_line_legacy.line_message_events）'$c2$;
+    END IF;
+  END IF;
+END $sera_wrap$;
+
 -- legacy ai_agents (text PK) 突合 VIEW
+DROP VIEW IF EXISTS veliora.legacy_veliora_line_ai_agents;
 DROP VIEW IF EXISTS veliora.legacy_veliora_ai_agents;
 CREATE OR REPLACE VIEW veliora.legacy_veliora_line_ai_agents AS
 SELECT

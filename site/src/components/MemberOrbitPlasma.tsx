@@ -84,7 +84,7 @@ export function MemberOrbitPlasma({
   return (
     <svg
       ref={svgRef}
-      className="member-orbit-plasma pointer-events-none absolute inset-0 z-[2] h-full w-full overflow-visible"
+      className="member-orbit-plasma pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible"
       aria-hidden
     >
       <defs>

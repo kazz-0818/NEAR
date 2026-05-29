@@ -166,13 +166,13 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
         {coreAgent ? (
           <button
             type="button"
-            className="member-orbit-core absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="member-orbit-core-btn member-orbit-core absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             onClick={() => scrollToAgentSection(coreAgent)}
             aria-label="CORE — 中枢の詳細へ"
           >
             <div
               ref={coreAvatarRef}
-              className="member-orbit-core-avatar relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/95 shadow-lg transition hover:scale-[1.04] sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
+              className="member-orbit-core-avatar member-orbit-avatar relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/95 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
               style={{
                 borderColor: `${CORE_ACCENT}cc`,
                 boxShadow: `0 0 32px ${CORE_ACCENT}66, 0 0 64px rgba(196,181,253,0.25)`,

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import showcaseRaw from "./data/showcase.json";
-import type { ShowcaseData } from "./types/showcase";
+import type { ShowcaseAgent, ShowcaseData } from "./types/showcase";
 import { HeroScene } from "./components/HeroScene";
 import { AgentSection } from "./components/AgentSection";
 import { PhaseRoadmap } from "./components/PhaseRoadmap";
@@ -9,13 +9,15 @@ import { CosmicBackground } from "./components/CosmicBackground";
 import { useRevealOnScroll } from "./hooks/useRevealOnScroll";
 import { useTabAnimationsPaused } from "./hooks/useTabAnimationsPaused";
 import { useReducedMotion } from "./hooks/useReducedMotion";
-import { AGENT_ACCENTS } from "./lib/colors";
+import { AGENT_ACCENTS, SECTION_ORDER } from "./lib/colors";
 
 const data = showcaseRaw as ShowcaseData;
-const agents = data.agents.map((a) => ({
-  ...a,
-  accent: AGENT_ACCENTS[a.id] ?? a.accent,
-}));
+const agentsById = Object.fromEntries(
+  data.agents.map((a) => [a.id, { ...a, accent: AGENT_ACCENTS[a.id] ?? a.accent }]),
+);
+const agents = SECTION_ORDER.map((id) => agentsById[id]).filter(
+  (a): a is ShowcaseAgent => Boolean(a),
+);
 
 function Nav() {
   const navRef = useRef<HTMLElement>(null);

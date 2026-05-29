@@ -75,12 +75,31 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   usePauseAnimationsOffscreen(wrapRef);
   const reduced = useReducedMotion();
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]));
+  const coreAgent = byId.core;
   const ordered = RING_ORDER.map((id) => byId[id]).filter(Boolean) as ShowcaseAgent[];
   const plasmaColors = ordered.map((a) => a.accent);
 
   if (reduced) {
     return (
       <div className="flex flex-wrap justify-center gap-4 py-4">
+        {coreAgent ? (
+          <button
+            key="core"
+            type="button"
+            onClick={() => scrollToAgentSection(coreAgent)}
+            className="flex flex-col items-center gap-1"
+          >
+            <AgentIcon
+              agentId="core"
+              alt="CORE"
+              glow={CORE_ACCENT}
+              className="h-14 w-14 rounded-full"
+            />
+            <span className="font-display text-[10px] uppercase" style={{ color: CORE_ACCENT }}>
+              CORE
+            </span>
+          </button>
+        ) : null}
         {ordered.map((agent) => (
           <button
             key={agent.id}
@@ -144,32 +163,36 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
           agentAvatarRefs={agentAvatarRefs}
           colors={plasmaColors}
         />
-        <div
-          className="member-orbit-core pointer-events-none absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
-          aria-hidden
-        >
-          <div
-            ref={coreAvatarRef}
-            className="member-orbit-core-avatar relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/95 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
-            style={{
-              borderColor: `${CORE_ACCENT}cc`,
-              boxShadow: `0 0 32px ${CORE_ACCENT}66, 0 0 64px rgba(196,181,253,0.25)`,
-            }}
+        {coreAgent ? (
+          <button
+            type="button"
+            className="member-orbit-core absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            onClick={() => scrollToAgentSection(coreAgent)}
+            aria-label="CORE — 中枢の詳細へ"
           >
-            <AgentIcon
-              agentId="core"
-              alt="CORE"
-              glow={CORE_ACCENT}
-              className="h-[86%] w-[86%] rounded-full"
-            />
-          </div>
-          <span
-            className="member-orbit-core-label mt-2 font-display text-[10px] tracking-[0.22em] uppercase sm:text-[11px]"
-            style={{ color: CORE_ACCENT }}
-          >
-            CORE
-          </span>
-        </div>
+            <div
+              ref={coreAvatarRef}
+              className="member-orbit-core-avatar relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/95 shadow-lg transition hover:scale-[1.04] sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
+              style={{
+                borderColor: `${CORE_ACCENT}cc`,
+                boxShadow: `0 0 32px ${CORE_ACCENT}66, 0 0 64px rgba(196,181,253,0.25)`,
+              }}
+            >
+              <AgentIcon
+                agentId="core"
+                alt="CORE"
+                glow={CORE_ACCENT}
+                className="h-[86%] w-[86%] rounded-full"
+              />
+            </div>
+            <span
+              className="member-orbit-core-label mt-2 font-display text-[10px] tracking-[0.22em] uppercase sm:text-[11px]"
+              style={{ color: CORE_ACCENT }}
+            >
+              CORE
+            </span>
+          </button>
+        ) : null}
         {ordered.map((agent, i) => (
           <MemberOrbitItem
             key={agent.id}

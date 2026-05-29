@@ -2,9 +2,44 @@
   "meta": {
     "title": "Veliora",
     "tagline": "組織 OS — AI が部署として動く",
-    "subtitle": "秘書・マーケ・経理・AI人事・編集 — 五部署が連携。共通顧客マスターで記憶を横断共有。"
+    "subtitle": "中枢 CORE が方針と記憶を統括。秘書・マーケ・経理・AI人事・編集の五部署が連携し、共通顧客マスターで記憶を横断共有。"
   },
   "agents": [
+    {
+      "id": "core",
+      "code": "CORE",
+      "kana": "コア",
+      "department": "中枢",
+      "displayName": "CORE-コア-『中枢』",
+      "role": "Veliora CEO AI — 意思決定・記憶・組織統括",
+      "description": "Veliora 全体の中枢知能。長期記憶と方針を保持し、五部署への委譲と横断的な判断を担う。チャット・会議モード・将来の Agent Registry 接続の起点。",
+      "greeting": "CORE です。方針と記憶はここに集約します。実務は各部署へ、判断は私が支えます。",
+      "accent": "#e2e8f0",
+      "handoffRules": [
+        "秘書・取次ぎ・タスク整理は NEAR に委譲",
+        "マーケ・SNS・広告分析は SERA に委譲",
+        "経理・数値・スプレッドシートは IRIE に委譲",
+        "会話品質・組織整合性の監査は RITS に委譲",
+        "BRAVO 記事・WordPress 下書きは LRAM に委譲"
+      ],
+      "capabilities": [
+        { "id": "chat", "label": "ストリーミング会話", "status": "live", "since": "2026-04" },
+        { "id": "memory", "label": "長期記憶と RAG 取得", "status": "live", "since": "2026-04" },
+        { "id": "auth", "label": "Supabase 認証・セッション", "status": "live", "since": "2026-04" },
+        { "id": "conversation", "label": "会話セッション管理", "status": "live", "since": "2026-04" },
+        { "id": "registry", "label": "Future Agent Registry", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "meeting", "label": "会議モード", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "web-search", "label": "Web 検索連携", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "org-memory", "label": "組織横断の方針・価値観の保持", "status": "evolved", "since": "2026-05", "highlight": true },
+        { "id": "auto-delegate", "label": "全部署への自動実務代行", "status": "planned" }
+      ],
+      "evolutionLog": [
+        { "date": "2026-05", "title": "会議モード", "summary": "ライブ文字起こし・CORE 割込応答・議事録" },
+        { "date": "2026-05", "title": "Agent Registry 準備", "summary": "NEAR / SERA / IRIE / RITS を inactive 登録" },
+        { "date": "2026-04", "title": "Memory Engine", "summary": "発言の記憶価値判定と RAG 注入" },
+        { "date": "2026-04", "title": "Phase 1 立ち上げ", "summary": "Chat / Auth / Supabase / Render デプロイ" }
+      ]
+    },
     {
       "id": "near",
       "code": "NEAR",
@@ -175,6 +210,11 @@
     }
   ],
   "handoffEdges": [
+    { "from": "core", "to": "near", "label": "秘書・取次ぎ" },
+    { "from": "core", "to": "sera", "label": "マーケ" },
+    { "from": "core", "to": "irie", "label": "経理" },
+    { "from": "core", "to": "rits", "label": "監査" },
+    { "from": "core", "to": "lram", "label": "編集" },
     { "from": "near", "to": "sera", "label": "マーケ・SNS" },
     { "from": "near", "to": "irie", "label": "経理・スプシ" },
     { "from": "near", "to": "rits", "label": "監査・品質" },

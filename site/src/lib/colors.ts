@@ -12,3 +12,6 @@ export const AGENT_ACCENTS: Record<string, string> = {
 export const CORE_ACCENT = AGENT_ACCENTS.core;
 
 export const RING_ORDER = ["near", "sera", "lram", "irie", "rits"] as const;
+
+/** Units セクションの表示順（CORE → 各部署） */
+export const SECTION_ORDER = ["core", ...RING_ORDER] as const;

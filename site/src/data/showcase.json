@@ -35,7 +35,7 @@
       ],
       "evolutionLog": [
         { "date": "2026-05", "title": "会議モード", "summary": "ライブ文字起こし・CORE 割込応答・議事録" },
-        { "date": "2026-05", "title": "Agent Registry 準備", "summary": "NEAR / SERA / IRIE / RITS を inactive 登録" },
+        { "date": "2026-05", "title": "Agent Registry 準備", "summary": "NEAR / SERA / IRIE / RITS / LRAM を inactive 登録" },
         { "date": "2026-04", "title": "Memory Engine", "summary": "発言の記憶価値判定と RAG 注入" },
         { "date": "2026-04", "title": "Phase 1 立ち上げ", "summary": "Chat / Auth / Supabase / Render デプロイ" }
       ]

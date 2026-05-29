@@ -371,7 +371,7 @@ html.tab-animations-paused * {
 .member-orbit-center-logo-img {
   display: block;
   background: transparent;
-  filter: drop-shadow(0 0 16px rgba(167, 139, 250, 0.22));
+  filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.28));
 }
 
 /* メンバー — 虹色リングの線の中央を周回（--orbit-r は JS でリング幅から算出） */

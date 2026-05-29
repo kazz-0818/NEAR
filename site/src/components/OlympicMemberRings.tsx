@@ -119,7 +119,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
           className="pointer-events-none absolute inset-0 rounded-full opacity-20"
           style={{ boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)" }}
         />
-        <picture className="member-orbit-center-logo pointer-events-none absolute top-1/2 left-1/2 z-[1] block h-[42%] w-[42%] -translate-x-1/2 -translate-y-1/2">
+        <picture className="member-orbit-center-logo pointer-events-none absolute top-1/2 left-1/2 z-[1] block h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2">
           <source srcSet={`${velioraLogoBase()}.webp`} type="image/webp" />
           <img
             src={`${velioraLogoBase()}.png`}

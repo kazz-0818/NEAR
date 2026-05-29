@@ -6,6 +6,7 @@ const ICON_MAP: Record<string, string> = {
   irie: "IRIE",
   rits: "RITS",
   lram: "LRAM",
+  core: "CORE",
 };
 
 /** Vite base（GitHub Pages では `/NEAR/`）を含むパス */

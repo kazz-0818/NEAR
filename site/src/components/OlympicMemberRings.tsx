@@ -1,8 +1,9 @@
 import { useRef } from "react";
 import type { ShowcaseAgent } from "../types/showcase";
 import { AgentIcon } from "./AgentIcon";
+import { MemberOrbitPlasma } from "./MemberOrbitPlasma";
 import { scrollToAgentSection, velioraLogoBase } from "../lib/agents";
-import { RING_ORDER } from "../lib/colors";
+import { CORE_ACCENT, RING_ORDER } from "../lib/colors";
 import { usePauseAnimationsOffscreen } from "../hooks/usePauseAnimationsOffscreen";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useRingOrbitRadius } from "../hooks/useRingOrbitRadius";
@@ -14,9 +15,10 @@ interface MemberOrbitItemProps {
   agent: ShowcaseAgent;
   index: number;
   total: number;
+  buttonRef: (el: HTMLButtonElement | null) => void;
 }
 
-function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
+function MemberOrbitItem({ agent, index, total, buttonRef }: MemberOrbitItemProps) {
   const angle = (index / total) * 360 - 90;
 
   return (
@@ -30,6 +32,7 @@ function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
       }
     >
       <button
+        ref={buttonRef}
         type="button"
         className="member-orbit-btn z-10 flex flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         onClick={() => scrollToAgentSection(agent)}
@@ -66,11 +69,14 @@ interface OlympicMemberRingsProps {
 export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
+  const centerRef = useRef<HTMLDivElement>(null);
+  const agentBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const orbitRadiusPx = useRingOrbitRadius(ringRef);
   usePauseAnimationsOffscreen(wrapRef);
   const reduced = useReducedMotion();
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]));
   const ordered = RING_ORDER.map((id) => byId[id]).filter(Boolean) as ShowcaseAgent[];
+  const plasmaColors = ordered.map((a) => a.accent);
 
   if (reduced) {
     return (
@@ -132,8 +138,48 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
             aria-hidden
           />
         </picture>
+        <MemberOrbitPlasma
+          fieldRef={wrapRef}
+          centerRef={centerRef}
+          agentButtonRefs={agentBtnRefs}
+          colors={plasmaColors}
+        />
+        <div
+          ref={centerRef}
+          className="member-orbit-core pointer-events-none absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+          aria-hidden
+        >
+          <div
+            className="member-orbit-core-avatar relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/95 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
+            style={{
+              borderColor: `${CORE_ACCENT}cc`,
+              boxShadow: `0 0 32px ${CORE_ACCENT}66, 0 0 64px rgba(196,181,253,0.25)`,
+            }}
+          >
+            <AgentIcon
+              agentId="core"
+              alt="CORE"
+              glow={CORE_ACCENT}
+              className="h-[86%] w-[86%] rounded-full"
+            />
+          </div>
+          <span
+            className="member-orbit-core-label mt-2 font-display text-[10px] tracking-[0.22em] uppercase sm:text-[11px]"
+            style={{ color: CORE_ACCENT }}
+          >
+            CORE
+          </span>
+        </div>
         {ordered.map((agent, i) => (
-          <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
+          <MemberOrbitItem
+            key={agent.id}
+            agent={agent}
+            index={i}
+            total={ordered.length}
+            buttonRef={(el) => {
+              agentBtnRefs.current[i] = el;
+            }}
+          />
         ))}
       </div>
     </div>

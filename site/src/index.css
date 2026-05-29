@@ -374,6 +374,45 @@ html.tab-animations-paused * {
   filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.28));
 }
 
+/* CORE ハブ（固定・Veliora ロゴより手前 z-[5]） */
+.member-orbit-core-avatar {
+  animation: member-core-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes member-core-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* CORE → 各 AI プラズマビーム（軌道に追従） */
+.member-orbit-plasma-line {
+  stroke-linecap: round;
+  fill: none;
+  animation: member-plasma-flow 2.1s linear infinite;
+  stroke-dasharray: 6 22;
+}
+
+.member-orbit-plasma-line--glow {
+  stroke-dasharray: 14 30;
+  animation-duration: 2.7s;
+}
+
+@keyframes member-plasma-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.animations-paused .member-orbit-plasma-line,
+.animations-paused .member-orbit-core-avatar {
+  animation-play-state: paused;
+}
+
 /* メンバー — 虹色リングの線の中央を周回（--orbit-r は JS でリング幅から算出） */
 @keyframes member-orbit-spin {
   from {
@@ -664,9 +703,15 @@ html.tab-animations-paused * {
   .orbit-cap,
   .member-orbit-item,
   .member-orbit-enter,
+  .member-orbit-plasma-line,
+  .member-orbit-core-avatar,
   .rainbow-ring,
   .orbit-agent-bubble {
     animation: none !important;
+  }
+
+  .member-orbit-plasma {
+    display: none;
   }
 
   .orbit-agent-hub-btn:hover .orbit-agent-bubble,

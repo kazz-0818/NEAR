@@ -358,6 +358,10 @@ html.tab-animations-paused * {
 }
 
 /* ヒーロー: 虹色リング＋メンバー周回（同一円の中心線上） */
+.member-orbit-field {
+  contain: layout style;
+}
+
 .member-orbit-ring-wrap {
   position: absolute;
   left: 50%;
@@ -457,14 +461,10 @@ html.tab-animations-paused * {
 @keyframes member-plasma-hub-pulse {
   0%,
   100% {
-    opacity: 0.5;
-    transform: scale(0.92);
-    transform-origin: center;
+    opacity: 0.45;
   }
   50% {
-    opacity: 1;
-    transform: scale(1.08);
-    transform-origin: center;
+    opacity: 0.95;
   }
 }
 
@@ -492,6 +492,7 @@ html.tab-animations-paused * {
   height: 0;
   animation: member-orbit-spin var(--dur, 96s) linear infinite;
   transform-origin: 0 0;
+  will-change: transform;
 }
 
 .rainbow-ring {

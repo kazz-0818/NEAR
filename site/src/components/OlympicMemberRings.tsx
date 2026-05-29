@@ -15,10 +15,9 @@ interface MemberOrbitItemProps {
   agent: ShowcaseAgent;
   index: number;
   total: number;
-  avatarRef: (el: HTMLDivElement | null) => void;
 }
 
-function MemberOrbitItem({ agent, index, total, avatarRef }: MemberOrbitItemProps) {
+function MemberOrbitItem({ agent, index, total }: MemberOrbitItemProps) {
   const angle = (index / total) * 360 - 90;
 
   return (
@@ -37,7 +36,6 @@ function MemberOrbitItem({ agent, index, total, avatarRef }: MemberOrbitItemProp
         onClick={() => scrollToAgentSection(agent)}
       >
         <div
-          ref={avatarRef}
           className="member-orbit-avatar relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[5rem] sm:w-[5rem] md:h-[5.75rem] md:w-[5.75rem]"
           style={{
             borderColor: agent.accent,
@@ -70,7 +68,6 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const coreAvatarRef = useRef<HTMLDivElement>(null);
-  const agentAvatarRefs = useRef<(HTMLDivElement | null)[]>([]);
   const orbitRadiusPx = useRingOrbitRadius(ringRef);
   usePauseAnimationsOffscreen(wrapRef);
   const reduced = useReducedMotion();
@@ -78,6 +75,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const coreAgent = byId.core;
   const ordered = RING_ORDER.map((id) => byId[id]).filter(Boolean) as ShowcaseAgent[];
   const plasmaColors = ordered.map((a) => a.accent);
+  const agentStartsDeg = ordered.map((_, i) => (i / ordered.length) * 360 - 90);
 
   if (reduced) {
     return (
@@ -159,8 +157,9 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
         </picture>
         <MemberOrbitPlasma
           ringRef={ringRef}
-          originRef={coreAvatarRef}
-          agentAvatarRefs={agentAvatarRefs}
+          orbitRadiusPx={orbitRadiusPx}
+          agentStartsDeg={agentStartsDeg}
+          orbitDurationSec={ORBIT_DURATION}
           colors={plasmaColors}
         />
         {coreAgent ? (
@@ -194,15 +193,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
           </button>
         ) : null}
         {ordered.map((agent, i) => (
-          <MemberOrbitItem
-            key={agent.id}
-            agent={agent}
-            index={i}
-            total={ordered.length}
-            avatarRef={(el) => {
-              agentAvatarRefs.current[i] = el;
-            }}
-          />
+          <MemberOrbitItem key={agent.id} agent={agent} index={i} total={ordered.length} />
         ))}
       </div>
     </div>

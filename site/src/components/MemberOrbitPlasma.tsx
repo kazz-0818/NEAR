@@ -1,42 +1,64 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 interface MemberOrbitPlasmaProps {
-  fieldRef: RefObject<HTMLDivElement | null>;
-  centerRef: RefObject<HTMLElement | null>;
-  agentButtonRefs: RefObject<(HTMLButtonElement | null)[]>;
+  /** member-orbit-ring-wrap（SVG と同じ座標系） */
+  ringRef: RefObject<HTMLDivElement | null>;
+  originRef: RefObject<HTMLElement | null>;
+  agentAvatarRefs: RefObject<(HTMLElement | null)[]>;
   colors: readonly string[];
+}
+
+function localCenter(el: HTMLElement, ring: DOMRect) {
+  const r = el.getBoundingClientRect();
+  return {
+    x: r.left + r.width / 2 - ring.left,
+    y: r.top + r.height / 2 - ring.top,
+  };
 }
 
 /** CORE 中心から各メンバーアイコンへ追従するプラズマビーム（SVG） */
 export function MemberOrbitPlasma({
-  fieldRef,
-  centerRef,
-  agentButtonRefs,
+  ringRef,
+  originRef,
+  agentAvatarRefs,
   colors,
 }: MemberOrbitPlasmaProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const hubRef = useRef<SVGCircleElement>(null);
 
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
     let raf = 0;
+    const t0 = performance.now();
 
     const update = () => {
-      const field = fieldRef.current;
-      const center = centerRef.current;
-      if (field && center) {
-        const fr = field.getBoundingClientRect();
-        const cr = center.getBoundingClientRect();
-        const cx = cr.left + cr.width / 2 - fr.left;
-        const cy = cr.top + cr.height / 2 - fr.top;
+      const ring = ringRef.current;
+      const origin = originRef.current;
+      if (ring && origin) {
+        const rr = ring.getBoundingClientRect();
+        const { x: cx, y: cy } = localCenter(origin, rr);
 
-        agentButtonRefs.current.forEach((btn, i) => {
+        hubRef.current?.setAttribute("cx", String(cx));
+        hubRef.current?.setAttribute("cy", String(cy));
+
+        agentAvatarRefs.current.forEach((avatar, i) => {
           const group = svg.querySelector<SVGGElement>(`[data-plasma="${i}"]`);
-          if (!btn || !group) return;
-          const br = btn.getBoundingClientRect();
-          const x2 = br.left + br.width / 2 - fr.left;
-          const y2 = br.top + br.height / 2 - fr.top;
+          if (!avatar || !group) return;
+
+          const { x: x2, y: y2 } = localCenter(avatar, rr);
+          const mx = (cx + x2) / 2;
+          const my = (cy + y2) / 2;
+          const dx = x2 - cx;
+          const dy = y2 - cy;
+          const len = Math.hypot(dx, dy) || 1;
+          const nx = -dy / len;
+          const ny = dx / len;
+          const wobble = Math.sin((performance.now() - t0) / 380 + i * 1.15) * 14;
+          const qx = mx + nx * wobble;
+          const qy = my + ny * wobble;
+          const d = `M ${cx} ${cy} Q ${qx} ${qy} ${x2} ${y2}`;
 
           const grad = svg.querySelector<SVGLinearGradientElement>(`#member-plasma-grad-${i}`);
           if (grad) {
@@ -46,11 +68,8 @@ export function MemberOrbitPlasma({
             grad.setAttribute("y2", String(y2));
           }
 
-          group.querySelectorAll("line").forEach((line) => {
-            line.setAttribute("x1", String(cx));
-            line.setAttribute("y1", String(cy));
-            line.setAttribute("x2", String(x2));
-            line.setAttribute("y2", String(y2));
+          group.querySelectorAll("path").forEach((path) => {
+            path.setAttribute("d", d);
           });
         });
       }
@@ -60,7 +79,7 @@ export function MemberOrbitPlasma({
 
     raf = requestAnimationFrame(update);
     return () => cancelAnimationFrame(raf);
-  }, [fieldRef, centerRef, agentButtonRefs]);
+  }, [ringRef, originRef, agentAvatarRefs]);
 
   return (
     <svg
@@ -69,40 +88,78 @@ export function MemberOrbitPlasma({
       aria-hidden
     >
       <defs>
-        <filter id="member-plasma-blur" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="4" result="b" />
+        <filter id="member-plasma-blur" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="7" result="b" />
           <feMerge>
             <feMergeNode in="b" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        {colors.map((color, i) => (
-          <linearGradient
-            key={i}
-            id={`member-plasma-grad-${i}`}
-            gradientUnits="userSpaceOnUse"
+        <filter id="member-plasma-displace" x="-30%" y="-30%" width="160%" height="160%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.018"
+            numOctaves="2"
+            seed={2}
+            result="noise"
           >
-            <stop offset="0%" stopColor="#f8fafc" stopOpacity="0.95" />
-            <stop offset="35%" stopColor="#c4b5fd" stopOpacity="0.85" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.9" />
+            <animate
+              attributeName="baseFrequency"
+              values="0.012;0.028;0.012"
+              dur="3.5s"
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <radialGradient id="member-plasma-hub-grad">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="45%" stopColor="#c4b5fd" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#a78bfa" stopOpacity="0" />
+        </radialGradient>
+        {colors.map((color, i) => (
+          <linearGradient key={i} id={`member-plasma-grad-${i}`} gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
+            <stop offset="25%" stopColor="#e9d5ff" stopOpacity="0.95" />
+            <stop offset="55%" stopColor="#c4b5fd" stopOpacity="0.75" />
+            <stop offset="100%" stopColor={color} stopOpacity="1" />
           </linearGradient>
         ))}
       </defs>
+
+      <circle ref={hubRef} r="38" fill="url(#member-plasma-hub-grad)" className="member-orbit-plasma-hub" />
+
       {colors.map((color, i) => (
         <g key={i} data-plasma={i}>
-          <line
-            className="member-orbit-plasma-line member-orbit-plasma-line--glow"
+          <path
+            className="member-orbit-plasma-path member-orbit-plasma-path--halo"
             stroke={color}
-            strokeWidth={5}
-            opacity={0.22}
+            strokeWidth={14}
+            opacity={0.14}
             filter="url(#member-plasma-blur)"
-            style={{ animationDelay: `${i * 0.4}s` }}
+            style={{ animationDelay: `${i * 0.35}s` }}
           />
-          <line
-            className="member-orbit-plasma-line member-orbit-plasma-line--core"
+          <path
+            className="member-orbit-plasma-path member-orbit-plasma-path--glow"
+            stroke={color}
+            strokeWidth={6}
+            opacity={0.38}
+            filter="url(#member-plasma-blur)"
+            style={{ animationDelay: `${i * 0.35}s` }}
+          />
+          <path
+            className="member-orbit-plasma-path member-orbit-plasma-path--beam"
             stroke={`url(#member-plasma-grad-${i})`}
-            strokeWidth={1.75}
-            style={{ animationDelay: `${i * 0.4}s` }}
+            strokeWidth={2.5}
+            filter="url(#member-plasma-displace)"
+            style={{ animationDelay: `${i * 0.35}s` }}
+          />
+          <path
+            className="member-orbit-plasma-path member-orbit-plasma-path--spark"
+            stroke="#ffffff"
+            strokeWidth={1}
+            opacity={0.85}
+            style={{ animationDelay: `${i * 0.35 + 0.15}s`, animationDirection: "reverse" }}
           />
         </g>
       ))}

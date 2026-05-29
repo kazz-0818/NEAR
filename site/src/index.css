@@ -389,26 +389,59 @@ html.tab-animations-paused * {
   }
 }
 
-/* CORE → 各 AI プラズマビーム（軌道に追従） */
-.member-orbit-plasma-line {
+/* CORE → 各 AI プラズマビーム（軌道に追従・曲線） */
+.member-orbit-plasma-path {
   stroke-linecap: round;
   fill: none;
-  animation: member-plasma-flow 2.1s linear infinite;
-  stroke-dasharray: 6 22;
+  vector-effect: non-scaling-stroke;
 }
 
-.member-orbit-plasma-line--glow {
-  stroke-dasharray: 14 30;
-  animation-duration: 2.7s;
+.member-orbit-plasma-path--halo {
+  animation: member-plasma-flow 2.8s linear infinite;
+  stroke-dasharray: 20 40;
+}
+
+.member-orbit-plasma-path--glow {
+  animation: member-plasma-flow 2.2s linear infinite;
+  stroke-dasharray: 10 26;
+}
+
+.member-orbit-plasma-path--beam {
+  animation: member-plasma-flow 1.6s linear infinite;
+  stroke-dasharray: 4 14;
+}
+
+.member-orbit-plasma-path--spark {
+  animation: member-plasma-flow 1.1s linear infinite;
+  stroke-dasharray: 2 10;
+}
+
+.member-orbit-plasma-hub {
+  animation: member-plasma-hub-pulse 2.4s ease-in-out infinite;
 }
 
 @keyframes member-plasma-flow {
   to {
-    stroke-dashoffset: -28;
+    stroke-dashoffset: -34;
   }
 }
 
-.animations-paused .member-orbit-plasma-line,
+@keyframes member-plasma-hub-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.92);
+    transform-origin: center;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+    transform-origin: center;
+  }
+}
+
+.animations-paused .member-orbit-plasma-path,
+.animations-paused .member-orbit-plasma-hub,
 .animations-paused .member-orbit-core-avatar {
   animation-play-state: paused;
 }
@@ -703,7 +736,8 @@ html.tab-animations-paused * {
   .orbit-cap,
   .member-orbit-item,
   .member-orbit-enter,
-  .member-orbit-plasma-line,
+  .member-orbit-plasma-path,
+  .member-orbit-plasma-hub,
   .member-orbit-core-avatar,
   .rainbow-ring,
   .orbit-agent-bubble {

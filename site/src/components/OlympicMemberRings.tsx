@@ -15,10 +15,10 @@ interface MemberOrbitItemProps {
   agent: ShowcaseAgent;
   index: number;
   total: number;
-  buttonRef: (el: HTMLButtonElement | null) => void;
+  avatarRef: (el: HTMLDivElement | null) => void;
 }
 
-function MemberOrbitItem({ agent, index, total, buttonRef }: MemberOrbitItemProps) {
+function MemberOrbitItem({ agent, index, total, avatarRef }: MemberOrbitItemProps) {
   const angle = (index / total) * 360 - 90;
 
   return (
@@ -32,12 +32,12 @@ function MemberOrbitItem({ agent, index, total, buttonRef }: MemberOrbitItemProp
       }
     >
       <button
-        ref={buttonRef}
         type="button"
         className="member-orbit-btn z-10 flex flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         onClick={() => scrollToAgentSection(agent)}
       >
         <div
+          ref={avatarRef}
           className="member-orbit-avatar relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 bg-[#050508]/90 shadow-lg sm:h-[5rem] sm:w-[5rem] md:h-[5.75rem] md:w-[5.75rem]"
           style={{
             borderColor: agent.accent,
@@ -69,8 +69,8 @@ interface OlympicMemberRingsProps {
 export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
-  const centerRef = useRef<HTMLDivElement>(null);
-  const agentBtnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const coreAvatarRef = useRef<HTMLDivElement>(null);
+  const agentAvatarRefs = useRef<(HTMLDivElement | null)[]>([]);
   const orbitRadiusPx = useRingOrbitRadius(ringRef);
   usePauseAnimationsOffscreen(wrapRef);
   const reduced = useReducedMotion();
@@ -125,7 +125,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
           className="pointer-events-none absolute inset-0 rounded-full opacity-20"
           style={{ boxShadow: "inset 0 0 40px rgba(255,255,255,0.06)" }}
         />
-        <picture className="member-orbit-center-logo pointer-events-none absolute top-1/2 left-1/2 z-[1] block h-[52%] w-[52%] -translate-x-1/2 -translate-y-1/2">
+        <picture className="member-orbit-center-logo pointer-events-none absolute top-1/2 left-1/2 z-[1] block h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2">
           <source srcSet={`${velioraLogoBase()}.webp`} type="image/webp" />
           <img
             src={`${velioraLogoBase()}.png`}
@@ -139,17 +139,17 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
           />
         </picture>
         <MemberOrbitPlasma
-          fieldRef={wrapRef}
-          centerRef={centerRef}
-          agentButtonRefs={agentBtnRefs}
+          ringRef={ringRef}
+          originRef={coreAvatarRef}
+          agentAvatarRefs={agentAvatarRefs}
           colors={plasmaColors}
         />
         <div
-          ref={centerRef}
           className="member-orbit-core pointer-events-none absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
           aria-hidden
         >
           <div
+            ref={coreAvatarRef}
             className="member-orbit-core-avatar relative flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full border-2 bg-[#050508]/95 shadow-lg sm:h-[4.75rem] sm:w-[4.75rem] md:h-[5.25rem] md:w-[5.25rem]"
             style={{
               borderColor: `${CORE_ACCENT}cc`,
@@ -176,8 +176,8 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
             agent={agent}
             index={i}
             total={ordered.length}
-            buttonRef={(el) => {
-              agentBtnRefs.current[i] = el;
+            avatarRef={(el) => {
+              agentAvatarRefs.current[i] = el;
             }}
           />
         ))}

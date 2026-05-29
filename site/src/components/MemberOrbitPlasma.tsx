@@ -22,6 +22,27 @@ function isPlasmaPaused(ring: HTMLElement | null): boolean {
   return false;
 }
 
+/** 一時停止中の CSS 軌道アニメの進捗（度）— スクロール復帰時のずれ補正用 */
+function readCssOrbitSpinDeg(ring: HTMLElement, orbitDurationSec: number): number | null {
+  const item = ring.querySelector(".member-orbit-item");
+  if (!item) return null;
+
+  for (const anim of item.getAnimations()) {
+    if (!(anim instanceof CSSAnimation) || anim.animationName !== "member-orbit-spin") continue;
+    const t = anim.currentTime;
+    if (t == null || typeof t !== "number") return null;
+
+    const timing = anim.effect?.getTiming();
+    const durMs =
+      typeof timing?.duration === "number" && timing.duration > 0
+        ? timing.duration
+        : orbitDurationSec * 1000;
+
+    return ((t % durMs) / durMs) * 360;
+  }
+  return null;
+}
+
 /** CORE 中心から各メンバーアイコンへ追従するプラズマビーム（SVG） */
 export function MemberOrbitPlasma({
   ringRef,
@@ -66,23 +87,18 @@ export function MemberOrbitPlasma({
 
     let raf = 0;
     let last = 0;
-    const t0 = performance.now();
+    let lastTick = 0;
+    let effectiveElapsed = 0;
+    let wasPaused = true;
 
-    const update = (now: number) => {
-      raf = requestAnimationFrame(update);
-
-      if (isPlasmaPaused(ring)) return;
-      if (now - last < FRAME_MS) return;
-      last = now;
-
+    const drawFrame = (now: number) => {
       const { w, h } = sizeRef.current;
       if (w < 1 || h < 1) return;
 
       const cx = w / 2;
       const cy = h / 2;
       const r = orbitRadiusPx;
-      const elapsed = (now - t0) / 1000;
-      const spin = (elapsed / orbitDurationSec) * 360;
+      const spin = ((effectiveElapsed % orbitDurationSec) / orbitDurationSec) * 360;
       const wobbleT = now / 380;
 
       hubRef.current?.setAttribute("cx", String(cx));
@@ -121,10 +137,51 @@ export function MemberOrbitPlasma({
       });
     };
 
+    const update = (now: number) => {
+      raf = requestAnimationFrame(update);
+      const paused = isPlasmaPaused(ring);
+
+      if (paused) {
+        wasPaused = true;
+        lastTick = 0;
+        return;
+      }
+
+      if (wasPaused) {
+        measure();
+        const cssSpin = readCssOrbitSpinDeg(ring, orbitDurationSec);
+        if (cssSpin !== null) {
+          effectiveElapsed = (cssSpin / 360) * orbitDurationSec;
+        }
+        wasPaused = false;
+        last = 0;
+        lastTick = now;
+        drawFrame(now);
+        return;
+      }
+
+      if (lastTick > 0) {
+        effectiveElapsed += (now - lastTick) / 1000;
+      }
+      lastTick = now;
+
+      if (now - last < FRAME_MS) return;
+      last = now;
+      drawFrame(now);
+    };
+
+    const onVisible = () => {
+      if (!document.hidden && !isPlasmaPaused(ring)) {
+        wasPaused = true;
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     raf = requestAnimationFrame(update);
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [ringRef, orbitRadiusPx, agentStartsDeg, orbitDurationSec]);
 

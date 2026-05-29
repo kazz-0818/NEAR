@@ -166,7 +166,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
         {coreAgent ? (
           <button
             type="button"
-            className="member-orbit-core-btn member-orbit-core absolute top-1/2 left-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="member-orbit-core-btn member-orbit-core absolute top-1/2 left-1/2 z-[5] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             onClick={() => scrollToAgentSection(coreAgent)}
             aria-label="CORE — 中枢の詳細へ"
           >
@@ -186,7 +186,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
               />
             </div>
             <span
-              className="member-orbit-core-label mt-2 font-display text-[10px] tracking-[0.22em] uppercase sm:text-[11px]"
+              className="member-orbit-core-label pointer-events-none absolute top-full left-1/2 mt-2 -translate-x-1/2 font-display text-[10px] tracking-[0.22em] uppercase sm:text-[11px]"
               style={{ color: CORE_ACCENT }}
             >
               CORE

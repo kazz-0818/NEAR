@@ -1,4 +1,5 @@
 import { getLogger } from "./logger.js";
+import { postAdminLogsWithRetry } from "./ritsIngestFetch.js";
 
 export type RitsAgentLogPayload = {
   agent_name: string;
@@ -43,14 +44,7 @@ export async function sendAgentLogToRits(payload: RitsAgentLogPayload): Promise<
   };
 
   try {
-    const res = await fetch(`${base}/admin/logs`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-api-key": key,
-      },
-      body: JSON.stringify(body),
-    });
+    const res = await postAdminLogsWithRetry(base, key, body);
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       getLogger().warn(

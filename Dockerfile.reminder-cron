@@ -1,0 +1,5 @@
+# Render Cron: 毎分 Web サービスの /internal/reminders/dispatch を叩く
+FROM curlimages/curl:8.12.1
+COPY scripts/render-reminder-dispatch.sh /dispatch.sh
+RUN chmod +x /dispatch.sh
+ENTRYPOINT ["/dispatch.sh"]

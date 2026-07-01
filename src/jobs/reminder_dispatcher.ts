@@ -28,8 +28,12 @@ async function dispatchDueReminders(): Promise<void> {
 
     for (const row of sel.rows) {
       try {
-        // グループリマインドはグループへ push、個人は本人へ push
-        const pushTo = row.group_id ?? row.channel_user_id;
+        // channel_user_id / actor_user_id は発言者の LINE userId（グループ内登録でも DM で通知）
+        const pushTo = (row.actor_user_id ?? row.channel_user_id)?.trim();
+        if (!pushTo) {
+          log.error({ reminderId: row.id }, "reminder dispatch skipped: no push target");
+          continue;
+        }
         await pushText(pushTo, `【NEARリマインド】${row.message}`);
         await client.query(`UPDATE near_reminders SET status = 'sent' WHERE id = $1`, [row.id]);
         log.info({ reminderId: row.id, pushTo: pushTo.slice(0, 12) }, "reminder dispatched");

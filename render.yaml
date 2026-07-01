@@ -18,3 +18,15 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+
+  # Web がスリープ中でも毎分 wake + リマインド送信（NEAR_PUBLIC_URL は本番 URL）
+  - type: cron
+    name: near-reminder-dispatch
+    runtime: docker
+    dockerfilePath: ./Dockerfile.reminder-cron
+    schedule: "* * * * *"
+    envVars:
+      - key: NEAR_PUBLIC_URL
+        value: https://near-5kyl.onrender.com
+      - key: CRON_SECRET
+        sync: false

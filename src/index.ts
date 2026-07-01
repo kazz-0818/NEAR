@@ -303,6 +303,9 @@ async function main() {
   startReminderCron();
   startImprovementCapsuleCron();
 
+  // デプロイ直後・ダウンタイム後に期限切れリマインドを即時再送
+  void dispatchDueReminders().catch((e) => log.error({ err: e }, "startup reminder dispatch failed"));
+
   serve(
     {
       fetch: app.fetch,

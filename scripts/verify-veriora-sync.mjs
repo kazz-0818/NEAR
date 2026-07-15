@@ -44,8 +44,23 @@ const SHARED_DOCS = [
 
 const DOC_REPOS = ["NEAR", "SERA", "IRIE", "RITS", "LRAM"];
 
-function sha256(rel) {
+/** LIRA は IRIE 名でチェックアウトされることがある（逆も許容） */
+function resolveRel(rel) {
   const full = join(SYSTEM_ROOT, rel);
+  if (existsSync(full)) return full;
+  if (rel.startsWith("LIRA/")) {
+    const alt = join(SYSTEM_ROOT, rel.replace(/^LIRA\//, "IRIE/"));
+    if (existsSync(alt)) return alt;
+  }
+  if (rel.startsWith("IRIE/")) {
+    const alt = join(SYSTEM_ROOT, rel.replace(/^IRIE\//, "LIRA/"));
+    if (existsSync(alt)) return alt;
+  }
+  return full;
+}
+
+function sha256(rel) {
+  const full = resolveRel(rel);
   if (!existsSync(full)) return { path: rel, missing: true };
   const buf = readFileSync(full);
   return {

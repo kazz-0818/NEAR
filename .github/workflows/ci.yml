@@ -76,3 +76,6 @@ jobs:
 
       - name: Veliora cross-repo sync
         run: npm run verify:veriora-sync
+
+      - name: Vegapunk static verify
+        run: npm run verify:vegapunk-static

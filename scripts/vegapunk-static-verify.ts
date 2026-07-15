@@ -15,11 +15,18 @@ type Check = { name: string; ok: boolean; detail?: string };
 
 const checks: Check[] = [];
 
-/** CI では兄弟リポが無い場合がある（LIRA は IRIE 名でチェックアウトされることもある） */
+/**
+ * CI では兄弟リポが無い・checkout 失敗で空ディレクトリだけ残る場合がある
+ * （LIRA は IRIE 名でチェックアウトされることもある）。
+ * マーカーファイルの存在で「実体のある checkout」かを判定する。
+ */
 function siblingDir(repo: string): string | null {
   const candidates = repo === "LIRA" ? ["LIRA", "IRIE"] : [repo];
   for (const c of candidates) {
-    if (existsSync(join(system, c))) return c;
+    const base = join(system, c);
+    const marker =
+      repo === "LIRA" ? join(base, "app/agents/registry.py") : join(base, "package.json");
+    if (existsSync(marker)) return c;
   }
   return null;
 }

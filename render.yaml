@@ -20,6 +20,9 @@ services:
         value: production
 
   # Web がスリープ中でも毎分 wake + リマインド送信（NEAR_PUBLIC_URL は本番 URL）
+  # VELIORA_WAKE_URLS: 兄弟サービスも同時に wake して LINE Webhook のコールドスリープ無返信を防ぐ。
+  # 注意: 無料プランの Web を常時ウォームに保つと Render の無料インスタンス時間を消費し続ける。
+  #       上限が気になる場合はこのリストを削るか、対象サービスを starter に上げること。
   - type: cron
     name: near-reminder-dispatch
     runtime: docker
@@ -30,3 +33,5 @@ services:
         value: https://near-5kyl.onrender.com
       - key: CRON_SECRET
         sync: false
+      - key: VELIORA_WAKE_URLS
+        value: https://sera-zsuf.onrender.com/health,https://lira-ofkv.onrender.com/health,https://rits-gj2m.onrender.com/health,https://lram.onrender.com/health

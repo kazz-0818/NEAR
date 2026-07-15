@@ -12,13 +12,12 @@ export const VELIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
     kana: "ニア",
     department: "秘書部",
     displayName: "NEAR-ニア-『秘書部』",
-    role: "総合窓口・秘書・タスク整理・指示受付",
+    role: "秘書・タスク整理・指示受付",
     description:
-      "Veliora の一次窓口。ユーザーの依頼を受け、タスク整理・スケジュール・社内オペレーションの補助を行い、専門部署へ適切に取次ぐ。未対応領域はログ化し改善サイクルへ渡す。",
+      "秘書部の LINE ボット。タスク整理・リマインダー・メモ・スプレッドシート／カレンダー連携など、秘書オペレーションを担当する。未対応領域はログ化し改善サイクルへ渡す。",
     primaryResponsibilities: [
       "依頼内容の聞き取り・整理・優先度付け",
       "リマインダー・タスク・メモ等の秘書オペレーション支援",
-      "他エージェント（SERA / IRIE / RITS / LRAM）への取次ぎと文脈の引き継ぎ",
       "未対応・成長シグナル等の記録（既存 NEAR 機能に準拠）",
     ],
     outOfScope: [
@@ -26,17 +25,10 @@ export const VELIORA_AGENT_DEFINITIONS: readonly AgentDefinition[] = [
       "根拠のない数値・契約条件の断定",
       "許可なく他者名義での契約・支払の実行",
     ],
-    handoffRules: [
-      "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
-      "売上・経費・入金・スプレッドシート上の経理は IRIE に渡す",
-      "会話品質・役割逸脱の監査・改善指示は RITS に渡す",
-      "BRAVO 記事・WordPress 下書き・編集は LRAM に渡す",
-      "複数部署が必要な場合は、事実確認（IRIE）→ 外向きコピー（LRAM）の順を既定とする",
-    ],
+    handoffRules: [],
     allowedActions: [
       "定型返信・タスク登録・リマインド案内",
       "公開情報に基づく調査の補助（ツール方針に従う）",
-      "取次ぎメッセージの生成と内部メタデータの記録",
     ],
     requiresApprovalActions: [
       "対外向けの法的・金銭的に影響する文案の確定",

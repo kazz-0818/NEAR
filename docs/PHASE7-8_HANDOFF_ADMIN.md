@@ -1,16 +1,8 @@
-# Phase 7–8: LRAM 取次ぎと管理 API 統一
+# Phase 7–8: 管理 API 統一（LINE 履歴）
 
-## Phase 7 — NEAR → LRAM 取次ぎ
+> **2026-07 更新**: NEAR→LRAM の HTTP 取次ぎ（`velioraHandoff` / `NEAR_LRAM_BASE_URL`）は削除済み。組織横断の総合窓口は将来 **CORE** が担う予定。
 
-1. Render（または .env）に **同一の** `VERIORA_HANDOFF_SECRET`（12文字以上）を NEAR と LRAM に設定
-2. NEAR に `NEAR_LRAM_BASE_URL=https://<lram-service>.onrender.com` を設定
-3. ユーザー発話が LRAM 向けキーワード（BRAVO / 記事 / WordPress 等）にマッチすると:
-   - `veriora.agent_handoff_logs` に記録（既存）
-   - `POST {NEAR_LRAM_BASE_URL}/internal/handoff/near` を best-effort 実行
-
-LRAM は監査ログ（`insertLog`）のみ。LINE 返信は引き続き NEAR が担当。
-
-## Phase 8 — 統一 LINE 履歴（管理 API）
+## 統一 LINE 履歴（管理 API）
 
 | サービス | エンドポイント | 認証 |
 |----------|----------------|------|

@@ -167,7 +167,7 @@ export function OlympicMemberRings({ agents }: OlympicMemberRingsProps) {
             type="button"
             className="member-orbit-core-btn member-orbit-core absolute top-1/2 left-1/2 z-[5] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             onClick={() => scrollToAgentSection(coreAgent)}
-            aria-label="CORE — 中枢の詳細へ"
+            aria-label="CORE — CEOの詳細へ"
           >
             <div
               ref={coreAvatarRef}

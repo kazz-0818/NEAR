@@ -680,16 +680,6 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((s) => s === "true" || s === "1"),
-  /** LRAM サービス URL（末尾スラッシュなし）。設定時のみ NEAR→LRAM 取次ぎ HTTP */
-  NEAR_LRAM_BASE_URL: z
-    .string()
-    .optional()
-    .transform((s) => (s?.trim() ? s.trim().replace(/\/$/, "") : undefined)),
-  /** NEAR↔LRAM 内部取次ぎ Bearer（12文字以上） */
-  VELIORA_HANDOFF_SECRET: z
-    .string()
-    .optional()
-    .transform((s) => (s?.trim() ? s.trim() : undefined)),
 });
 
 export type Env = z.infer<typeof envSchema>;

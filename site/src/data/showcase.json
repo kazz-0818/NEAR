@@ -2,21 +2,21 @@
   "meta": {
     "title": "Veliora",
     "tagline": "組織 OS — AI が部署として動く",
-    "subtitle": "中枢 CORE が方針と記憶を統括。秘書・マーケ・経理・AI人事・編集の五部署が連携し、共通顧客マスターで記憶を横断共有。"
+    "subtitle": "CEO の CORE が方針と記憶を統括。秘書・マーケ・経理・AI人事・編集の五部署が連携し、共通顧客マスターで記憶を横断共有。"
   },
   "agents": [
     {
       "id": "core",
       "code": "CORE",
       "kana": "コア",
-      "department": "中枢",
-      "displayName": "CORE-コア-『中枢』",
+      "department": "CEO",
+      "displayName": "CORE-コア-『CEO』",
       "role": "Veliora CEO AI — 意思決定・記憶・組織統括",
-      "description": "Veliora 全体の中枢知能。長期記憶と方針を保持し、五部署への委譲と横断的な判断を担う。チャット・会議モード・将来の Agent Registry 接続の起点。",
+      "description": "Veliora 全体の CEO。長期記憶と方針を保持し、五部署への委譲と横断的な判断を担う。チャット・会議モード・将来の Agent Registry 接続の起点。",
       "greeting": "CORE です。方針と記憶はここに集約します。実務は各部署へ、判断は私が支えます。",
       "accent": "#e2e8f0",
       "handoffRules": [
-        "秘書・取次ぎ・タスク整理は NEAR に委譲",
+        "秘書・タスク整理は NEAR に委譲",
         "マーケ・SNS・広告分析は SERA に委譲",
         "経理・数値・スプレッドシートは IRIE に委譲",
         "会話品質・組織整合性の監査は RITS に委譲",
@@ -46,16 +46,11 @@
       "kana": "ニア",
       "department": "秘書部",
       "displayName": "NEAR-ニア-『秘書部』",
-      "role": "総合窓口・秘書・タスク整理",
-      "description": "Veliora の一次窓口。依頼の受付・タスク整理・各専門部署への取次ぎと、強い LLM 経路での応答合成を担う。",
-      "greeting": "お疲れ様です。秘書部 NEAR です。タスク整理と取次ぎ、なんでもやりますよ。",
+      "role": "秘書・タスク整理",
+      "description": "秘書部の LINE ボット。タスク整理・リマインダー・メモ・スプレッドシート／カレンダー連携など秘書オペレーションを担う。",
+      "greeting": "お疲れ様です。秘書部 NEAR です。タスク整理やリマインド、なんでもやりますよ。",
       "accent": "#f472b6",
-      "handoffRules": [
-        "マーケ・SNS・広告・Instagram 分析は SERA に渡す",
-        "売上・経費・入金・スプレッドシート上の経理は IRIE に渡す",
-        "会話品質・組織整合性の監査・改善指示は RITS に渡す",
-        "BRAVO 記事・WordPress 下書き・編集は LRAM に渡す"
-      ],
+      "handoffRules": [],
       "capabilities": [
         { "id": "tasks", "label": "タスクの記録", "status": "live", "since": "2025-01" },
         { "id": "memo", "label": "メモの保存", "status": "live", "since": "2025-01" },
@@ -64,10 +59,8 @@
         { "id": "chat", "label": "幅広いチャット相談", "status": "live", "since": "2025-02" },
         { "id": "sheets", "label": "Googleスプレッドシートの参照と分析", "status": "live", "since": "2025-03" },
         { "id": "calendar", "label": "Googleカレンダーの予定一覧・追加", "status": "live", "since": "2025-04" },
-        { "id": "routing", "label": "各専門部署への取次ぎ", "status": "live", "since": "2025-06" },
         { "id": "line-name", "label": "LINE グループ・ルームでの名前呼びかけ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "growth", "label": "未対応要望の記録と進化フロー", "status": "evolved", "since": "2025-09", "highlight": true },
-        { "id": "lram-handoff", "label": "LRAM への記事取次ぎ", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "customer-master", "label": "共通顧客マスターと管理", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "admin-line", "label": "統一 LINE 履歴の管理", "status": "evolved", "since": "2026-05" }
       ],
@@ -75,9 +68,7 @@
         { "date": "2026-05", "title": "ベガパンク Phase 3 運用", "summary": "顧客一覧・merge 承認・memory 編集の管理 UI。RITS 監査サマリ表示。E2E 手順ドキュメント" },
         { "date": "2026-05", "title": "共通顧客マスター", "summary": "veliora.customers — チャネル横断の identity・memory。SERA 由来メモを NEAR context に注入" },
         { "date": "2026-05", "title": "トークルーム表示名", "summary": "room member Profile API — グループと同様に名前呼びかけ可能" },
-        { "date": "2026-05", "title": "LRAM 内部ハンドオフ", "summary": "BRAVO / WordPress 系キーワードで LRAM へ best-effort 取次ぎ" },
-        { "date": "2025-09", "title": "進化カプセル", "summary": "ユーザー要望から capability_registry へ能力を追加する成長フロー" },
-        { "date": "2025-06", "title": "組織ルーティング", "summary": "部署間 handoff と registry 接続" }
+        { "date": "2025-09", "title": "進化カプセル", "summary": "ユーザー要望から capability_registry へ能力を追加する成長フロー" }
       ]
     },
     {
@@ -187,7 +178,7 @@
       "handoffRules": [
         "数値・売上ファクトの確認は IRIE",
         "集客・SNS連携の戦略決めは SERA と調整",
-        "ユーザー向けの取次ぎ・スケジュールは NEAR",
+        "スケジュール・秘書タスクは NEAR",
         "組織整合性の指摘は RITS"
       ],
       "capabilities": [
@@ -197,28 +188,22 @@
         { "id": "wp-draft", "label": "WordPress 下書き保存", "status": "live", "since": "2026-04" },
         { "id": "image-prompt", "label": "アイキャッチ画像生成", "status": "live", "since": "2026-05" },
         { "id": "line-name", "label": "LINE 表示名での呼びかけ", "status": "evolved", "since": "2026-05", "highlight": true },
-        { "id": "near-handoff", "label": "NEAR からの記事取次ぎ受信", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "customer-article", "label": "顧客嗜好の記事反映", "status": "evolved", "since": "2026-05", "highlight": true },
         { "id": "publish", "label": "WordPress 本番公開・予約投稿", "status": "planned" }
       ],
       "evolutionLog": [
         { "date": "2026-05", "title": "顧客嗜好 → 記事", "summary": "buildCustomerContextForAgent を workflowDraft 経由で BRAVO 視点に反映" },
         { "date": "2026-05", "title": "room Profile API", "summary": "トークルーム member 表示名でプレフィックス返信" },
-        { "date": "2026-05", "title": "NEAR 取次ぎ接続", "summary": "POST /internal/handoff/near — 監査ログ記録" },
         { "date": "2026-04", "title": "編集部サービス立ち上げ", "summary": "BRAVO 編集・WP 下書き支援の本実装開始" }
       ]
     }
   ],
   "handoffEdges": [
-    { "from": "core", "to": "near", "label": "秘書・取次ぎ" },
+    { "from": "core", "to": "near", "label": "秘書" },
     { "from": "core", "to": "sera", "label": "マーケ" },
     { "from": "core", "to": "irie", "label": "経理" },
     { "from": "core", "to": "rits", "label": "監査" },
     { "from": "core", "to": "lram", "label": "編集" },
-    { "from": "near", "to": "sera", "label": "マーケ・SNS" },
-    { "from": "near", "to": "irie", "label": "経理・スプシ" },
-    { "from": "near", "to": "rits", "label": "監査・品質" },
-    { "from": "near", "to": "lram", "label": "BRAVO・記事" },
     { "from": "sera", "to": "irie", "label": "数値確認" },
     { "from": "sera", "to": "lram", "label": "記事化" },
     { "from": "irie", "to": "lram", "label": "ファクト確認" },

@@ -82,16 +82,6 @@ export const NEAR_ENV_ALIASES: readonly EnvAliasRule[] = [
     deprecatedLegacy: true,
   },
   {
-    canonical: "NEAR_LRAM_BASE_URL",
-    legacy: ["LRAM_BASE_URL", "LRAM_PUBLIC_BASE_URL"],
-    deprecatedLegacy: true,
-  },
-  {
-    canonical: "VELIORA_HANDOFF_SECRET",
-    legacy: ["VERIORA_HANDOFF_SECRET", "NEAR_HANDOFF_SECRET", "LRAM_HANDOFF_SECRET"],
-    deprecatedLegacy: true,
-  },
-  {
     canonical: "VELIORA_RITS_BASE_URL",
     legacy: ["VERIORA_RITS_BASE_URL", "RITS_BASE_URL", "RITS_URL", "NEAR_RITS_BASE_URL"],
     deprecatedLegacy: true,

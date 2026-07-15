@@ -7,7 +7,6 @@ import { classifyIntent } from "./intent_classifier.js";
 import { sheetsReadIntegrationEnabled } from "../lib/userGoogleSheetsClient.js";
 import { replyOrPush } from "../channels/line/client.js";
 import { getLogger } from "../lib/logger.js";
-import { recordVelioraHandoffHint } from "../lib/velioraHandoff.js";
 import type { GrowthGateResult } from "./growth_suggestion_gate.js";
 import { runGrowthPipelineAfterUnsupported } from "./growth_pipeline.js";
 import {
@@ -645,12 +644,6 @@ export async function handleLineTextMessage(input: {
       };
     }
   }
-
-  void recordVelioraHandoffHint(db, {
-    userText: text,
-    intent: parsed.intent,
-    channelUserId,
-  }).catch(() => undefined);
 
   // ----------------------------------------------------------------
   // Growth 明示要望: LLM が reminder_request に誤分類したケースのみ上書きする

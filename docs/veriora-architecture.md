@@ -21,13 +21,13 @@
 
 - **監査（整合性・会話品質・改善指示）**: **RITS（AI人事部）** が実施。台帳は Supabase（`agent_audits` / `daily_reports`）。横断レポートは RITS リポジトリ `docs/veriora-consistency-audit.md`。
 - **正典ドキュメント・core migration の置き場**: 実務上は **NEAR** の `docs/` および `053_veriora_core_schema.sql` を参照基準とし、他リポへコピー同期する。これは「NEAR が監査主体」という意味ではない。
-- **NEAR（秘書部）**: 総合窓口に加え **LLM・handoff の裏方**（オーケストレーション）。監査レポートの出し元ではない。
+- **NEAR（秘書部）**: 秘書 LINE ボット（タスク・リマインド等）。組織横断取次ぎは **CORE** が担う予定。監査レポートの出し元ではない。
 
 ## 現在の部署一覧（AI エージェント）
 
 | id（registry） | code | 部署 | 主担当 |
 |----------------|------|------|--------|
-| `near` | NEAR | 秘書部 | 総合窓口・秘書・タスク整理・指示受付（**LLM / handoff の裏方**） |
+| `near` | NEAR | 秘書部 | 秘書・タスク整理・リマインド（LINE ボット） |
 | `sera` | SERA | マーケ部 | SNS・広告・集客・マーケ支援 |
 | `irie` | IRIE | 経理部 | 売上・経費・請求・入金・利益管理 |
 | `rits` | RITS | AI人事部 | **組織監査**・会話品質・役割遵守・改善指示 |
@@ -50,7 +50,7 @@
 
 ## Agent registry の使い方（現状と今後）
 
-- **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は `verioraHandoff` 等で `getVelioraAgentByKey` を実行経路で使用。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。IRIE は `app/agents/registry.py`。全面接続は Phase 5 以降で段階的に。
+- **現状（Phase 2→5）**: 各リポに registry 型定義を同梱。**NEAR** は秘書部 LINE 経路（`orchestrator.ts`）。**SERA / RITS / LRAM** は `src/agents/{key}/config.ts` で参照。IRIE は `app/agents/registry.py`。組織横断取次ぎは将来 **CORE**。
 - **Phase 3**: `getEnv()` に **互換 alias**（legacy → canonical）を追加し、`.env.example` と Zod schema を同期。**実装済み**（各リポ `envAlias.ts` / IRIE `config_env_alias.py`）。
 - **Phase 4 以降**: ルーティング・ログ・RITS 取り込みが registry の `code` / `id` と一致するよう段階接続。
 

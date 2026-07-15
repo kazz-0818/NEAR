@@ -7,7 +7,7 @@
 - **組織・ブランド名（正典）**: **Veliora**
 - **Postgres（migration 073 以降）**: 正典スキーマ `veliora`、旧 LINE イベントは `veliora_line_legacy`（`VELIORA_LEGACY_LINE_LOG`）
 - **env**: 推奨 `VELIORA_*`。`VERIORA_*` は互換 alias（`src/config/envAlias.ts`）
-- **コード**: `velioraHandoff.ts` が正。`verioraHandoff.ts` は re-export シム
+- **コード**: `velioraHandoff.ts` は削除済み（組織横断取次ぎは将来 CORE が担当予定）
 - **旧誤表記**: **Veriora** → **Veliora**。migration ファイル名の `053_veriora_*` は適用履歴のためリネームしない
 
 ## このリポジトリの役割
@@ -35,7 +35,7 @@
 - Canonical DB: `src/services/supabase/`（LINE ログ・[`supabase-simplification.md`](docs/supabase-simplification.md)）
 - ユーザー長期記憶: `src/services/user_memory_*.ts`（[`near-user-memory.md`](docs/near-user-memory.md)、既定 ON）
 
-**現状**: **NEAR** は handoff（`velioraHandoff.ts`）等で `getVelioraAgentByKey` を実行経路で使用。他 TS リポは `src/agents/{key}/config.ts` で参照。IRIE は Python registry。全面接続は Phase 5 以降で段階的に（[`docs/veriora-architecture.md`](docs/veriora-architecture.md)）。
+**現状**: **NEAR** は秘書部 LINE ボット（`orchestrator.ts` / agent registry）。組織横断の取次ぎ窓口は **CORE** が担う予定（未実装）。他 TS リポは `src/agents/{key}/config.ts` で registry 参照。IRIE は Python registry。
 
 ## 禁止事項（エージェント・人間共通）
 

@@ -1,4 +1,6 @@
 export * from "./types.js";
+export * from "./customerRepository.js";
+export * from "./memoryRepository.js";
 export * from "./identityRepository.js";
 export * from "./contextBuilder.js";
 export * from "./memoryExtractor.js";

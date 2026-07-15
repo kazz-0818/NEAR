@@ -29,7 +29,7 @@ npm run dev
 直結ホストは `db.<Project ID>.supabase.co` で固定です。DB パスワードが分かればターミナルで組み立てられます（**パスワードはチャットに貼らず、自分のターミナルだけで実行**）。
 
 ```bash
-cd /Users/akaikazufumi/Downloads/NEAR
+cd /Users/akaikazufumi/Downloads/System/NEAR
 PGPASSWORD='（Supabase の Database パスワード）' npm run db:url
 # 表示された DATABASE_URL=... を .env にコピー
 PGPASSWORD='（同じ）' npm run db:test   # 接続確認

@@ -34,4 +34,4 @@ services:
       - key: CRON_SECRET
         sync: false
       - key: VELIORA_WAKE_URLS
-        value: https://sera-zsuf.onrender.com/health,https://lira-ofkv.onrender.com/health,https://rits-gj2m.onrender.com/health,https://lram.onrender.com/health
+        value: https://sera-zsuf.onrender.com/health,https://lira-ofkv.onrender.com/health,https://rits-gj2m.onrender.com/health,https://lram.onrender.com/health,https://core-cr6z.onrender.com/api/health

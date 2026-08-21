@@ -68,8 +68,10 @@ export function usageFromResponse(
   };
 }
 
+let usageSendChain: Promise<void> = Promise.resolve();
+
 /**
- * LLM usage を捨てずに保持。RITS API 準備後はここから POST するだけ。
+ * LLM usage を捨てずに保持。RITS へ直列 POST（429 バースト回避）。
  */
 export function recordLlmUsage(payload: LlmUsagePayload): void {
   getLogger().debug(
@@ -83,28 +85,29 @@ export function recordLlmUsage(payload: LlmUsagePayload): void {
     },
     "llm_usage_recorded"
   );
-  void sendLlmUsageToRits(payload).catch(() => undefined);
+  usageSendChain = usageSendChain
+    .then(() => sendLlmUsageToRits(payload))
+    .catch(() => undefined);
 }
 
-/** VELIORA_RITS_BASE_URL + VELIORA_RITS_ADMIN_API_KEY があるときのみ送信（未設定は no-op） */
+/** VELIORA_RITS_* / VERIORA_RITS_* があるときのみ送信（未設定は no-op） */
 export async function sendLlmUsageToRits(payload: LlmUsagePayload): Promise<void> {
-  const base = process.env.VELIORA_RITS_BASE_URL?.trim().replace(/\/$/, "");
-  const key = process.env.VELIORA_RITS_ADMIN_API_KEY?.trim();
+  const base = (
+    process.env.VELIORA_RITS_BASE_URL ?? process.env.VERIORA_RITS_BASE_URL
+  )
+    ?.trim()
+    .replace(/\/$/, "");
+  const key = (
+    process.env.VELIORA_RITS_ADMIN_API_KEY ?? process.env.VERIORA_RITS_ADMIN_API_KEY
+  )?.trim();
   if (!base || !key || key.length < 12) return;
 
-  const url = `${base}/admin/usage`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-admin-api-key": key,
-    },
-    body: JSON.stringify(payload),
-  });
+  const { postAdminUsageWithRetry } = await import("./ritsIngestFetch.js");
+  const res = await postAdminUsageWithRetry(base, key, payload);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     getLogger().warn(
-      { status: res.status, body: body.slice(0, 200), url },
+      { status: res.status, body: body.slice(0, 200) },
       "sendLlmUsageToRits failed (non-fatal)"
     );
   }
